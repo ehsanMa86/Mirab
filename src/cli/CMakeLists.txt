@@ -1,8 +1,8 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    src/cli/CMakeLists.txt
-# Purpose: Build definition of anahita-cli, the command-line tool and solver process.
+# Purpose: Build definition of mirab-cli, the command-line tool and solver process.
 #
 # Copyright (C) 2026 Ehsan Madadi
 #
@@ -20,19 +20,19 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_executable(anahita-cli main.cpp)
-target_link_libraries(anahita-cli PRIVATE
-    Anahita::engine Anahita::resilience Anahita::interop Anahita::warnings)
+add_executable(mirab-cli main.cpp)
+target_link_libraries(mirab-cli PRIVATE
+    Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 if(WIN32)
-    target_link_libraries(anahita-cli PRIVATE shell32)
+    target_link_libraries(mirab-cli PRIVATE shell32)
 endif()
 if(MINGW)
     # Keep the solver process free of MinGW runtime DLLs.
-    target_link_options(anahita-cli PRIVATE -static -static-libgcc -static-libstdc++)
+    target_link_options(mirab-cli PRIVATE -static -static-libgcc -static-libstdc++)
 endif()
 if(APPLE)
-    set_target_properties(anahita-cli PROPERTIES INSTALL_RPATH "@executable_path/../Frameworks")
+    set_target_properties(mirab-cli PROPERTIES INSTALL_RPATH "@executable_path/../Frameworks")
 elseif(UNIX)
-    set_target_properties(anahita-cli PROPERTIES INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/anahita")
+    set_target_properties(mirab-cli PROPERTIES INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/mirab")
 endif()
-install(TARGETS anahita-cli RUNTIME DESTINATION "${ANAHITA_INSTALL_BINDIR}")
+install(TARGETS mirab-cli RUNTIME DESTINATION "${MIRAB_INSTALL_BINDIR}")

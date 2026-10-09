@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    tools/env-mingw.sh
 # Purpose: Puts the private Windows toolchain (CMake, Ninja, Qt 6, MinGW) on PATH for a Git Bash session.
@@ -21,7 +21,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Usage:  source tools/env-mingw.sh
-ANAHITA_DEV="${ANAHITA_DEV:-$LOCALAPPDATA/anahita-dev}"
-ANAHITA_DEV="$(cygpath -u "$ANAHITA_DEV" 2>/dev/null || echo "$ANAHITA_DEV")"
-export PATH="$ANAHITA_DEV/nsis-3.11:$ANAHITA_DEV/Qt/Tools/mingw1310_64/bin:$ANAHITA_DEV/Qt/6.8.3/mingw_64/bin:$ANAHITA_DEV/venv/Scripts:$PATH"
-export CMAKE_PREFIX_PATH="$ANAHITA_DEV/Qt/6.8.3/mingw_64"
+MIRAB_DEV="${MIRAB_DEV:-$LOCALAPPDATA/mirab-dev}"
+MIRAB_DEV="$(cygpath -u "$MIRAB_DEV" 2>/dev/null || echo "$MIRAB_DEV")"
+export PATH="$MIRAB_DEV/nsis-3.11:$MIRAB_DEV/Qt/Tools/mingw1310_64/bin:$MIRAB_DEV/Qt/6.8.3/mingw_64/bin:$MIRAB_DEV/venv/Scripts:$PATH"
+export CMAKE_PREFIX_PATH="$MIRAB_DEV/Qt/6.8.3/mingw_64"

@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/SwmmEngine.cpp
  * Purpose: Adapter that runs EPA SWMM 5.2 step by step and reads its binary output.
@@ -24,13 +24,13 @@
  */
 #include "Adapters.h"
 
-#include "anahita/core/Model.h"
+#include "mirab/core/Model.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 
-namespace anahita::engine::detail
+namespace mirab::engine::detail
 {
 
 namespace
@@ -199,4 +199,4 @@ std::unique_ptr<Engine> makeSwmmEngine(EngineDescriptor d, std::filesystem::path
     return std::make_unique<SwmmEngine>(std::move(d), std::move(library));
 }
 
-} // namespace anahita::engine::detail
+} // namespace mirab::engine::detail

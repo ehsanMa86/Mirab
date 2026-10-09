@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    .github/workflows/release.yml
 # Purpose: Release pipeline: builds installers for Windows, macOS and Linux and attaches them to a GitHub release.
@@ -65,8 +65,8 @@ jobs:
         with:
           name: windows
           path: |
-            build/release/Anahita-*.exe
-            build/release/Anahita-*.zip
+            build/release/Mirab-*.exe
+            build/release/Mirab-*.zip
 
   macos:
     runs-on: macos-14
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos
-          path: build/release/Anahita-*.dmg
+          path: build/release/Mirab-*.dmg
 
   linux:
     runs-on: ubuntu-22.04
@@ -117,16 +117,16 @@ jobs:
           VERSION=$(grep -m1 -oP '^\s+VERSION \K[0-9.]+' CMakeLists.txt)
           export LINUXDEPLOY_OUTPUT_VERSION="$VERSION"
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
-            --desktop-file AppDir/usr/share/applications/io.github.ehsanma86.Anahita.desktop \
-            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/anahita.png \
-            --executable AppDir/usr/bin/anahita
-          mv Anahita-*.AppImage "build/release/Anahita-${VERSION}-linux-x86_64.AppImage"
+            --desktop-file AppDir/usr/share/applications/io.github.ehsanma86.Mirab.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/mirab.png \
+            --executable AppDir/usr/bin/mirab
+          mv Mirab-*.AppImage "build/release/Mirab-${VERSION}-linux-x86_64.AppImage"
       - uses: actions/upload-artifact@v4
         with:
           name: linux
           path: |
-            build/release/Anahita-*.AppImage
-            build/release/Anahita-*.tar.gz
+            build/release/Mirab-*.AppImage
+            build/release/Mirab-*.tar.gz
 
   publish:
     needs: [windows, macos, linux]

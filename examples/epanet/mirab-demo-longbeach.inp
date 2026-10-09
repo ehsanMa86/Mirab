@@ -1,0 +1,163 @@
+; Mirab - Unified Water Infrastructure Modeling Environment
+; https://github.com/ehsanMa86/Mirab
+;
+; File:    examples/epanet/mirab-demo-longbeach.inp
+; Purpose: The demonstration network in downtown Long Beach, California, in US units and State Plane coordinates (EPSG:2229).
+;
+; Copyright (C) 2026 Ehsan Madadi
+;
+; This program is free software: you can redistribute it and/or modify it
+; under the terms of the GNU General Public License as published by the Free
+; Software Foundation, either version 3 of the License, or (at your option)
+; any later version.
+;
+; This program is distributed in the hope that it will be useful, but WITHOUT
+; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+; FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+; more details.
+;
+; You should have received a copy of the GNU General Public License along
+; with this program. If not, see <https://www.gnu.org/licenses/>.
+;
+; SPDX-License-Identifier: GPL-3.0-or-later
+[TITLE]
+Mirab demonstration network, downtown Long Beach, California
+NAD83 / California zone 5 (US survey feet, EPSG:2229); US customary units
+
+[JUNCTIONS]
+;ID              Elev            Demand          Pattern
+ J1              66              0               PAT1
+ J2              59              80              PAT1
+ J3              52              80              PAT1
+ J4              59              80              PAT1
+ J5              49              125             PAT1
+ J6              46              95              PAT1
+ J7              52              65              PAT1
+ J8              43              110             PAT1
+ J9              39              80              PAT1
+
+[RESERVOIRS]
+;ID              Head            Pattern
+ R1              98
+
+[TANKS]
+;ID              Elevation       InitLevel       MinLevel        MaxLevel        Diameter        MinVol          VolCurve        Overflow
+ T1              197             13              3               26              49              0
+
+[PIPES]
+;ID              Node1           Node2           Length          Diameter        Roughness       MinorLoss       Status
+ P1              J1              J2              984             8               120             0               Open
+ P2              J2              J3              984             6               120             0               Open
+ P3              J1              J4              984             8               120             0               Open
+ P4              J2              J5              984             6               120             0               Open
+ P5              J3              J6              984             4               120             0               Open
+ P6              J4              J5              984             6               120             0               Open
+ P7              J5              J6              984             6               120             0               Open
+ P8              J4              J7              984             6               120             0               Open
+ P9              J5              J8              984             4               120             0               Open
+ P10             J6              J9              984             4               120             0               Open
+ P11             J7              J8              984             4               120             0               Open
+ P12             J8              J9              984             4               120             0               Open
+ P13             J7              T1              984             8               120             0               Open
+
+[PUMPS]
+;ID              Node1           Node2           Parameters
+ PU1             R1              J1              HEAD C1
+
+[VALVES]
+;ID              Node1           Node2           Diameter        Type            Setting         MinorLoss
+
+[DEMANDS]
+
+[EMITTERS]
+
+[STATUS]
+
+[PATTERNS]
+;ID              Multipliers
+ PAT1            0.6             0.5             0.45            0.45            0.5             0.7
+ PAT1            1.0             1.3             1.4             1.3             1.2             1.15
+ PAT1            1.1             1.05            1.0             1.0             1.1             1.3
+ PAT1            1.4             1.3             1.1             0.9             0.8             0.7
+
+[CURVES]
+;ID              X-Value         Y-Value
+;PUMP: single-point design curve (gpm, ft)
+ C1              950             130
+
+[CONTROLS]
+
+[RULES]
+
+[ENERGY]
+ Global Efficiency 75
+ Global Price      0.18
+ Demand Charge     0
+
+[QUALITY]
+;Node            InitQual
+ R1              1.0
+
+[SOURCES]
+
+[REACTIONS]
+ Order Bulk      1
+ Order Tank      1
+ Order Wall      1
+ Global Bulk     -0.5
+ Global Wall     0
+
+[MIXING]
+
+[TIMES]
+ Duration           24:00
+ Hydraulic Timestep 1:00
+ Quality Timestep   0:05
+ Pattern Timestep   1:00
+ Pattern Start      0:00
+ Report Timestep    1:00
+ Report Start       0:00
+ Start ClockTime    12 am
+ Statistic          NONE
+
+[REPORT]
+ Status          No
+ Summary         No
+
+[OPTIONS]
+ Units              GPM
+ Headloss           H-W
+ Specific Gravity   1.0
+ Viscosity          1.0
+ Trials             200
+ Accuracy           0.001
+ Unbalanced         Continue 10
+ Pattern            1
+ Demand Multiplier  1.0
+ Emitter Exponent   0.5
+ Quality            CHLORINE mg/L
+ Diffusivity        1.0
+ Tolerance          0.01
+
+[COORDINATES]
+;Node            X-Coord         Y-Coord
+ J1              6503245.1       1742993.2
+ J2              6504229.3       1742993.2
+ J3              6505213.6       1742993.2
+ J4              6503245.1       1742008.9
+ J5              6504229.3       1742008.9
+ J6              6505213.6       1742008.9
+ J7              6503245.1       1741024.7
+ J8              6504229.3       1741024.7
+ J9              6505213.6       1741024.7
+ R1              6502260.8       1742993.2
+ T1              6503245.1       1740040.4
+
+[VERTICES]
+
+[LABELS]
+
+[BACKDROP]
+ UNITS           Feet
+
+[END]

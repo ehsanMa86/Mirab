@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    src/core/CMakeLists.txt
 # Purpose: Build definition of the UI-free core library.
@@ -20,7 +20,7 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_library(anahita_core STATIC
+add_library(mirab_core STATIC
     src/Crs.cpp
     src/Features.cpp
     src/Hash.cpp
@@ -32,11 +32,11 @@ add_library(anahita_core STATIC
     src/Schema.cpp
     src/Text.cpp
     src/Units.cpp)
-add_library(Anahita::core ALIAS anahita_core)
-target_include_directories(anahita_core PUBLIC
+add_library(Mirab::core ALIAS mirab_core)
+target_include_directories(mirab_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
     "${PROJECT_BINARY_DIR}/generated")
-target_link_libraries(anahita_core PRIVATE Anahita::warnings)
+target_link_libraries(mirab_core PRIVATE Mirab::warnings)
 if(MINGW)
-    target_link_libraries(anahita_core PUBLIC stdc++fs)
+    target_link_libraries(mirab_core PUBLIC stdc++fs)
 endif()

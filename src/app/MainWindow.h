@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/MainWindow.h
  * Purpose: Main application window: menus, tool bars, map, panels and simulation control.
@@ -25,8 +25,8 @@
 #pragma once
 
 #include "ProjectDocument.h"
-#include "anahita/app/PluginInterface.h"
-#include "anahita/engine/EngineRegistry.h"
+#include "mirab/app/PluginInterface.h"
+#include "mirab/engine/EngineRegistry.h"
 
 #include <QMainWindow>
 #include <QPointer>
@@ -44,7 +44,7 @@ class QTabWidget;
 class QToolBar;
 class QToolButton;
 
-namespace anahita::app
+namespace mirab::app
 {
 
 class InpEditor;
@@ -183,7 +183,7 @@ private:
     QAction* redoAct_ = nullptr;
     QAction* deleteAct_ = nullptr;
     QList<QAction*> addActions_;
-    QList<AnahitaPlugin*> plugins_;
+    QList<MirabPlugin*> plugins_;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

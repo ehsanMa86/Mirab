@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/interop/src/Gis.cpp
  * Purpose: Builds GIS layers from a model and writes them as GeoJSON or GeoPackage.
@@ -22,9 +22,9 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/interop/Interop.h"
+#include "mirab/interop/Interop.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <cctype>
 #include <cstdint>
@@ -34,11 +34,11 @@
 #include <set>
 #include <stdexcept>
 
-#if defined(ANAHITA_HAVE_SQLITE)
+#if defined(MIRAB_HAVE_SQLITE)
 #include <sqlite3.h>
 #endif
 
-namespace anahita::interop
+namespace mirab::interop
 {
 
 using core::Category;
@@ -210,7 +210,7 @@ json::Value toGeoJson(const core::Model& model, const GisOptions& options)
 {
     json::Value fc = json::Value::object();
     fc.set("type", "FeatureCollection");
-    fc.set("name", model.title().empty() ? "anahita" : model.title());
+    fc.set("name", model.title().empty() ? "mirab" : model.title());
     if (!options.crs.empty())
     {
         // Legacy named CRS member, understood by QGIS and GDAL for projected data.
@@ -291,7 +291,7 @@ void writeGeoJson(const core::Model& model, const std::filesystem::path& path, c
     out << toGeoJson(model, options).dump(1) << "\n";
 }
 
-#if defined(ANAHITA_HAVE_SQLITE)
+#if defined(MIRAB_HAVE_SQLITE)
 namespace
 {
 class Db
@@ -419,7 +419,7 @@ void writeGeoPackage(const core::Model& model, const std::filesystem::path& path
             if (srs != 4326)
                 db.exec("INSERT INTO gpkg_spatial_ref_sys VALUES (" + quoteSql(options.crs) + ", " +
                         std::to_string(srs) + ", 'EPSG', " + std::to_string(srs) +
-                        ", 'undefined', 'coordinate system declared by the Anahita project')");
+                        ", 'undefined', 'coordinate system declared by the Mirab project')");
         }
     }
     db.exec("CREATE TABLE gpkg_contents (table_name TEXT NOT NULL PRIMARY KEY, data_type TEXT NOT NULL, "
@@ -450,7 +450,7 @@ void writeGeoPackage(const core::Model& model, const std::filesystem::path& path
         db.exec("INSERT INTO gpkg_contents (table_name, data_type, identifier, description, min_x, min_y, max_x, "
                 "max_y, srs_id) VALUES (" +
                 quoteSql(layer.name) + ", 'features', " + quoteSql(layer.name) + ", " +
-                quoteSql("Anahita " + layer.name) + ", " + text::formatDouble(b.minX, 15) + ", " +
+                quoteSql("Mirab " + layer.name) + ", " + text::formatDouble(b.minX, 15) + ", " +
                 text::formatDouble(b.minY, 15) + ", " + text::formatDouble(b.maxX, 15) + ", " +
                 text::formatDouble(b.maxY, 15) + ", " + std::to_string(srs) + ")");
         db.exec("INSERT INTO gpkg_geometry_columns VALUES (" + quoteSql(layer.name) + ", 'geom', " +
@@ -493,8 +493,8 @@ bool geoPackageAvailable()
 
 void writeGeoPackage(const core::Model&, const std::filesystem::path&, const GisOptions&)
 {
-    throw std::runtime_error("this build of Anahita was made without GeoPackage support");
+    throw std::runtime_error("this build of Mirab was made without GeoPackage support");
 }
 #endif
 
-} // namespace anahita::interop
+} // namespace mirab::interop

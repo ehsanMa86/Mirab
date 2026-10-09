@@ -1,11 +1,11 @@
 # Third-party notices
 
-Anahita is Copyright (C) 2026 Ehsan Madadi and licensed under GPL-3.0-or-later. It builds on the projects below. Their source code is downloaded unmodified at the pinned commits listed here and compiled into separate engine libraries. Each project keeps its own copyright and license, reproduced or referenced below.
+Mirab is Copyright (C) 2026 Ehsan Madadi and licensed under GPL-3.0-or-later. It builds on the projects below. Their source code is downloaded unmodified at the pinned commits listed here and compiled into separate engine libraries. Each project keeps its own copyright and license, reproduced or referenced below.
 
 ## EPANET 2.2 (U.S. EPA)
 
 - Source: https://github.com/USEPA/epanet-engine, commit `6aff01d7d9be7c9eee64246c6588b486776b3a75`
-- Library: `anahita_epanet22_epa`
+- Library: `mirab_epanet22_epa`
 - License: material original to EPANET 2.0.12 and new material prepared by the United States Government is in the public domain (17 USC 105). Material from Open Water Analytics is under the MIT License:
 
 ```
@@ -35,25 +35,25 @@ SOFTWARE.
 ## EPANET 2.3 (Open Water Analytics)
 
 - Source: https://github.com/OpenWaterAnalytics/EPANET, tag v2.3.5, commit `444725fbf16ab28b0470ef0ed281dc4849d49583`
-- Library: `anahita_epanet23_owa`
+- Library: `mirab_epanet23_owa`
 - License: MIT License, Copyright (c) 2019 (see the AUTHORS file of the project). The full text is the MIT License reproduced above, with "list of authors" added to the notice that must be retained.
 
 ## EPANET-MSX 2.0 (U.S. EPA)
 
 - Source: https://github.com/USEPA/EPANETMSX, tag EPANET-MSX-2.0, commit `84c057e0a62b7fb3a89ef555a86fa0e3e0ed87ad`
-- Libraries: `anahita_msx20_22_epa` and `anahita_msx20_23_owa` (the same sources linked against each EPANET engine)
+- Libraries: `mirab_msx20_22_epa` and `mirab_msx20_23_owa` (the same sources linked against each EPANET engine)
 - License: MIT License (see the project repository).
 
 ## SWMM 5.2 (U.S. EPA)
 
 - Source: https://github.com/USEPA/Stormwater-Management-Model, tag v5.2.4, commit `7952ca837988b1c32f791812eccc9fd64547e093`
-- Library: `anahita_swmm52_epa`
+- Library: `mirab_swmm52_epa`
 - License: public domain.
 
 ## SWMM5+ 1.0 (CIMM, University of Texas at Austin), optional
 
 - Source: https://github.com/CIMM-ORG/SWMM5plus
-- Distributed separately through the swmm5plus-capi project; not included in Anahita packages unless installed by the user.
+- Distributed separately through the swmm5plus-capi project; not included in Mirab packages unless installed by the user.
 - License: The Unlicense (public domain dedication). SWMM5+ was developed under Cooperative Agreement No. 83595001 awarded by the U.S. EPA to the University of Texas at Austin.
 
 ## SQLite
@@ -69,7 +69,7 @@ SOFTWARE.
 
 ## SWMM5+ engine package (optional, installed separately)
 
-The SWMM5+ engine is not part of the Anahita packages. When it is installed from the swmm5plus-capi releases, it brings SWMM5+ (The Unlicense), EPA SWMM 5.1.13 (public domain), json-fortran (BSD-style), HDF5 (BSD-style) and the GNU Fortran runtime (GPL-3.0 with the GCC Runtime Library Exception). The installed files include `swmm5plus-capi-THIRD_PARTY_NOTICES.md` with the details.
+The SWMM5+ engine is not part of the Mirab packages. When it is installed from the swmm5plus-capi releases, it brings SWMM5+ (The Unlicense), EPA SWMM 5.1.13 (public domain), json-fortran (BSD-style), HDF5 (BSD-style) and the GNU Fortran runtime (GPL-3.0 with the GCC Runtime Library Exception). The installed files include `swmm5plus-capi-THIRD_PARTY_NOTICES.md` with the details.
 
 ## MinGW-w64 runtime (Windows packages only)
 
@@ -81,4 +81,4 @@ The resilience tools are original implementations of published methods and conta
 
 - Todini, E. (2000). Looped water distribution networks design using a resilience index based heuristic approach. Urban Water, 2(2), 115-122.
 - Buhl, J., et al. (2004). Efficiency and robustness in ant networks of galleries. The European Physical Journal B, 42, 123-129 (meshedness coefficient).
-- The water service availability definition and the JSON network layout follow the Water Network Tool for Resilience (WNTR), https://github.com/USEPA/WNTR, Copyright 2024 National Technology & Engineering Solutions of Sandia, LLC, Revised BSD License. No WNTR code is included in Anahita.
+- The water service availability definition and the JSON network layout follow the Water Network Tool for Resilience (WNTR), https://github.com/USEPA/WNTR, Copyright 2024 National Technology & Engineering Solutions of Sandia, LLC, Revised BSD License. No WNTR code is included in Mirab.

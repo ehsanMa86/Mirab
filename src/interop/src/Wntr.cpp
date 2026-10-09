@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/interop/src/Wntr.cpp
  * Purpose: Conversion between EPANET models and the WNTR JSON network format (SI units).
@@ -22,10 +22,10 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/interop/Interop.h"
+#include "mirab/interop/Interop.h"
 
-#include "anahita/core/Text.h"
-#include "anahita/core/Units.h"
+#include "mirab/core/Text.h"
+#include "mirab/core/Units.h"
 
 #include <cmath>
 #include <fstream>
@@ -34,7 +34,7 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace anahita::interop
+namespace mirab::interop
 {
 
 using json::Value;
@@ -707,4 +707,4 @@ core::Model readWntrJson(const std::filesystem::path& path, std::vector<std::str
     return fromWntrJson(Value::parse(buf.str()), notes);
 }
 
-} // namespace anahita::interop
+} // namespace mirab::interop

@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    tests/CMakeLists.txt
 # Purpose: Build definition of the unit and integration tests.
@@ -20,28 +20,28 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_executable(anahita-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp)
-target_link_libraries(anahita-tests PRIVATE
-    Anahita::core Anahita::engine Anahita::resilience Anahita::interop Anahita::warnings)
-target_compile_definitions(anahita-tests PRIVATE
-    ANAHITA_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
-    ANAHITA_ENGINE_DIR="${ANAHITA_ENGINE_BUILD_DIR}")
+add_executable(mirab-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp)
+target_link_libraries(mirab-tests PRIVATE
+    Mirab::core Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
+target_compile_definitions(mirab-tests PRIVATE
+    MIRAB_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+    MIRAB_ENGINE_DIR="${MIRAB_ENGINE_BUILD_DIR}")
 if(MINGW)
-    target_link_options(anahita-tests PRIVATE -static -static-libgcc -static-libstdc++)
+    target_link_options(mirab-tests PRIVATE -static -static-libgcc -static-libstdc++)
 endif()
-if(TARGET anahita_engines)
-    add_dependencies(anahita-tests anahita_engines)
+if(TARGET mirab_engines)
+    add_dependencies(mirab-tests mirab_engines)
 endif()
 
 foreach(group IN ITEMS text json inp model features results settings hash crs import)
-    add_test(NAME ${group} COMMAND anahita-tests "${group}:")
+    add_test(NAME ${group} COMMAND mirab-tests "${group}:")
 endforeach()
-if(ANAHITA_BUILD_ENGINES)
+if(MIRAB_BUILD_ENGINES)
     foreach(group IN ITEMS engines resilience interop)
-        add_test(NAME ${group} COMMAND anahita-tests "${group}:")
+        add_test(NAME ${group} COMMAND mirab-tests "${group}:")
     endforeach()
 endif()
-add_test(NAME cli-version COMMAND anahita-cli version)
+add_test(NAME cli-version COMMAND mirab-cli version)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_test(NAME license-headers
@@ -50,19 +50,19 @@ endif()
 
 # Desktop smoke test: open the demo, run it through the solver process and
 # save a screenshot, all with Qt's offscreen platform (no display needed).
-if(ANAHITA_BUILD_GUI AND ANAHITA_BUILD_ENGINES)
+if(MIRAB_BUILD_GUI AND MIRAB_BUILD_ENGINES)
     add_test(NAME gui-smoke
-        COMMAND Anahita "${CMAKE_CURRENT_BINARY_DIR}/gui-smoke.inp" --run --select J5
+        COMMAND Mirab "${CMAKE_CURRENT_BINARY_DIR}/gui-smoke.inp" --run --select J5
                 --screenshot "${CMAKE_CURRENT_BINARY_DIR}/gui-smoke.png")
     set_tests_properties(gui-smoke PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
         TIMEOUT 120
         FIXTURES_REQUIRED gui-input)
     add_test(NAME gui-smoke-setup
-        COMMAND ${CMAKE_COMMAND} -E copy "${PROJECT_SOURCE_DIR}/examples/epanet/anahita-demo.inp"
+        COMMAND ${CMAKE_COMMAND} -E copy "${PROJECT_SOURCE_DIR}/examples/epanet/mirab-demo.inp"
                 "${CMAKE_CURRENT_BINARY_DIR}/gui-smoke.inp")
     set_tests_properties(gui-smoke-setup PROPERTIES FIXTURES_SETUP gui-input)
     add_test(NAME gui-smoke-results
-        COMMAND anahita-cli results "${CMAKE_CURRENT_BINARY_DIR}/gui-smoke.anr")
+        COMMAND mirab-cli results "${CMAKE_CURRENT_BINARY_DIR}/gui-smoke.anr")
     set_tests_properties(gui-smoke-results PROPERTIES DEPENDS gui-smoke)
 endif()

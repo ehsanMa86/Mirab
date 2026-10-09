@@ -1,8 +1,8 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    src/CMakeLists.txt
-# Purpose: Source tree of Anahita: libraries, command-line tool and desktop application.
+# Purpose: Source tree of Mirab: libraries, command-line tool and desktop application.
 #
 # Copyright (C) 2026 Ehsan Madadi
 #
@@ -25,7 +25,7 @@ add_subdirectory(engine)
 add_subdirectory(resilience)
 add_subdirectory(interop)
 add_subdirectory(cli)
-if(ANAHITA_BUILD_GUI)
+if(MIRAB_BUILD_GUI)
     add_subdirectory(app)
     add_subdirectory(${PROJECT_SOURCE_DIR}/plugins ${PROJECT_BINARY_DIR}/plugins)
 endif()

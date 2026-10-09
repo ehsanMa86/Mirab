@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Theme.cpp
  * Purpose: Light application theme: palette, style sheet and shared colors.
@@ -34,7 +34,7 @@
 #include <QStyleFactory>
 #include <QStyleHints>
 
-namespace anahita::app::theme
+namespace mirab::app::theme
 {
 
 namespace
@@ -232,4 +232,4 @@ void apply(QApplication& app)
     app.setStyleSheet(styleSheet());
 }
 
-} // namespace anahita::app::theme
+} // namespace mirab::app::theme

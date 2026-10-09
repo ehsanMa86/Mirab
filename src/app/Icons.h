@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Icons.h
  * Purpose: Vector line icons drawn in code, crisp at every screen scale.
@@ -27,7 +27,7 @@
 #include <QIcon>
 #include <QString>
 
-namespace anahita::app::icons
+namespace mirab::app::icons
 {
 
 /// Returns the icon with the given name, for example "open", "run",
@@ -39,4 +39,4 @@ QIcon get(const QString& name);
 /// Outfall, Storage, Divider, Conduit, Orifice, Weir, Outlet, Subcatchment, RainGage).
 QIcon element(const QString& kind);
 
-} // namespace anahita::app::icons
+} // namespace mirab::app::icons

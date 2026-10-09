@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/InpDocument.cpp
  * Purpose: Reader and writer for the section-preserving input file document.
@@ -22,16 +22,16 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/InpDocument.h"
+#include "mirab/core/InpDocument.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <fstream>
 #include <iterator>
 #include <sstream>
 #include <stdexcept>
 
-namespace anahita::core
+namespace mirab::core
 {
 
 using text::splitInpLine;
@@ -409,4 +409,4 @@ bool InpDocument::removeKeyValue(std::string_view section, std::string_view key)
     return removed;
 }
 
-} // namespace anahita::core
+} // namespace mirab::core

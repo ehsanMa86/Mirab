@@ -1,6 +1,6 @@
 # Resilience tools
 
-Anahita implements five analyses natively in C++. They are available in *Analysis > Resilience tools* and through `anahita-cli resilience`. All pressures and flows are in the units of the model.
+Mirab implements five analyses natively in C++. They are available in *Analysis > Resilience tools* and through `mirab-cli resilience`. All pressures and flows are in the units of the model.
 
 ## Todini resilience index
 
@@ -52,12 +52,12 @@ For each hydrant node a constant fire demand is added and a single-period hydrau
 ## Command line examples
 
 ```
-anahita-cli resilience topology model.inp
-anahita-cli run model.inp --out model.anr
-anahita-cli resilience todini model.inp --results model.anr --required-pressure 20
-anahita-cli resilience service --results model.anr
-anahita-cli resilience criticality model.inp --threshold 20
-anahita-cli resilience fireflow model.inp --flow 30 --residual 14 --time 8 --nodes J5,J9
+mirab-cli resilience topology model.inp
+mirab-cli run model.inp --out model.anr
+mirab-cli resilience todini model.inp --results model.anr --required-pressure 20
+mirab-cli resilience service --results model.anr
+mirab-cli resilience criticality model.inp --threshold 20
+mirab-cli resilience fireflow model.inp --flow 30 --residual 14 --time 8 --nodes J5,J9
 ```
 
 Add `--json` for machine-readable output.

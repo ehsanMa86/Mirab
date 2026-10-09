@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/ProjectDocument.h
  * Purpose: Open project state for the desktop application: model, file, settings, undo history and results.
@@ -24,9 +24,9 @@
  */
 #pragma once
 
-#include "anahita/core/Model.h"
-#include "anahita/core/ProjectSettings.h"
-#include "anahita/core/Results.h"
+#include "mirab/core/Model.h"
+#include "mirab/core/ProjectSettings.h"
+#include "mirab/core/Results.h"
 
 #include <QObject>
 #include <QString>
@@ -35,7 +35,7 @@
 #include <functional>
 #include <memory>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 struct Selection
@@ -108,4 +108,4 @@ private:
     Selection selection_;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

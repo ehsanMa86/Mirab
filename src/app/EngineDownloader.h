@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/EngineDownloader.h
  * Purpose: Downloads, verifies and installs separately distributed engines such as SWMM5+.
@@ -36,10 +36,10 @@ class QFile;
 class QNetworkReply;
 class QTemporaryDir;
 
-namespace anahita::app
+namespace mirab::app
 {
 
-/// Fetches an "anahita-engine/1" manifest and the files it lists, checks
+/// Fetches an "mirab-engine/1" manifest and the files it lists, checks
 /// their SHA-256 sums, installs them into the per-user engine folder and
 /// confirms that the engine loads (in the separate solver process).
 class EngineDownloader : public QObject
@@ -50,7 +50,7 @@ public:
     ~EngineDownloader() override;
 
     /// Default manifest location of SWMM5+ for this platform (overridable with
-    /// the ANAHITA_SWMM5PLUS_MANIFEST_URL environment variable or settings).
+    /// the MIRAB_SWMM5PLUS_MANIFEST_URL environment variable or settings).
     static QUrl swmm5PlusManifestUrl();
 
     /// Downloads from an http(s) or file URL.
@@ -82,4 +82,4 @@ private:
     bool running_ = false;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/Compatibility.cpp
  * Purpose: Compares detected project features with an engine manifest and strips ignorable ones.
@@ -22,11 +22,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/engine/Compatibility.h"
+#include "mirab/engine/Compatibility.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
-namespace anahita::engine
+namespace mirab::engine
 {
 
 using core::Feature;
@@ -148,4 +148,4 @@ std::string prepareInput(const core::Model& model, const EngineDescriptor& engin
     return doc.toString();
 }
 
-} // namespace anahita::engine
+} // namespace mirab::engine

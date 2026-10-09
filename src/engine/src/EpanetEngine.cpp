@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/EpanetEngine.cpp
  * Purpose: Adapter that runs EPA EPANET 2.2 and OWA EPANET 2.3 through their toolkit API.
@@ -25,11 +25,11 @@
 #include "Adapters.h"
 #include "EpanetRun.h"
 
-#include "anahita/core/Model.h"
-#include "anahita/core/Text.h"
-#include "anahita/core/Units.h"
+#include "mirab/core/Model.h"
+#include "mirab/core/Text.h"
+#include "mirab/core/Units.h"
 
-namespace anahita::engine::detail
+namespace mirab::engine::detail
 {
 
 std::string formatEpanetVersion(int v)
@@ -287,4 +287,4 @@ std::unique_ptr<Engine> makeEpanetEngine(EngineDescriptor d, std::filesystem::pa
     return std::make_unique<EpanetEngine>(std::move(d), std::move(library));
 }
 
-} // namespace anahita::engine::detail
+} // namespace mirab::engine::detail

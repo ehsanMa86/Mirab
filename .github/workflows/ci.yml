@@ -1,8 +1,8 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    .github/workflows/ci.yml
-# Purpose: Continuous integration: build and test Anahita on Windows, macOS and Linux.
+# Purpose: Continuous integration: build and test Mirab on Windows, macOS and Linux.
 #
 # Copyright (C) 2026 Ehsan Madadi
 #
@@ -108,7 +108,7 @@ jobs:
 
       - name: Engine report
         shell: bash
-        run: ./build/release/bin/anahita-cli engines
+        run: ./build/release/bin/mirab-cli engines
 
   headless:
     runs-on: ubuntu-24.04

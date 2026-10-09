@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/MainWindow.cpp
  * Purpose: Main application window: menus, tool bars, map, panels and simulation control.
@@ -35,10 +35,10 @@
 #include "Reports.h"
 #include "SolverProcess.h"
 #include "Theme.h"
-#include "anahita/AnahitaConfig.h"
-#include "anahita/core/Text.h"
-#include "anahita/engine/Compatibility.h"
-#include "anahita/interop/Interop.h"
+#include "mirab/MirabConfig.h"
+#include "mirab/core/Text.h"
+#include "mirab/engine/Compatibility.h"
+#include "mirab/interop/Interop.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -77,7 +77,7 @@
 #include <QToolButton>
 #include <QUrl>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 using core::Category;
@@ -92,7 +92,7 @@ const char* kGeometryKey = "window/geometry-v3";
 MainWindow::MainWindow() : doc_(new ProjectDocument(this))
 {
     setAcceptDrops(true);
-    setWindowIcon(QIcon(":/anahita/anahita.png"));
+    setWindowIcon(QIcon(":/mirab/mirab.png"));
     setDockNestingEnabled(true);
     setDocumentMode(true);
     mapPage_ = new MapPage(doc_, this);
@@ -528,12 +528,12 @@ void MainWindow::createMenus()
         mapPage_->setStartVisible(true);
     });
     help->addAction(tr("&Documentation"), this, [] {
-        QDesktopServices::openUrl(QUrl(QString(ANAHITA_HOMEPAGE) + "/tree/main/docs"));
+        QDesktopServices::openUrl(QUrl(QString(MIRAB_HOMEPAGE) + "/tree/main/docs"));
     });
     help->addAction(tr("Open &examples folder"), this,
                     [this] { QDesktopServices::openUrl(QUrl::fromLocalFile(examplesDirectory())); });
     help->addSeparator();
-    help->addAction(tr("&About Anahita"), this, [this] { AboutDialog(this).exec(); });
+    help->addAction(tr("&About Mirab"), this, [this] { AboutDialog(this).exec(); });
     help->addAction(tr("About &Qt"), qApp, &QApplication::aboutQt);
 }
 
@@ -678,7 +678,7 @@ void MainWindow::updateStartPage()
 QString MainWindow::examplesDirectory() const
 {
     const QString base = QCoreApplication::applicationDirPath();
-    for (const char* rel : {"../examples", "examples", "../share/anahita/examples", "../Resources/examples", "../../examples",
+    for (const char* rel : {"../examples", "examples", "../share/mirab/examples", "../Resources/examples", "../../examples",
                             "../../../examples"})
     {
         const QDir d(QDir(base).filePath(rel));
@@ -903,7 +903,7 @@ bool MainWindow::editModel(const QString& description, const std::function<bool(
 // ---------------------------------------------------------------------------
 void MainWindow::updateTitle()
 {
-    setWindowTitle(QString("%1%2 - Anahita").arg(doc_->displayName(), doc_->isModified() ? "*" : ""));
+    setWindowTitle(QString("%1%2 - Mirab").arg(doc_->displayName(), doc_->isModified() ? "*" : ""));
     setWindowModified(doc_->isModified());
 }
 
@@ -1119,7 +1119,7 @@ QString MainWindow::writeRunInput(QString* error)
     QString dir = doc_->path().isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::TempLocation)
                                          : QFileInfo(doc_->path()).absolutePath();
     const QString base = doc_->path().isEmpty() ? QString("untitled") : QFileInfo(doc_->path()).completeBaseName();
-    const QString file = QDir(dir).filePath("." + base + ".anahita-run.inp");
+    const QString file = QDir(dir).filePath("." + base + ".mirab-run.inp");
     QFile f(file);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
     {
@@ -1569,7 +1569,7 @@ void MainWindow::showResilience(const QString& page)
                                     "Network topology is available for both model types from this dialog."));
     }
     const QString tmpDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    const QString input = QDir(tmpDir).filePath("anahita-resilience-" + QString::number(QCoreApplication::applicationPid()) + ".inp");
+    const QString input = QDir(tmpDir).filePath("mirab-resilience-" + QString::number(QCoreApplication::applicationPid()) + ".inp");
     QFile f(input);
     if (f.open(QIODevice::WriteOnly | QIODevice::Truncate))
         f.write(QByteArray::fromStdString(doc_->model().toText()));
@@ -1588,8 +1588,8 @@ void MainWindow::showResilience(const QString& page)
 void MainWindow::loadPlugins()
 {
     const QString app = QCoreApplication::applicationDirPath();
-    QStringList dirs = {QDir(app).filePath("plugins"), QDir(app).filePath("../lib/anahita/plugins"),
-                        QDir(app).filePath("../PlugIns/anahita"),
+    QStringList dirs = {QDir(app).filePath("plugins"), QDir(app).filePath("../lib/mirab/plugins"),
+                        QDir(app).filePath("../PlugIns/mirab"),
                         QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)).filePath("plugins")};
     for (const QString& d : dirs)
     {
@@ -1602,7 +1602,7 @@ void MainWindow::loadPlugins()
                 continue;
             QPluginLoader loader(dir.absoluteFilePath(file));
             QObject* obj = loader.instance();
-            auto* plugin = qobject_cast<AnahitaPlugin*>(obj);
+            auto* plugin = qobject_cast<MirabPlugin*>(obj);
             if (!plugin)
             {
                 if (!loader.errorString().isEmpty() && obj == nullptr)
@@ -1630,4 +1630,4 @@ void MainWindow::loadPlugins()
     });
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

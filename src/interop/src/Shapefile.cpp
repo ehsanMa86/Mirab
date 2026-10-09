@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/interop/src/Shapefile.cpp
  * Purpose: Reads ESRI shapefiles (.shp/.dbf/.prj/.cpg) into imported feature layers.
@@ -30,11 +30,11 @@
 //   dBASE III/IV file structure (table header, 32-byte field descriptors
 //     terminated by 0x0D, fixed-length records with a deletion flag byte).
 //   ESRI code page file (.cpg) convention for the attribute text encoding.
-#include "anahita/interop/Import.h"
+#include "mirab/interop/Import.h"
 
 #include "ImportDetail.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <cctype>
 #include <cmath>
@@ -42,7 +42,7 @@
 #include <cstring>
 #include <stdexcept>
 
-namespace anahita::interop
+namespace mirab::interop
 {
 
 namespace fs = std::filesystem;
@@ -478,4 +478,4 @@ ImportedLayer readShapefile(const fs::path& shp)
     return layer;
 }
 
-} // namespace anahita::interop
+} // namespace mirab::interop

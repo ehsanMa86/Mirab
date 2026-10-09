@@ -1,9 +1,9 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/SolverProcess.h
- * Purpose: Runs anahita-cli as an isolated solver process and relays its progress.
+ * Purpose: Runs mirab-cli as an isolated solver process and relays its progress.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -29,7 +29,7 @@
 #include <QProcess>
 #include <QStringList>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 /// Engines run in a separate process: a crash or a Fortran STOP inside a
@@ -62,4 +62,4 @@ private:
     QString stderr_;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

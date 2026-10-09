@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    src/interop/CMakeLists.txt
 # Purpose: Build definition of the GIS and WNTR interchange library.
@@ -20,12 +20,12 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_library(anahita_interop STATIC src/Gis.cpp src/Wntr.cpp
+add_library(mirab_interop STATIC src/Gis.cpp src/Wntr.cpp
     src/Shapefile.cpp src/Dxf.cpp src/CsvImport.cpp src/ImportModel.cpp)
-add_library(Anahita::interop ALIAS anahita_interop)
-target_include_directories(anahita_interop PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(anahita_interop PUBLIC Anahita::core PRIVATE Anahita::warnings)
-if(TARGET Anahita::sqlite)
-    target_link_libraries(anahita_interop PRIVATE Anahita::sqlite)
-    target_compile_definitions(anahita_interop PRIVATE ANAHITA_HAVE_SQLITE)
+add_library(Mirab::interop ALIAS mirab_interop)
+target_include_directories(mirab_interop PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(mirab_interop PUBLIC Mirab::core PRIVATE Mirab::warnings)
+if(TARGET Mirab::sqlite)
+    target_link_libraries(mirab_interop PRIVATE Mirab::sqlite)
+    target_compile_definitions(mirab_interop PRIVATE MIRAB_HAVE_SQLITE)
 endif()

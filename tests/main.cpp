@@ -1,9 +1,9 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    tests/main.cpp
- * Purpose: Entry point of the Anahita test runner.
+ * Purpose: Entry point of the Mirab test runner.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -26,5 +26,5 @@
 
 int main(int argc, char** argv)
 {
-    return anahita::test::runAll(argc, argv);
+    return mirab::test::runAll(argc, argv);
 }

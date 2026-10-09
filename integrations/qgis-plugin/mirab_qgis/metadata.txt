@@ -1,0 +1,38 @@
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
+#
+# File:    integrations/qgis-plugin/mirab_qgis/metadata.txt
+# Purpose: QGIS plugin metadata for the Mirab bridge.
+#
+# Copyright (C) 2026 Ehsan Madadi
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+[general]
+name=Mirab bridge
+qgisMinimumVersion=3.22
+description=Load Mirab GeoPackages and EPANET or SWMM input files with sensible styling.
+about=Companion of the Mirab desktop application. It loads the GeoPackage written by "Open in QGIS", styles nodes, links and subcatchments, and can convert an .inp file through mirab-cli. Mirab itself never loads QGIS; this plugin runs inside QGIS only.
+version=0.1.0
+author=Ehsan Madadi
+email=noreply@github.com
+homepage=https://github.com/ehsanMa86/Mirab
+tracker=https://github.com/ehsanMa86/Mirab/issues
+repository=https://github.com/ehsanMa86/Mirab
+tags=epanet,swmm,water,hydraulics,stormwater
+category=Plugins
+icon=icon.png
+experimental=True
+license=GPL-3.0-or-later

@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/DataEditor.cpp
  * Purpose: Editor for time patterns, curves and time series, with a live chart.
@@ -26,7 +26,7 @@
 
 #include "ChartWidget.h"
 #include "Icons.h"
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <QComboBox>
 #include <QHBoxLayout>
@@ -39,7 +39,7 @@
 
 #include <algorithm>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 namespace
@@ -209,7 +209,7 @@ void DataEditor::load()
             std::size_t i = 1;
             if (i < tokens.size() && text::iequals(tokens[i], "FILE"))
             {
-                state_->setText(tr("This time series is read from a file and is edited outside Anahita."));
+                state_->setText(tr("This time series is read from a file and is edited outside Mirab."));
                 continue;
             }
             while (i < tokens.size())
@@ -415,4 +415,4 @@ void DataEditor::apply()
     load();
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

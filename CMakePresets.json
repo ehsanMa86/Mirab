@@ -25,7 +25,7 @@
       "name": "headless",
       "displayName": "Release without the Qt application",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "ANAHITA_BUILD_GUI": "OFF" }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "MIRAB_BUILD_GUI": "OFF" }
     }
   ],
   "buildPresets": [

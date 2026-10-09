@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    src/resilience/CMakeLists.txt
 # Purpose: Build definition of the native resilience metrics library.
@@ -20,7 +20,7 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_library(anahita_resilience STATIC src/Resilience.cpp)
-add_library(Anahita::resilience ALIAS anahita_resilience)
-target_include_directories(anahita_resilience PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(anahita_resilience PUBLIC Anahita::engine PRIVATE Anahita::warnings)
+add_library(mirab_resilience STATIC src/Resilience.cpp)
+add_library(Mirab::resilience ALIAS mirab_resilience)
+target_include_directories(mirab_resilience PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(mirab_resilience PUBLIC Mirab::engine PRIVATE Mirab::warnings)

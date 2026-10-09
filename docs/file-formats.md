@@ -6,7 +6,7 @@
 |---|---|
 | `model.inp` | EPANET or SWMM input file, the master copy of the model |
 | `model.msx` | EPANET-MSX input file (optional) |
-| `model.inp.anahita.json` | Anahita settings that engines do not read |
+| `model.inp.mirab.json` | Mirab settings that engines do not read |
 | `model.anr` | results of the last run |
 | `model.rpt` | the engine's text report |
 | `model.gpkg` | GeoPackage written by "Open in QGIS" |
@@ -15,7 +15,7 @@
 
 ```json
 {
-  "format": "anahita-project-settings/1",
+  "format": "mirab-project-settings/1",
   "engine": "epanet-2.3-owa",
   "useMsx": false,
   "msxFile": "model.msx",
@@ -31,7 +31,7 @@ Paths are relative to the `.inp` file.
 
 Little-endian binary:
 
-1. 16 bytes: the ASCII text `ANAHITA-RESULTS` followed by a zero byte,
+1. 16 bytes: the ASCII text `MIRAB-RESULTS` padded with zero bytes,
 2. `uint32` format version (currently 1),
 3. `uint32` length of the header in bytes,
 4. the header, UTF-8 JSON:
@@ -46,7 +46,7 @@ Little-endian binary:
 
 ## Solver protocol
 
-The desktop application runs `anahita-cli <command> ... --machine`. Every line on standard output is one JSON object with an `event` member:
+The desktop application runs `mirab-cli <command> ... --machine`. Every line on standard output is one JSON object with an `event` member:
 
 | Event | Members |
 |---|---|

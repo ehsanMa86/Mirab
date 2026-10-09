@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/MapPage.cpp
  * Purpose: Map tab: display bar (result colors, time playback, basemap), the map and the start page.
@@ -27,7 +27,7 @@
 #include "Icons.h"
 #include "MapView.h"
 #include "Theme.h"
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <QActionGroup>
 #include <QComboBox>
@@ -44,7 +44,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 // ---------------------------------------------------------------------------
@@ -103,9 +103,9 @@ StartPage::StartPage(QWidget* parent) : QWidget(parent)
     layout->setSpacing(14);
     auto* titleRow = new QHBoxLayout;
     auto* logo = new QLabel(card);
-    logo->setPixmap(QIcon(":/anahita/anahita.png").pixmap(48, 48));
+    logo->setPixmap(QIcon(":/mirab/mirab.png").pixmap(48, 48));
     auto* titles = new QVBoxLayout;
-    auto* heading = new QLabel(tr("Welcome to Anahita"), card);
+    auto* heading = new QLabel(tr("Welcome to Mirab"), card);
     heading->setObjectName("heading");
     auto* sub = new QLabel(tr("Model water distribution networks with EPANET and stormwater systems with SWMM, side by side."),
                            card);
@@ -479,4 +479,4 @@ void MapPage::updateTimeLabel()
                             .arg(r->periodCount()));
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

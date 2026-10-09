@@ -1,8 +1,8 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    CMakeLists.txt
-# Purpose: Top-level build definition for Anahita.
+# Purpose: Top-level build definition for Mirab.
 #
 # Copyright (C) 2026 Ehsan Madadi
 #
@@ -22,21 +22,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(Anahita
+project(Mirab
     VERSION 0.1.0
     DESCRIPTION "Unified modeling environment for water distribution and stormwater systems"
-    HOMEPAGE_URL "https://github.com/ehsanMa86/Anahita"
+    HOMEPAGE_URL "https://github.com/ehsanMa86/Mirab"
     LANGUAGES C CXX)
 
-set(ANAHITA_VENDOR "Ehsan Madadi")
-set(ANAHITA_COPYRIGHT "Copyright (C) 2026 Ehsan Madadi")
+set(MIRAB_VENDOR "Ehsan Madadi")
+set(MIRAB_COPYRIGHT "Copyright (C) 2026 Ehsan Madadi")
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
-option(ANAHITA_BUILD_GUI        "Build the Qt 6 desktop application" ON)
-option(ANAHITA_BUILD_TESTS      "Build the unit and integration tests" ON)
-option(ANAHITA_BUILD_ENGINES    "Fetch and build the bundled simulation engines" ON)
-option(ANAHITA_WITH_GEOPACKAGE  "Enable GeoPackage export (builds the bundled SQLite)" ON)
+option(MIRAB_BUILD_GUI        "Build the Qt 6 desktop application" ON)
+option(MIRAB_BUILD_TESTS      "Build the unit and integration tests" ON)
+option(MIRAB_BUILD_ENGINES    "Fetch and build the bundled simulation engines" ON)
+option(MIRAB_WITH_GEOPACKAGE  "Enable GeoPackage export (builds the bundled SQLite)" ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
@@ -52,8 +52,8 @@ if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
 endif()
 
 include(GNUInstallDirs)
-include(AnahitaLayout)
-include(AnahitaWarnings)
+include(MirabLayout)
+include(MirabWarnings)
 
 # Everything that runs lands in one folder of the build tree, so the
 # application, the command-line tool and the engines find each other
@@ -61,30 +61,30 @@ include(AnahitaWarnings)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
-set(ANAHITA_ENGINE_BUILD_DIR "${PROJECT_BINARY_DIR}/bin/engines")
+set(MIRAB_ENGINE_BUILD_DIR "${PROJECT_BINARY_DIR}/bin/engines")
 
-configure_file(cmake/AnahitaConfig.h.in
-    "${PROJECT_BINARY_DIR}/generated/anahita/AnahitaConfig.h" @ONLY)
+configure_file(cmake/MirabConfig.h.in
+    "${PROJECT_BINARY_DIR}/generated/mirab/MirabConfig.h" @ONLY)
 
-if(ANAHITA_BUILD_GUI)
+if(MIRAB_BUILD_GUI)
     find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network)
     qt_standard_project_setup()
 endif()
 
 add_subdirectory(third_party)
-if(ANAHITA_BUILD_ENGINES)
+if(MIRAB_BUILD_ENGINES)
     add_subdirectory(engines)
 endif()
 add_subdirectory(src)
 
-if(ANAHITA_BUILD_TESTS)
+if(MIRAB_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
 
 install(FILES LICENSE README.md THIRD_PARTY_NOTICES.md CHANGELOG.md AUTHORS
-    DESTINATION "${ANAHITA_INSTALL_DOCDIR}")
-install(DIRECTORY examples/ DESTINATION "${ANAHITA_INSTALL_EXAMPLEDIR}")
-install(DIRECTORY docs/ DESTINATION "${ANAHITA_INSTALL_DOCDIR}")
+    DESTINATION "${MIRAB_INSTALL_DOCDIR}")
+install(DIRECTORY examples/ DESTINATION "${MIRAB_INSTALL_EXAMPLEDIR}")
+install(DIRECTORY docs/ DESTINATION "${MIRAB_INSTALL_DOCDIR}")
 
-include(AnahitaPackaging)
+include(MirabPackaging)

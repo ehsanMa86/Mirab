@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/interop/src/Dxf.cpp
  * Purpose: Reads point, line and polygon entities from ASCII DXF drawings.
@@ -28,17 +28,17 @@
 // LWPOLYLINE, POLYLINE/VERTEX/SEQEND, POINT, CIRCLE and INSERT entities, and the
 // "Arbitrary Axis Algorithm" that maps object coordinate systems (OCS) to world
 // coordinates. Binary DXF ("AutoCAD Binary DXF" sentinel) is rejected.
-#include "anahita/interop/Import.h"
+#include "mirab/interop/Import.h"
 
 #include "ImportDetail.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <cmath>
 #include <map>
 #include <stdexcept>
 
-namespace anahita::interop
+namespace mirab::interop
 {
 
 namespace fs = std::filesystem;
@@ -464,4 +464,4 @@ std::vector<ImportedLayer> readDxf(const fs::path& path)
     return builder.take();
 }
 
-} // namespace anahita::interop
+} // namespace mirab::interop

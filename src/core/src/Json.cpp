@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/Json.cpp
  * Purpose: JSON parser and serializer used for results headers, settings and interchange files.
@@ -22,7 +22,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/Json.h"
+#include "mirab/core/Json.h"
 
 #include <cmath>
 #include <cstdint>
@@ -30,7 +30,7 @@
 #include <locale>
 #include <sstream>
 
-namespace anahita::json
+namespace mirab::json
 {
 
 namespace
@@ -548,4 +548,4 @@ Value Value::parse(std::string_view text)
     return Parser(text).parseDocument();
 }
 
-} // namespace anahita::json
+} // namespace mirab::json

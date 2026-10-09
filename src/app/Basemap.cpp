@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Basemap.cpp
  * Purpose: Web basemap layer: XYZ map tiles projected into the coordinate system of the model.
@@ -24,8 +24,8 @@
  */
 #include "Basemap.h"
 
-#include "anahita/AnahitaConfig.h"
-#include "anahita/core/Crs.h"
+#include "mirab/MirabConfig.h"
+#include "mirab/core/Crs.h"
 
 #include <QDir>
 #include <QNetworkAccessManager>
@@ -39,7 +39,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 namespace
@@ -185,7 +185,7 @@ void Basemap::request(int z, int x, int y)
         url.replace("{s}", prov->subdomains.at((x + y) % prov->subdomains.size()));
     QNetworkRequest req{QUrl(url)};
     req.setHeader(QNetworkRequest::UserAgentHeader,
-                  QStringLiteral("Anahita/" ANAHITA_VERSION_STRING " (+" ANAHITA_HOMEPAGE ")"));
+                  QStringLiteral("Mirab/" MIRAB_VERSION_STRING " (+" MIRAB_HOMEPAGE ")"));
     req.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::PreferCache);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     req.setTransferTimeout(20000);
@@ -323,4 +323,4 @@ void Basemap::paint(QPainter& p, const QRectF& viewport, const std::function<QPo
     p.restore();
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    src/app/CMakeLists.txt
 # Purpose: Build definition of the Qt 6 desktop application.
@@ -37,38 +37,38 @@ set(APP_SOURCES
     Reports.cpp Reports.h
     SolverProcess.cpp SolverProcess.h
     Theme.cpp Theme.h
-    include/anahita/app/PluginInterface.h
+    include/mirab/app/PluginInterface.h
     main.cpp
-    resources/anahita.qrc)
+    resources/mirab.qrc)
 
 if(WIN32)
-    set(ANAHITA_ICO "${PROJECT_SOURCE_DIR}/packaging/windows/anahita.ico")
-    configure_file("${PROJECT_SOURCE_DIR}/packaging/windows/anahita.rc.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/anahita.rc" @ONLY)
-    list(APPEND APP_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/anahita.rc")
+    set(MIRAB_ICO "${PROJECT_SOURCE_DIR}/packaging/windows/mirab.ico")
+    configure_file("${PROJECT_SOURCE_DIR}/packaging/windows/mirab.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/mirab.rc" @ONLY)
+    list(APPEND APP_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/mirab.rc")
 elseif(APPLE)
-    set(ANAHITA_ICNS "${PROJECT_SOURCE_DIR}/packaging/macos/anahita.icns")
-    set_source_files_properties("${ANAHITA_ICNS}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-    list(APPEND APP_SOURCES "${ANAHITA_ICNS}")
+    set(MIRAB_ICNS "${PROJECT_SOURCE_DIR}/packaging/macos/mirab.icns")
+    set_source_files_properties("${MIRAB_ICNS}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    list(APPEND APP_SOURCES "${MIRAB_ICNS}")
 endif()
 
-qt_add_executable(Anahita WIN32 MACOSX_BUNDLE ${APP_SOURCES})
-target_include_directories(Anahita PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(Anahita PRIVATE
-    Qt6::Widgets Qt6::Network Anahita::engine Anahita::resilience Anahita::interop Anahita::warnings)
+qt_add_executable(Mirab WIN32 MACOSX_BUNDLE ${APP_SOURCES})
+target_include_directories(Mirab PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(Mirab PRIVATE
+    Qt6::Widgets Qt6::Network Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 
 if(APPLE)
     configure_file("${PROJECT_SOURCE_DIR}/packaging/macos/Info.plist.in"
         "${CMAKE_CURRENT_BINARY_DIR}/Info.plist" @ONLY)
-    set_target_properties(Anahita PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist")
+    set_target_properties(Mirab PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info.plist")
 elseif(UNIX)
     # Linux convention: lower-case program names.
-    set_target_properties(Anahita PROPERTIES OUTPUT_NAME anahita)
+    set_target_properties(Mirab PROPERTIES OUTPUT_NAME mirab)
 endif()
 
-install(TARGETS Anahita
+install(TARGETS Mirab
     BUNDLE DESTINATION .
-    RUNTIME DESTINATION "${ANAHITA_INSTALL_BINDIR}")
+    RUNTIME DESTINATION "${MIRAB_INSTALL_BINDIR}")
 
 # Headers for plugin authors.
-install(FILES include/anahita/app/PluginInterface.h DESTINATION include/anahita/app COMPONENT sdk EXCLUDE_FROM_ALL)
+install(FILES include/mirab/app/PluginInterface.h DESTINATION include/mirab/app COMPONENT sdk EXCLUDE_FROM_ALL)

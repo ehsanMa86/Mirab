@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Icons.cpp
  * Purpose: Vector line icons drawn in code, crisp at every screen scale.
@@ -33,7 +33,7 @@
 #include <cmath>
 #include <functional>
 
-namespace anahita::app::icons
+namespace mirab::app::icons
 {
 
 namespace
@@ -721,4 +721,4 @@ QIcon element(const QString& kind)
     return QIcon(new LineIconEngine([kind](QPainter& p, const Ink& k) { drawElement(p, k, kind); }));
 }
 
-} // namespace anahita::app::icons
+} // namespace mirab::app::icons

@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/Units.cpp
  * Purpose: Unit labels and SI conversion factors for EPANET and SWMM projects.
@@ -22,11 +22,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/Units.h"
+#include "mirab/core/Units.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
-namespace anahita::core
+namespace mirab::core
 {
 
 double flowToCms(std::string_view flowUnits)
@@ -141,4 +141,4 @@ double ProjectUnits::toSI(std::string_view quantity) const
     return 1.0;
 }
 
-} // namespace anahita::core
+} // namespace mirab::core

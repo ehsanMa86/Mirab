@@ -1,9 +1,9 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/cli/main.cpp
- * Purpose: anahita-cli: command-line runner and the isolated solver process used by the desktop application.
+ * Purpose: mirab-cli: command-line runner and the isolated solver process used by the desktop application.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -22,19 +22,19 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/AnahitaConfig.h"
-#include "anahita/core/Features.h"
-#include "anahita/core/Json.h"
-#include "anahita/core/Model.h"
-#include "anahita/core/ProjectSettings.h"
-#include "anahita/core/Results.h"
-#include "anahita/core/Text.h"
-#include "anahita/engine/Compatibility.h"
-#include "anahita/engine/EngineInstall.h"
-#include "anahita/engine/EngineRegistry.h"
-#include "anahita/engine/EpanetToolkit.h"
-#include "anahita/interop/Interop.h"
-#include "anahita/resilience/Resilience.h"
+#include "mirab/MirabConfig.h"
+#include "mirab/core/Features.h"
+#include "mirab/core/Json.h"
+#include "mirab/core/Model.h"
+#include "mirab/core/ProjectSettings.h"
+#include "mirab/core/Results.h"
+#include "mirab/core/Text.h"
+#include "mirab/engine/Compatibility.h"
+#include "mirab/engine/EngineInstall.h"
+#include "mirab/engine/EngineRegistry.h"
+#include "mirab/engine/EpanetToolkit.h"
+#include "mirab/interop/Interop.h"
+#include "mirab/resilience/Resilience.h"
 
 #include <atomic>
 #include <chrono>
@@ -57,7 +57,7 @@
 #endif
 
 namespace fs = std::filesystem;
-using namespace anahita;
+using namespace mirab;
 using json::Value;
 
 namespace
@@ -303,9 +303,9 @@ const char* supportName(engine::Support s)
 // ---------------------------------------------------------------------------
 int cmdVersion()
 {
-    std::cout << "Anahita " << ANAHITA_VERSION_STRING << "\n" << ANAHITA_COPYRIGHT << "\n"
+    std::cout << "Mirab " << MIRAB_VERSION_STRING << "\n" << MIRAB_COPYRIGHT << "\n"
               << "License GPL-3.0-or-later: <https://www.gnu.org/licenses/gpl-3.0.html>\n"
-              << ANAHITA_HOMEPAGE << "\n";
+              << MIRAB_HOMEPAGE << "\n";
     return 0;
 }
 
@@ -313,7 +313,7 @@ std::string resolveEngineId(const engine::EngineRegistry& registry, std::string 
 {
     id = canonicalEngineId(id);
     if (!registry.descriptor(id))
-        throw std::runtime_error("unknown engine " + id + " (see anahita-cli engines)");
+        throw std::runtime_error("unknown engine " + id + " (see mirab-cli engines)");
     return id;
 }
 
@@ -325,7 +325,7 @@ int cmdEnginesManage(const Args& a)
     if (action == "install")
     {
         if (a.positional.size() < 2)
-            throw std::runtime_error("usage: anahita-cli engines install <manifest.json> [--target DIR]");
+            throw std::runtime_error("usage: mirab-cli engines install <manifest.json> [--target DIR]");
         const fs::path manifestFile = pathArg(a.positional[1]);
         const auto manifest = engine::EngineManifest::load(manifestFile);
         resolveEngineId(registry, manifest.engine);
@@ -337,7 +337,7 @@ int cmdEnginesManage(const Args& a)
     if (action == "uninstall")
     {
         if (a.positional.size() < 2)
-            throw std::runtime_error("usage: anahita-cli engines uninstall <engine> [--target DIR]");
+            throw std::runtime_error("usage: mirab-cli engines uninstall <engine> [--target DIR]");
         const std::string id = resolveEngineId(registry, a.positional[1]);
         if (!engine::uninstallEngine(id, target))
             throw std::runtime_error(id + " was not installed in " + target.u8string());
@@ -347,7 +347,7 @@ int cmdEnginesManage(const Args& a)
     if (action == "verify")
     {
         if (a.positional.size() < 2)
-            throw std::runtime_error("usage: anahita-cli engines verify <engine>");
+            throw std::runtime_error("usage: mirab-cli engines verify <engine>");
         const std::string id = resolveEngineId(registry, a.positional[1]);
         std::string error;
         auto eng = registry.create(id, &error);
@@ -517,12 +517,12 @@ int cmdRun(const Args& a)
     fs::path scratchInput;
     if (!notes.empty())
     {
-        scratchInput = inp.parent_path() / ("." + inp.stem().u8string() + ".anahita-run.inp");
+        scratchInput = inp.parent_path() / ("." + inp.stem().u8string() + ".mirab-run.inp");
         std::ofstream f(scratchInput, std::ios::binary | std::ios::trunc);
         f << prepared;
         runInput = scratchInput;
         for (const auto& n : notes)
-            out.log("warning", "for this engine Anahita " + n);
+            out.log("warning", "for this engine Mirab " + n);
     }
 
     engine::RunRequest req;
@@ -540,7 +540,7 @@ int cmdRun(const Args& a)
     req.reportFile = a.has("report") ? pathArg(a.opt("report")) : fs::path(inp).replace_extension(".rpt");
     req.workDir = a.has("workdir") ? pathArg(a.opt("workdir"))
                                    : fs::temp_directory_path() /
-                                         ("anahita-" + std::to_string(std::chrono::steady_clock::now()
+                                         ("mirab-" + std::to_string(std::chrono::steady_clock::now()
                                                                           .time_since_epoch()
                                                                           .count()));
     fs::create_directories(req.workDir);
@@ -573,7 +573,7 @@ int cmdRun(const Args& a)
     if (outcome.success)
     {
         outcome.results.metadata["input"] = inp.filename().u8string();
-        outcome.results.metadata["anahitaVersion"] = ANAHITA_VERSION_STRING;
+        outcome.results.metadata["mirabVersion"] = MIRAB_VERSION_STRING;
         outcome.results.save(results);
         done.set("results", results.u8string());
         done.set("report", req.reportFile.u8string());
@@ -895,7 +895,7 @@ int cmdResilience(const Args& a)
 int cmdExport(const Args& a)
 {
     if (a.positional.size() < 2)
-        throw std::runtime_error("usage: anahita-cli export geojson|gpkg|wntr <model.inp> --out <file>");
+        throw std::runtime_error("usage: mirab-cli export geojson|gpkg|wntr <model.inp> --out <file>");
     const std::string format = a.positional[0];
     Args rest = a;
     rest.positional.erase(rest.positional.begin());
@@ -931,7 +931,7 @@ int cmdExport(const Args& a)
 int cmdImport(const Args& a)
 {
     if (a.positional.size() < 2 || a.positional[0] != "wntr")
-        throw std::runtime_error("usage: anahita-cli import wntr <network.json> --out <model.inp>");
+        throw std::runtime_error("usage: mirab-cli import wntr <network.json> --out <model.inp>");
     if (!a.has("out"))
         throw std::runtime_error("--out <model.inp> is required");
     std::vector<std::string> notes;
@@ -947,34 +947,34 @@ int cmdImport(const Args& a)
 void usage()
 {
     std::cout <<
-        R"(Anahita command-line interface
+        R"(Mirab command-line interface
 
 Usage:
-  anahita-cli version
-  anahita-cli engines [--json]
-  anahita-cli engines install <manifest.json> [--target DIR]
-  anahita-cli engines uninstall <engine> [--target DIR]
-  anahita-cli engines verify <engine>
-  anahita-cli engines where
-  anahita-cli info <model.inp>
-  anahita-cli check <model.inp> [--engine ID] [--msx file.msx] [--json]
-  anahita-cli run <model.inp> [--engine ID] [--msx file.msx] [--out results.anr]
+  mirab-cli version
+  mirab-cli engines [--json]
+  mirab-cli engines install <manifest.json> [--target DIR]
+  mirab-cli engines uninstall <engine> [--target DIR]
+  mirab-cli engines verify <engine>
+  mirab-cli engines where
+  mirab-cli info <model.inp>
+  mirab-cli check <model.inp> [--engine ID] [--msx file.msx] [--json]
+  mirab-cli run <model.inp> [--engine ID] [--msx file.msx] [--out results.anr]
                   [--report file.rpt] [--workdir DIR] [--machine]
-  anahita-cli results <results.anr|.out> [--table node|link|subcatchment|system]
+  mirab-cli results <results.anr|.out> [--table node|link|subcatchment|system]
                   [--variable NAME] [--element ID[,ID...]]
-  anahita-cli resilience todini <model.inp> --results FILE [--required-pressure P] [--json]
-  anahita-cli resilience service --results FILE [--json]
-  anahita-cli resilience topology <model.inp> [--json]
-  anahita-cli resilience criticality <model.inp> [--engine ID] [--threshold P] [--dda]
+  mirab-cli resilience todini <model.inp> --results FILE [--required-pressure P] [--json]
+  mirab-cli resilience service --results FILE [--json]
+  mirab-cli resilience topology <model.inp> [--json]
+  mirab-cli resilience criticality <model.inp> [--engine ID] [--threshold P] [--dda]
                   [--links ID,ID] [--json]
-  anahita-cli resilience fireflow <model.inp> --flow Q [--residual P] [--time HOURS]
+  mirab-cli resilience fireflow <model.inp> --flow Q [--residual P] [--time HOURS]
                   [--nodes ID,ID] [--max-flow Q] [--no-available] [--json]
-  anahita-cli export geojson|gpkg|wntr <model.inp> --out FILE [--crs EPSG:n]
+  mirab-cli export geojson|gpkg|wntr <model.inp> --out FILE [--crs EPSG:n]
                   [--results FILE [--period N]]
-  anahita-cli import wntr <network.json> --out model.inp
+  mirab-cli import wntr <network.json> --out model.inp
 
 Engines: epanet-2.2-epa, epanet-2.3-owa, epanet-msx-2.0-epa22, epanet-msx-2.0-owa23,
-         swmm-5.2-epa, swmm5plus-1.0 (when installed). Run "anahita-cli engines".
+         swmm-5.2-epa, swmm5plus-1.0 (when installed). Run "mirab-cli engines".
 Pressures and flows are in the units of the model.
 )";
 }

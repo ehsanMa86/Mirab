@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    src/engine/CMakeLists.txt
 # Purpose: Build definition of the engine adapter library.
@@ -20,7 +20,7 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_library(anahita_engine STATIC
+add_library(mirab_engine STATIC
     src/Compatibility.cpp
     src/DynamicLibrary.cpp
     src/EngineInstall.cpp
@@ -30,6 +30,6 @@ add_library(anahita_engine STATIC
     src/MsxEngine.cpp
     src/Swmm5PlusEngine.cpp
     src/SwmmEngine.cpp)
-add_library(Anahita::engine ALIAS anahita_engine)
-target_include_directories(anahita_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(anahita_engine PUBLIC Anahita::core ${CMAKE_DL_LIBS} PRIVATE Anahita::warnings)
+add_library(Mirab::engine ALIAS mirab_engine)
+target_include_directories(mirab_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_link_libraries(mirab_engine PUBLIC Mirab::core ${CMAKE_DL_LIBS} PRIVATE Mirab::warnings)

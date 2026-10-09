@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/DataEditor.h
  * Purpose: Editor for time patterns, curves and time series, with a live chart.
@@ -33,7 +33,7 @@ class QLabel;
 class QPushButton;
 class QTableWidget;
 
-namespace anahita::app
+namespace mirab::app
 {
 
 class ChartWidget;
@@ -66,4 +66,4 @@ private:
     ChartWidget* chart_;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/SolverProcess.cpp
  * Purpose: Implementation of the solver process bridge (JSON lines over standard output).
@@ -30,7 +30,7 @@
 #include <QJsonDocument>
 #include <QTimer>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 SolverProcess::SolverProcess(QObject* parent) : QObject(parent)
@@ -63,9 +63,9 @@ QString SolverProcess::cliPath()
 {
     const QString dir = QCoreApplication::applicationDirPath();
 #if defined(Q_OS_WIN)
-    return QDir(dir).filePath("anahita-cli.exe");
+    return QDir(dir).filePath("mirab-cli.exe");
 #else
-    return QDir(dir).filePath("anahita-cli");
+    return QDir(dir).filePath("mirab-cli");
 #endif
 }
 
@@ -145,4 +145,4 @@ void SolverProcess::onFinished(int exitCode, QProcess::ExitStatus status)
     emit finished(done_.value("success").toBool(), done_);
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

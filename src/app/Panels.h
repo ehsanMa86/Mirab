@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Panels.h
  * Purpose: Results, project browser and input-file editor panels of the main window.
@@ -40,7 +40,7 @@ class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
 
-namespace anahita::app
+namespace mirab::app
 {
 
 class ChartWidget;
@@ -141,4 +141,4 @@ private:
     QString path_;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

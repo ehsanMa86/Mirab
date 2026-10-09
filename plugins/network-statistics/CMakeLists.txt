@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    plugins/network-statistics/CMakeLists.txt
 # Purpose: Build definition of the network statistics example plugin.
@@ -20,19 +20,19 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-qt_add_plugin(anahita_network_statistics CLASS_NAME NetworkStatisticsPlugin NetworkStatisticsPlugin.cpp)
-target_include_directories(anahita_network_statistics PRIVATE "${PROJECT_SOURCE_DIR}/src/app/include")
-target_link_libraries(anahita_network_statistics PRIVATE Qt6::Widgets Anahita::core)
-set_target_properties(anahita_network_statistics PROPERTIES
+qt_add_plugin(mirab_network_statistics CLASS_NAME NetworkStatisticsPlugin NetworkStatisticsPlugin.cpp)
+target_include_directories(mirab_network_statistics PRIVATE "${PROJECT_SOURCE_DIR}/src/app/include")
+target_link_libraries(mirab_network_statistics PRIVATE Qt6::Widgets Mirab::core)
+set_target_properties(mirab_network_statistics PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin/plugins"
     RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin/plugins")
 if(WIN32)
-    set(ANAHITA_PLUGIN_DIR "bin/plugins")
+    set(MIRAB_PLUGIN_DIR "bin/plugins")
 elseif(APPLE)
-    set(ANAHITA_PLUGIN_DIR "Anahita.app/Contents/PlugIns/anahita")
+    set(MIRAB_PLUGIN_DIR "Mirab.app/Contents/PlugIns/mirab")
 else()
-    set(ANAHITA_PLUGIN_DIR "lib/anahita/plugins")
+    set(MIRAB_PLUGIN_DIR "lib/mirab/plugins")
 endif()
-install(TARGETS anahita_network_statistics
-    LIBRARY DESTINATION "${ANAHITA_PLUGIN_DIR}"
-    RUNTIME DESTINATION "${ANAHITA_PLUGIN_DIR}")
+install(TARGETS mirab_network_statistics
+    LIBRARY DESTINATION "${MIRAB_PLUGIN_DIR}"
+    RUNTIME DESTINATION "${MIRAB_PLUGIN_DIR}")

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    tools/license_headers.py
-# Purpose: Applies and verifies the GPL-3.0-or-later copyright header on Anahita source files.
+# Purpose: Applies and verifies the GPL-3.0-or-later copyright header on Mirab source files.
 #
 # Copyright (C) 2026 Ehsan Madadi
 #
@@ -21,15 +21,15 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Developer tool: expand and verify Anahita license headers.
+"""Developer tool: expand and verify Mirab license headers.
 
 New files start with a single marker line such as::
 
-    // @anahita-header Short description of what this file does.
+    // @mirab-header Short description of what this file does.
 
 Running ``python tools/license_headers.py --apply`` replaces the marker with the
 full copyright and license header in the comment style of the file type.
-``--check`` (used by CI) fails when an Anahita source file has no header.
+``--check`` (used by CI) fails when an Mirab source file has no header.
 Files under third_party/ or build trees are never touched.
 """
 
@@ -41,9 +41,9 @@ import pathlib
 import sys
 
 OWNER = "Ehsan Madadi"
-PROJECT = "Anahita - Unified Water Infrastructure Modeling Environment"
-URL = "https://github.com/ehsanMa86/Anahita"
-MARKER = "@anahita-header"
+PROJECT = "Mirab - Unified Water Infrastructure Modeling Environment"
+URL = "https://github.com/ehsanMa86/Mirab"
+MARKER = "@mirab-header"
 SPDX = "SPDX-License-Identifier: GPL-3.0-or-later"
 
 LICENSE_TEXT = [

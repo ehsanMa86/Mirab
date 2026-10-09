@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/Results.cpp
  * Purpose: Results storage, the .anr file format and readers for EPANET and SWMM binary output.
@@ -22,11 +22,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/Results.h"
+#include "mirab/core/Results.h"
 
-#include "anahita/core/Json.h"
-#include "anahita/core/Text.h"
-#include "anahita/core/Units.h"
+#include "mirab/core/Json.h"
+#include "mirab/core/Text.h"
+#include "mirab/core/Units.h"
 
 #include <algorithm>
 #include <cmath>
@@ -36,13 +36,13 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace anahita::core
+namespace mirab::core
 {
 
 namespace
 {
-constexpr char kMagic[16] = {'A', 'N', 'A', 'H', 'I', 'T', 'A', '-',
-                             'R', 'E', 'S', 'U', 'L', 'T', 'S', '\0'};
+constexpr char kMagic[16] = {'M', 'I', 'R', 'A', 'B', '-', 'R', 'E',
+                             'S', 'U', 'L', 'T', 'S', '\0', '\0', '\0'};
 constexpr std::uint32_t kFormatVersion = 1;
 constexpr std::int32_t kEpanetMagic = 516114521;
 constexpr std::int32_t kSwmmMagic = 516114522;
@@ -257,7 +257,7 @@ ResultSet ResultSet::load(const std::filesystem::path& path)
     char magic[16] = {};
     in.read(magic, sizeof(magic));
     if (!in || std::memcmp(magic, kMagic, sizeof(kMagic)) != 0)
-        throw std::runtime_error(path.u8string() + " is not an Anahita results file");
+        throw std::runtime_error(path.u8string() + " is not an Mirab results file");
     std::uint32_t version = 0, headerLen = 0;
     in.read(reinterpret_cast<char*>(&version), sizeof(version));
     in.read(reinterpret_cast<char*>(&headerLen), sizeof(headerLen));
@@ -675,4 +675,4 @@ ResultSet ResultSet::loadAny(const std::filesystem::path& path)
     throw std::runtime_error(path.u8string() + " is not a recognized results file");
 }
 
-} // namespace anahita::core
+} // namespace mirab::core

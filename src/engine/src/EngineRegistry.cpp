@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/EngineRegistry.cpp
  * Purpose: Built-in engine catalog with capability manifests, and engine library discovery.
@@ -22,16 +22,16 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/engine/EngineRegistry.h"
+#include "mirab/engine/EngineRegistry.h"
 
 #include "Adapters.h"
-#include "anahita/AnahitaConfig.h"
-#include "anahita/core/Text.h"
-#include "anahita/engine/EngineInstall.h"
+#include "mirab/MirabConfig.h"
+#include "mirab/core/Text.h"
+#include "mirab/engine/EngineInstall.h"
 
 #include <cstdlib>
 
-namespace anahita::engine
+namespace mirab::engine
 {
 
 using core::Dialect;
@@ -50,7 +50,7 @@ std::vector<EngineDescriptor> builtinDescriptors()
     epa22.upstreamUrl = "https://github.com/USEPA/epanet-engine";
     epa22.description = "The official EPA release of the EPANET hydraulic and water quality solver.";
     epa22.dialect = Dialect::Epanet;
-    epa22.library = "anahita_epanet22_epa";
+    epa22.library = "mirab_epanet22_epa";
     epa22.support = {{Feature::EpanetLeakage, Support::Ignored},
                      {Feature::EpanetPcvValve, Support::Unsupported},
                      {Feature::EpanetFlowUnitsCms, Support::Unsupported},
@@ -68,7 +68,7 @@ std::vector<EngineDescriptor> builtinDescriptors()
     owa23.description = "Community EPANET with pressure-driven demands, FAVAD pipe leakage, "
                         "positional control valves and extended units.";
     owa23.dialect = Dialect::Epanet;
-    owa23.library = "anahita_epanet23_owa";
+    owa23.library = "mirab_epanet23_owa";
     v.push_back(owa23);
 
     EngineDescriptor msx22 = epa22;
@@ -78,8 +78,8 @@ std::vector<EngineDescriptor> builtinDescriptors()
     msx22.license = "MIT";
     msx22.upstreamUrl = "https://github.com/USEPA/EPANETMSX";
     msx22.description = "Multi-species reactive transport on top of EPA EPANET 2.2 hydraulics.";
-    msx22.library = "anahita_msx20_22_epa";
-    msx22.companion = "anahita_epanet22_epa";
+    msx22.library = "mirab_msx20_22_epa";
+    msx22.companion = "mirab_epanet22_epa";
     msx22.multiSpecies = true;
     msx22.baseEngineId = epa22.id;
     v.push_back(msx22);
@@ -91,8 +91,8 @@ std::vector<EngineDescriptor> builtinDescriptors()
     msx23.provider = "U.S. EPA (MSX) and Open Water Analytics (EPANET)";
     msx23.upstreamUrl = "https://github.com/USEPA/EPANETMSX";
     msx23.description = "Multi-species reactive transport on top of OWA EPANET 2.3 hydraulics.";
-    msx23.library = "anahita_msx20_23_owa";
-    msx23.companion = "anahita_epanet23_owa";
+    msx23.library = "mirab_msx20_23_owa";
+    msx23.companion = "mirab_epanet23_owa";
     msx23.multiSpecies = true;
     msx23.baseEngineId = owa23.id;
     v.push_back(msx23);
@@ -106,7 +106,7 @@ std::vector<EngineDescriptor> builtinDescriptors()
     swmm.upstreamUrl = "https://github.com/USEPA/Stormwater-Management-Model";
     swmm.description = "The official EPA Storm Water Management Model solver.";
     swmm.dialect = Dialect::Swmm;
-    swmm.library = "anahita_swmm52_epa";
+    swmm.library = "mirab_swmm52_epa";
     v.push_back(swmm);
 
     EngineDescriptor s5p;
@@ -141,7 +141,7 @@ EngineRegistry::EngineRegistry(std::vector<std::filesystem::path> searchDirector
 std::vector<std::filesystem::path> EngineRegistry::defaultSearchDirectories()
 {
     std::vector<std::filesystem::path> dirs;
-    if (const char* env = std::getenv("ANAHITA_ENGINE_PATH"))
+    if (const char* env = std::getenv("MIRAB_ENGINE_PATH"))
     {
 #if defined(_WIN32)
         const char sep = ';';
@@ -166,7 +166,7 @@ std::vector<std::filesystem::path> EngineRegistry::defaultSearchDirectories()
         }
     }
     const auto exe = executableDirectory();
-    std::string rel = ANAHITA_ENGINE_RELATIVE_DIRS;
+    std::string rel = MIRAB_ENGINE_RELATIVE_DIRS;
     std::string cur;
     for (char c : rel + ";")
     {
@@ -296,4 +296,4 @@ std::string EngineRegistry::defaultEngineId(Dialect dialect)
     return dialect == Dialect::Swmm ? "swmm-5.2-epa" : "epanet-2.3-owa";
 }
 
-} // namespace anahita::engine
+} // namespace mirab::engine

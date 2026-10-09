@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    engines/patches/msx-fix-compiler-typo.cmake
 # Purpose: Portability fix applied to the downloaded EPANET-MSX 2.0 sources: a typo breaks non-Windows builds.

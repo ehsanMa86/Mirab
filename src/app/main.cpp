@@ -1,9 +1,9 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/main.cpp
- * Purpose: Entry point of the Anahita desktop application.
+ * Purpose: Entry point of the Mirab desktop application.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -26,12 +26,14 @@
 #include "MainWindow.h"
 #include "Theme.h"
 
-#include "anahita/AnahitaConfig.h"
+#include "mirab/MirabConfig.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QFileInfo>
 #include <QIcon>
+#include <QSettings>
+#include <QTemporaryDir>
 #include <QTimer>
 
 #include <cstdio>
@@ -39,12 +41,12 @@
 int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
-    QApplication::setApplicationName("Anahita");
-    QApplication::setOrganizationName("Anahita");
-    QApplication::setOrganizationDomain("anahita.app");
-    QApplication::setApplicationVersion(ANAHITA_VERSION_STRING);
-    QApplication::setWindowIcon(QIcon(":/anahita/anahita.png"));
-    anahita::app::theme::apply(app);
+    QApplication::setApplicationName("Mirab");
+    QApplication::setOrganizationName("Mirab");
+    QApplication::setOrganizationDomain("mirab.app");
+    QApplication::setApplicationVersion(MIRAB_VERSION_STRING);
+    QApplication::setWindowIcon(QIcon(":/mirab/mirab.png"));
+    mirab::app::theme::apply(app);
 
     QCommandLineParser parser;
     parser.setApplicationDescription("Unified modeling environment for water distribution and stormwater systems");
@@ -81,15 +83,15 @@ int main(int argc, char* argv[])
     if (parser.isSet(installEngine))
     {
         const QString source = parser.value(installEngine);
-        anahita::app::EngineDownloader downloader;
+        mirab::app::EngineDownloader downloader;
         int status = 1;
-        QObject::connect(&downloader, &anahita::app::EngineDownloader::progress, &app,
+        QObject::connect(&downloader, &mirab::app::EngineDownloader::progress, &app,
                          [last = QString()](qint64, qint64, const QString& stage) mutable {
                              if (stage != last)
                                  std::fprintf(stderr, "%s\n", qPrintable(stage));
                              last = stage;
                          });
-        QObject::connect(&downloader, &anahita::app::EngineDownloader::finished, &app,
+        QObject::connect(&downloader, &mirab::app::EngineDownloader::finished, &app,
                          [&status](bool ok, const QString& message) {
                              std::fprintf(ok ? stdout : stderr, "%s\n", qPrintable(message));
                              status = ok ? 0 : 1;
@@ -97,7 +99,7 @@ int main(int argc, char* argv[])
                          });
         QTimer::singleShot(0, &app, [&] {
             if (source.compare("swmm5plus", Qt::CaseInsensitive) == 0 || source == "swmm5+")
-                downloader.start(anahita::app::EngineDownloader::swmm5PlusManifestUrl());
+                downloader.start(mirab::app::EngineDownloader::swmm5PlusManifestUrl());
             else if (QFileInfo::exists(source))
                 downloader.installLocal(QFileInfo(source).absoluteFilePath());
             else
@@ -107,7 +109,16 @@ int main(int argc, char* argv[])
         return status;
     }
 
-    anahita::app::MainWindow window;
+    // Automated runs (screenshots, tests) keep their settings in a temporary
+    // folder, so they never change the user's recent files or window layout.
+    QTemporaryDir automationSettings;
+    if (parser.isSet(screenshot) && automationSettings.isValid())
+    {
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, automationSettings.path());
+    }
+
+    mirab::app::MainWindow window;
     window.show();
     const QStringList files = parser.positionalArguments();
     if (!files.isEmpty())
@@ -141,7 +152,7 @@ int main(int argc, char* argv[])
         };
         if (parser.isSet(runFirst))
         {
-            QObject::connect(&window, &anahita::app::MainWindow::simulationCompleted, &window, shoot);
+            QObject::connect(&window, &mirab::app::MainWindow::simulationCompleted, &window, shoot);
             QTimer::singleShot(500, &window, [&window] { window.runSimulation(); });
         }
         else

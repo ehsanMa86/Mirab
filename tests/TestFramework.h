@@ -1,9 +1,9 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    tests/TestFramework.h
- * Purpose: Minimal self-registering unit test framework used by the Anahita test suite.
+ * Purpose: Minimal self-registering unit test framework used by the Mirab test suite.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -32,7 +32,7 @@
 #include <string>
 #include <vector>
 
-namespace anahita::test
+namespace mirab::test
 {
 
 struct Case
@@ -82,16 +82,16 @@ inline int runAll(int argc, char** argv)
     return failed == 0 && run > 0 ? 0 : 1;
 }
 
-} // namespace anahita::test
+} // namespace mirab::test
 
-#define ANAHITA_CAT2(a, b) a##b
-#define ANAHITA_CAT(a, b) ANAHITA_CAT2(a, b)
+#define MIRAB_CAT2(a, b) a##b
+#define MIRAB_CAT(a, b) MIRAB_CAT2(a, b)
 
 #define TEST_CASE(name)                                                                           \
-    static void ANAHITA_CAT(test_fn_, __LINE__)();                                                \
-    static ::anahita::test::Register ANAHITA_CAT(test_reg_, __LINE__)(name,                       \
-                                                                      ANAHITA_CAT(test_fn_, __LINE__)); \
-    static void ANAHITA_CAT(test_fn_, __LINE__)()
+    static void MIRAB_CAT(test_fn_, __LINE__)();                                                \
+    static ::mirab::test::Register MIRAB_CAT(test_reg_, __LINE__)(name,                       \
+                                                                      MIRAB_CAT(test_fn_, __LINE__)); \
+    static void MIRAB_CAT(test_fn_, __LINE__)()
 
 #define CHECK(cond)                                                                               \
     do                                                                                            \
@@ -100,7 +100,7 @@ inline int runAll(int argc, char** argv)
         {                                                                                         \
             std::ostringstream os_;                                                               \
             os_ << __FILE__ << ":" << __LINE__ << ": CHECK(" #cond ") failed";                    \
-            throw ::anahita::test::Failure(os_.str());                                            \
+            throw ::mirab::test::Failure(os_.str());                                            \
         }                                                                                         \
     } while (0)
 
@@ -114,7 +114,7 @@ inline int runAll(int argc, char** argv)
             std::ostringstream os_;                                                               \
             os_ << __FILE__ << ":" << __LINE__ << ": " #a " == " #b " failed (" << va_ << " vs "  \
                 << vb_ << ")";                                                                    \
-            throw ::anahita::test::Failure(os_.str());                                            \
+            throw ::mirab::test::Failure(os_.str());                                            \
         }                                                                                         \
     } while (0)
 
@@ -128,6 +128,6 @@ inline int runAll(int argc, char** argv)
             std::ostringstream os_;                                                               \
             os_ << __FILE__ << ":" << __LINE__ << ": " #a " ~ " #b " failed (" << va_ << " vs "   \
                 << vb_ << ")";                                                                    \
-            throw ::anahita::test::Failure(os_.str());                                            \
+            throw ::mirab::test::Failure(os_.str());                                            \
         }                                                                                         \
     } while (0)

@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Panels.cpp
  * Purpose: Implementation of the results, browser and text editor panels.
@@ -26,7 +26,7 @@
 
 #include "ChartWidget.h"
 #include "Icons.h"
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <QComboBox>
 #include <QFile>
@@ -50,7 +50,7 @@
 
 #include <functional>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 using core::Category;
@@ -605,4 +605,4 @@ bool MsxEditor::isModified() const
     return edit_->document()->isModified();
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

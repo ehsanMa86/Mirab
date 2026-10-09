@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    tools/make_icons.py
-# Purpose: Developer tool that draws the Anahita application icon and writes PNG, ICO, ICNS and SVG files.
+# Purpose: Developer tool that draws the Mirab application icon and writes PNG, ICO, ICNS and SVG files.
 #
 # Copyright (C) 2026 Ehsan Madadi
 #
@@ -82,7 +82,7 @@ def svg():
     nodes = "".join(
         f'<circle cx="{x}" cy="{y}" r="33" fill="#18a3a8" stroke="#0b5f8f" stroke-width="14"/>' for x, y in NODES)
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<!-- Anahita application icon. Copyright (C) 2026 Ehsan Madadi. SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Mirab application icon. Copyright (C) 2026 Ehsan Madadi. SPDX-License-Identifier: GPL-3.0-or-later -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
@@ -101,13 +101,13 @@ def svg():
 def main():
     big = draw(1024)
     (ROOT / "packaging/icons").mkdir(parents=True, exist_ok=True)
-    big.save(ROOT / "packaging/icons/anahita-1024.png")
+    big.save(ROOT / "packaging/icons/mirab-1024.png")
     for s in (512, 256, 128, 64, 48, 32, 16):
-        draw(s).save(ROOT / f"packaging/icons/anahita-{s}.png")
-    draw(256).save(ROOT / "src/app/resources/anahita.png")
-    big.save(ROOT / "packaging/windows/anahita.ico", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-    big.save(ROOT / "packaging/macos/anahita.icns")
-    (ROOT / "packaging/icons/anahita.svg").write_text(svg(), encoding="utf-8")
+        draw(s).save(ROOT / f"packaging/icons/mirab-{s}.png")
+    draw(256).save(ROOT / "src/app/resources/mirab.png")
+    big.save(ROOT / "packaging/windows/mirab.ico", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+    big.save(ROOT / "packaging/macos/mirab.icns")
+    (ROOT / "packaging/icons/mirab.svg").write_text(svg(), encoding="utf-8")
     print("icons written")
 
 

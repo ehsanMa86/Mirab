@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/ProjectSettings.cpp
  * Purpose: Reads and writes the per-project settings sidecar file.
@@ -22,21 +22,21 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/ProjectSettings.h"
+#include "mirab/core/ProjectSettings.h"
 
-#include "anahita/core/Json.h"
+#include "mirab/core/Json.h"
 
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 
-namespace anahita::core
+namespace mirab::core
 {
 
 std::filesystem::path ProjectSettings::sidecarPath(const std::filesystem::path& inpFile)
 {
     std::filesystem::path p = inpFile;
-    p += ".anahita.json";
+    p += ".mirab.json";
     return p;
 }
 
@@ -69,7 +69,7 @@ ProjectSettings ProjectSettings::loadFor(const std::filesystem::path& inpFile)
 void ProjectSettings::saveFor(const std::filesystem::path& inpFile) const
 {
     json::Value v = json::Value::object();
-    v.set("format", "anahita-project-settings/1");
+    v.set("format", "mirab-project-settings/1");
     v.set("engine", engineId);
     v.set("useMsx", useMsx);
     v.set("msxFile", msxFile);
@@ -84,4 +84,4 @@ void ProjectSettings::saveFor(const std::filesystem::path& inpFile) const
     out << v.dump(2) << "\n";
 }
 
-} // namespace anahita::core
+} // namespace mirab::core

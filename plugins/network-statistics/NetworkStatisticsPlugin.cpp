@@ -1,9 +1,9 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    plugins/network-statistics/NetworkStatisticsPlugin.cpp
- * Purpose: Example plugin: pipe length by diameter and demand totals, showing how to extend Anahita.
+ * Purpose: Example plugin: pipe length by diameter and demand totals, showing how to extend Mirab.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -22,8 +22,8 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/app/PluginInterface.h"
-#include "anahita/core/Text.h"
+#include "mirab/app/PluginInterface.h"
+#include "mirab/core/Text.h"
 
 #include <QAction>
 #include <QMessageBox>
@@ -32,13 +32,13 @@
 
 #include <map>
 
-using namespace anahita;
+using namespace mirab;
 
-class NetworkStatisticsPlugin : public QObject, public app::AnahitaPlugin
+class NetworkStatisticsPlugin : public QObject, public app::MirabPlugin
 {
     Q_OBJECT
-    Q_PLUGIN_METADATA(IID AnahitaPlugin_iid)
-    Q_INTERFACES(anahita::app::AnahitaPlugin)
+    Q_PLUGIN_METADATA(IID MirabPlugin_iid)
+    Q_INTERFACES(mirab::app::MirabPlugin)
 
 public:
     QString name() const override { return tr("Network statistics"); }

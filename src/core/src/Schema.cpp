@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/Schema.cpp
  * Purpose: Definitions of the EPANET 2.2/2.3 and SWMM 5.2 section layouts used by the editor.
@@ -22,11 +22,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/Schema.h"
+#include "mirab/core/Schema.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
-namespace anahita::core
+namespace mirab::core
 {
 
 const char* dialectName(Dialect d)
@@ -487,4 +487,4 @@ const std::vector<std::string>& sectionOrder(Dialect dialect)
     return epanet;
 }
 
-} // namespace anahita::core
+} // namespace mirab::core

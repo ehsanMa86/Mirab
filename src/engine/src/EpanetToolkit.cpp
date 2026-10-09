@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/EpanetToolkit.cpp
  * Purpose: Binding of the EPANET toolkit entry points and an RAII project session.
@@ -22,12 +22,12 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/engine/EpanetToolkit.h"
+#include "mirab/engine/EpanetToolkit.h"
 
 #include <array>
 #include <cstdint>
 
-namespace anahita::engine
+namespace mirab::engine
 {
 
 bool EpanetApi::bind(const DynamicLibrary& lib, std::string* missing)
@@ -144,7 +144,7 @@ void EpanetSession::open(const std::filesystem::path& input, const std::filesyst
     {
         static int counter = 0;
         rptPath = std::filesystem::temp_directory_path() /
-                  ("anahita-" + std::to_string(reinterpret_cast<std::uintptr_t>(this)) + "-" +
+                  ("mirab-" + std::to_string(reinterpret_cast<std::uintptr_t>(this)) + "-" +
                    std::to_string(++counter) + ".rpt");
         scratchReport_ = rptPath;
     }
@@ -411,4 +411,4 @@ void EpanetSession::deleteDemand(int node, int demandIndex)
     check(api_.deletedemand(ph_, node, demandIndex), "deleting a demand");
 }
 
-} // namespace anahita::engine
+} // namespace mirab::engine

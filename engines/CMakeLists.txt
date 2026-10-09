@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    engines/CMakeLists.txt
 # Purpose: Fetches the upstream EPANET, EPANET-MSX and SWMM sources at pinned commits and builds them as engine libraries.
@@ -23,17 +23,17 @@
 #
 # Each engine is compiled from its unmodified upstream sources into a shared
 # library with a unique name, so several versions of the same solver can be
-# shipped side by side and loaded at run time by Anahita. The upstream
+# shipped side by side and loaded at run time by Mirab. The upstream
 # copyright notices and licenses travel with the sources and are reproduced in
 # THIRD_PARTY_NOTICES.md.
 #
 # To build from local checkouts (for offline builds or engine development),
 # set FETCHCONTENT_SOURCE_DIR_<NAME> to the checkout, for example
-#   -DFETCHCONTENT_SOURCE_DIR_ANAHITA_UPSTREAM_OWA_EPANET=/path/to/EPANET
+#   -DFETCHCONTENT_SOURCE_DIR_MIRAB_UPSTREAM_OWA_EPANET=/path/to/EPANET
 
 include(FetchContent)
 
-macro(anahita_fetch name url sha256)
+macro(mirab_fetch name url sha256)
     FetchContent_Declare(${name}
         URL      ${url}
         URL_HASH SHA256=${sha256}
@@ -43,40 +43,40 @@ macro(anahita_fetch name url sha256)
 endmacro()
 
 # USEPA/epanet-engine (EPANET 2.2, public domain and MIT)
-anahita_fetch(anahita_upstream_epa_epanet
+mirab_fetch(mirab_upstream_epa_epanet
     https://github.com/USEPA/epanet-engine/archive/6aff01d7d9be7c9eee64246c6588b486776b3a75.tar.gz
     dc5ad1ffce064dff466200e9d017dd216873231b5e735885ed6bb116f1e19f38)
 
 # OpenWaterAnalytics/EPANET v2.3.5 (MIT)
-anahita_fetch(anahita_upstream_owa_epanet
+mirab_fetch(mirab_upstream_owa_epanet
     https://github.com/OpenWaterAnalytics/EPANET/archive/444725fbf16ab28b0470ef0ed281dc4849d49583.tar.gz
     9bd03df20d53b0fe26be755be40b9219a95843f4a92c8d878dcc42d020e857e2)
 
 # USEPA/EPANETMSX 2.0 (MIT). A one-word typo in the non-Windows code path is
 # corrected after download; see patches/msx-fix-compiler-typo.cmake.
-FetchContent_Declare(anahita_upstream_epanet_msx
+FetchContent_Declare(mirab_upstream_epanet_msx
     URL      https://github.com/USEPA/EPANETMSX/archive/84c057e0a62b7fb3a89ef555a86fa0e3e0ed87ad.tar.gz
     URL_HASH SHA256=5e44e9cc01e8088ea4d78a1a13adbbe79c88f9e0819aeee443c4145748600e97
     PATCH_COMMAND ${CMAKE_COMMAND} -DFILE=<SOURCE_DIR>/Src/msxcompiler.c
                   -P ${CMAKE_CURRENT_SOURCE_DIR}/patches/msx-fix-compiler-typo.cmake
     SOURCE_SUBDIR do-not-add
     DOWNLOAD_EXTRACT_TIMESTAMP ON)
-FetchContent_MakeAvailable(anahita_upstream_epanet_msx)
+FetchContent_MakeAvailable(mirab_upstream_epanet_msx)
 
 # USEPA/Stormwater-Management-Model v5.2.4 (public domain)
-anahita_fetch(anahita_upstream_epa_swmm
+mirab_fetch(mirab_upstream_epa_swmm
     https://github.com/USEPA/Stormwater-Management-Model/archive/7952ca837988b1c32f791812eccc9fd64547e093.tar.gz
     0c882c315b64d5236b3569f891e9ad71421bc5b7d92a5710ceb1ae3b7f34c6cf)
 
-set(EPA_EPANET_DIR "${anahita_upstream_epa_epanet_SOURCE_DIR}")
-set(OWA_EPANET_DIR "${anahita_upstream_owa_epanet_SOURCE_DIR}")
-set(EPANET_MSX_DIR "${anahita_upstream_epanet_msx_SOURCE_DIR}")
-set(EPA_SWMM_DIR   "${anahita_upstream_epa_swmm_SOURCE_DIR}")
+set(EPA_EPANET_DIR "${mirab_upstream_epa_epanet_SOURCE_DIR}")
+set(OWA_EPANET_DIR "${mirab_upstream_owa_epanet_SOURCE_DIR}")
+set(EPANET_MSX_DIR "${mirab_upstream_epanet_msx_SOURCE_DIR}")
+set(EPA_SWMM_DIR   "${mirab_upstream_epa_swmm_SOURCE_DIR}")
 
-find_library(ANAHITA_LIBM m)
+find_library(MIRAB_LIBM m)
 
 # Common settings for every engine library.
-function(anahita_engine_library target)
+function(mirab_engine_library target)
     cmake_parse_arguments(E "" "" "SOURCES;INCLUDES;DEFINES;LINK" ${ARGN})
     add_library(${target} SHARED ${E_SOURCES})
     target_include_directories(${target} PRIVATE ${E_INCLUDES})
@@ -86,8 +86,8 @@ function(anahita_engine_library target)
         IMPORT_PREFIX ""
         C_STANDARD 99
         C_VISIBILITY_PRESET default
-        RUNTIME_OUTPUT_DIRECTORY "${ANAHITA_ENGINE_BUILD_DIR}"
-        LIBRARY_OUTPUT_DIRECTORY "${ANAHITA_ENGINE_BUILD_DIR}")
+        RUNTIME_OUTPUT_DIRECTORY "${MIRAB_ENGINE_BUILD_DIR}"
+        LIBRARY_OUTPUT_DIRECTORY "${MIRAB_ENGINE_BUILD_DIR}")
     if(APPLE)
         set_target_properties(${target} PROPERTIES
             INSTALL_NAME_DIR "@rpath"
@@ -107,27 +107,27 @@ function(anahita_engine_library target)
         # Engines must not depend on MinGW runtime DLLs.
         target_link_options(${target} PRIVATE -static -static-libgcc)
     endif()
-    if(ANAHITA_LIBM)
-        target_link_libraries(${target} PRIVATE ${ANAHITA_LIBM})
+    if(MIRAB_LIBM)
+        target_link_libraries(${target} PRIVATE ${MIRAB_LIBM})
     endif()
     if(E_LINK)
         target_link_libraries(${target} PRIVATE ${E_LINK})
     endif()
     install(TARGETS ${target}
-        RUNTIME DESTINATION "${ANAHITA_INSTALL_ENGINEDIR}"
-        LIBRARY DESTINATION "${ANAHITA_INSTALL_ENGINEDIR}")
+        RUNTIME DESTINATION "${MIRAB_INSTALL_ENGINEDIR}"
+        LIBRARY DESTINATION "${MIRAB_INSTALL_ENGINEDIR}")
 endfunction()
 
 # --- EPA EPANET 2.2 ---------------------------------------------------------
 file(GLOB EPA_EPANET_SOURCES "${EPA_EPANET_DIR}/src/solver/*.c")
-anahita_engine_library(anahita_epanet22_epa
+mirab_engine_library(mirab_epanet22_epa
     SOURCES  ${EPA_EPANET_SOURCES}
     INCLUDES "${EPA_EPANET_DIR}/src/solver/include" "${EPA_EPANET_DIR}/src/solver"
     DEFINES  epanet2_EXPORTS)
 
 # --- OWA EPANET 2.3 ---------------------------------------------------------
 file(GLOB OWA_EPANET_SOURCES "${OWA_EPANET_DIR}/src/*.c" "${OWA_EPANET_DIR}/src/util/*.c")
-anahita_engine_library(anahita_epanet23_owa
+mirab_engine_library(mirab_epanet23_owa
     SOURCES  ${OWA_EPANET_SOURCES}
     INCLUDES "${OWA_EPANET_DIR}/include" "${OWA_EPANET_DIR}/src" "${OWA_EPANET_DIR}/src/util"
     DEFINES  epanet2_EXPORTS)
@@ -141,21 +141,21 @@ if(APPLE)
 endif()
 foreach(base IN ITEMS epanet22_epa epanet23_owa)
     string(REPLACE "epanet" "" suffix "${base}")
-    anahita_engine_library(anahita_msx20_${suffix}
+    mirab_engine_library(mirab_msx20_${suffix}
         SOURCES  ${EPANET_MSX_SOURCES}
         INCLUDES ${MSX_INCLUDES}
         DEFINES  epanetmsx_EXPORTS
-        LINK     anahita_${base})
+        LINK     mirab_${base})
 endforeach()
 
 # --- EPA SWMM 5.2 -----------------------------------------------------------
 file(GLOB EPA_SWMM_SOURCES "${EPA_SWMM_DIR}/src/solver/*.c")
-anahita_engine_library(anahita_swmm52_epa
+mirab_engine_library(mirab_swmm52_epa
     SOURCES  ${EPA_SWMM_SOURCES}
     INCLUDES "${EPA_SWMM_DIR}/src/solver/include" "${EPA_SWMM_DIR}/src/solver"
     DEFINES  swmm5_EXPORTS)
 
-add_custom_target(anahita_engines DEPENDS
-    anahita_epanet22_epa anahita_epanet23_owa
-    anahita_msx20_22_epa anahita_msx20_23_owa
-    anahita_swmm52_epa)
+add_custom_target(mirab_engines DEPENDS
+    mirab_epanet22_epa mirab_epanet23_owa
+    mirab_msx20_22_epa mirab_msx20_23_owa
+    mirab_swmm52_epa)

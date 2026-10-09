@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/DynamicLibrary.cpp
  * Purpose: LoadLibraryEx/dlopen wrapper used to load simulation engines.
@@ -22,7 +22,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/engine/DynamicLibrary.h"
+#include "mirab/engine/DynamicLibrary.h"
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -39,7 +39,7 @@
 
 #include <vector>
 
-namespace anahita::engine
+namespace mirab::engine
 {
 
 DynamicLibrary::~DynamicLibrary()
@@ -155,4 +155,4 @@ std::filesystem::path executableDirectory()
 #endif
 }
 
-} // namespace anahita::engine
+} // namespace mirab::engine

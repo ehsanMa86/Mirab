@@ -1,5 +1,5 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    tools/bootstrap-windows.ps1
 # Purpose: Installs a private Windows build toolchain (CMake, Ninja, Qt 6.8 with MinGW 13.1, NSIS) without administrator rights.
@@ -23,7 +23,7 @@
 # Usage (PowerShell):  powershell -ExecutionPolicy Bypass -File tools\bootstrap-windows.ps1
 # Then, in Git Bash:   source tools/env-mingw.sh
 param(
-    [string]$Root = "$env:LOCALAPPDATA\anahita-dev",
+    [string]$Root = "$env:LOCALAPPDATA\mirab-dev",
     [string]$QtVersion = "6.8.3"
 )
 $ErrorActionPreference = "Stop"

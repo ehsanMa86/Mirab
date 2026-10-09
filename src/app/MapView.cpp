@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/MapView.cpp
  * Purpose: Network map: drawing, basemap, result coloring and interactive editing.
@@ -26,7 +26,7 @@
 
 #include "Basemap.h"
 #include "Theme.h"
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <QFile>
 #include <QFileInfo>
@@ -42,7 +42,7 @@
 #include <cmath>
 #include <limits>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 using core::Category;
@@ -968,6 +968,11 @@ void MapView::drawScaleBar(QPainter& p, const QRect& area)
     {
         perPixel = haversineMeters(lon1, lat1, lon2, lat2) / 100.0;
         unit = "m";
+        if (doc_->model().units().system == core::UnitSystem::US)
+        {
+            perPixel /= 0.3048; // feet and miles for US customary models
+            unit = "ft";
+        }
     }
     else
     {
@@ -1400,4 +1405,4 @@ void MapView::leaveEvent(QEvent*)
     update();
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

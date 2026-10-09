@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/MsxEngine.cpp
  * Purpose: Adapter that runs EPANET-MSX multi-species quality on top of an EPANET engine.
@@ -29,7 +29,7 @@
 #include <array>
 #include <cmath>
 
-namespace anahita::engine::detail
+namespace mirab::engine::detail
 {
 
 namespace
@@ -296,4 +296,4 @@ std::unique_ptr<Engine> makeMsxEngine(EngineDescriptor d, std::filesystem::path 
     return std::make_unique<MsxEngine>(std::move(d), std::move(msxLibrary), std::move(epanetLibrary));
 }
 
-} // namespace anahita::engine::detail
+} // namespace mirab::engine::detail

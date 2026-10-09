@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/Text.cpp
  * Purpose: Implementation of the locale-independent string helpers.
@@ -22,7 +22,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <algorithm>
 #include <cctype>
@@ -31,7 +31,7 @@
 #include <locale>
 #include <sstream>
 
-namespace anahita::text
+namespace mirab::text
 {
 
 namespace
@@ -294,4 +294,4 @@ std::string formatDuration(double seconds)
     return out.str();
 }
 
-} // namespace anahita::text
+} // namespace mirab::text

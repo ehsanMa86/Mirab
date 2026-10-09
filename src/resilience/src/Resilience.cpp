@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/resilience/src/Resilience.cpp
  * Purpose: Implementation of the Todini index, service availability, topology, criticality and fire-flow analyses.
@@ -22,10 +22,10 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/resilience/Resilience.h"
+#include "mirab/resilience/Resilience.h"
 
-#include "anahita/core/Text.h"
-#include "anahita/core/Units.h"
+#include "mirab/core/Text.h"
+#include "mirab/core/Units.h"
 
 #include <algorithm>
 #include <cmath>
@@ -34,7 +34,7 @@
 #include <stack>
 #include <unordered_map>
 
-namespace anahita::resilience
+namespace mirab::resilience
 {
 
 using core::ResultSet;
@@ -459,7 +459,7 @@ std::vector<FireFlowEntry> fireFlow(const engine::EpanetApi& api, const std::fil
     // Single-period snapshot at the requested time of day.
     s.setTimeParam(engine::en::DURATION, 0);
     s.setTimeParam(engine::en::PATTERNSTART, static_cast<long>(options.timeOfDay));
-    s.addPattern("ANAHITA_FIRE", {1.0});
+    s.addPattern("MIRAB_FIRE", {1.0});
 
     std::vector<int> junctions;
     for (int i = 1; i <= s.nodeCount(); ++i)
@@ -482,7 +482,7 @@ std::vector<FireFlowEntry> fireFlow(const engine::EpanetApi& api, const std::fil
     s.openH();
     auto solveWith = [&](int node, double q, double& atNode, double& minP, int& minNode) {
         const int before = s.demandCount(node);
-        s.addDemand(node, q, "ANAHITA_FIRE", "fire");
+        s.addDemand(node, q, "MIRAB_FIRE", "fire");
         bool ok = true;
         try
         {
@@ -553,4 +553,4 @@ std::vector<FireFlowEntry> fireFlow(const engine::EpanetApi& api, const std::fil
     return out;
 }
 
-} // namespace anahita::resilience
+} // namespace mirab::resilience

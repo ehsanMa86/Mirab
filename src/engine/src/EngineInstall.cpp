@@ -1,9 +1,9 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/EngineInstall.cpp
- * Purpose: Verifies and installs engine packages described by "anahita-engine/1" manifests.
+ * Purpose: Verifies and installs engine packages described by "mirab-engine/1" manifests.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -22,18 +22,18 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/engine/EngineInstall.h"
+#include "mirab/engine/EngineInstall.h"
 
-#include "anahita/core/Hash.h"
-#include "anahita/core/Json.h"
-#include "anahita/core/Text.h"
+#include "mirab/core/Hash.h"
+#include "mirab/core/Json.h"
+#include "mirab/core/Text.h"
 
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
 
-namespace anahita::engine
+namespace mirab::engine
 {
 
 std::string platformId()
@@ -58,22 +58,22 @@ std::filesystem::path userEngineDirectory()
 {
 #if defined(_WIN32)
     if (const char* local = std::getenv("LOCALAPPDATA"))
-        return std::filesystem::u8path(local) / "Anahita" / "engines";
+        return std::filesystem::u8path(local) / "Mirab" / "engines";
 #elif defined(__APPLE__)
     if (const char* home = std::getenv("HOME"))
-        return std::filesystem::u8path(home) / "Library" / "Application Support" / "Anahita" / "engines";
+        return std::filesystem::u8path(home) / "Library" / "Application Support" / "Mirab" / "engines";
 #else
     if (const char* xdg = std::getenv("XDG_DATA_HOME"); xdg && *xdg)
-        return std::filesystem::u8path(xdg) / "anahita" / "engines";
+        return std::filesystem::u8path(xdg) / "mirab" / "engines";
     if (const char* home = std::getenv("HOME"))
-        return std::filesystem::u8path(home) / ".local" / "share" / "anahita" / "engines";
+        return std::filesystem::u8path(home) / ".local" / "share" / "mirab" / "engines";
 #endif
-    return std::filesystem::temp_directory_path() / "anahita-engines";
+    return std::filesystem::temp_directory_path() / "mirab-engines";
 }
 
 std::string defaultSwmm5PlusManifestUrl()
 {
-    if (const char* env = std::getenv("ANAHITA_SWMM5PLUS_MANIFEST_URL"); env && *env)
+    if (const char* env = std::getenv("MIRAB_SWMM5PLUS_MANIFEST_URL"); env && *env)
         return env;
     return "https://github.com/ehsanMa86/swmm5plus-capi/releases/latest/download/swmm5plus-capi-" + platformId() +
            ".json";
@@ -90,7 +90,7 @@ EngineManifest EngineManifest::parse(const std::string& textValue)
     {
         throw std::runtime_error(std::string("the engine manifest is not valid JSON: ") + e.what());
     }
-    if (v.get("format").asString() != "anahita-engine/1")
+    if (v.get("format").asString() != "mirab-engine/1")
         throw std::runtime_error("unsupported engine manifest format \"" + v.get("format").asString() + "\"");
     EngineManifest m;
     m.engine = v.get("engine").asString();
@@ -138,7 +138,7 @@ void installFromManifest(const EngineManifest& m, const std::filesystem::path& s
                                  platformId());
     if (m.engine == "swmm5plus-1.0" && m.apiVersion != 1)
         throw std::runtime_error("this " + m.name + " package uses C interface version " +
-                                 std::to_string(m.apiVersion) + "; this Anahita supports version 1");
+                                 std::to_string(m.apiVersion) + "; this Mirab supports version 1");
 
     // 1. Verify everything before touching the engine folder.
     for (const auto& f : m.files)
@@ -161,7 +161,7 @@ void installFromManifest(const EngineManifest& m, const std::filesystem::path& s
         fs::copy_file(sourceDir / fs::u8path(f.asset), tmp, fs::copy_options::overwrite_existing);
     }
     json::Value record = json::Value::object();
-    record.set("format", "anahita-engine-installed/1");
+    record.set("format", "mirab-engine-installed/1");
     record.set("engine", m.engine);
     record.set("name", m.name);
     record.set("version", m.version);
@@ -206,4 +206,4 @@ bool uninstallEngine(const std::string& engineId, const std::filesystem::path& t
     return true;
 }
 
-} // namespace anahita::engine
+} // namespace mirab::engine

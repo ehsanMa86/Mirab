@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/ImportDialog.h
  * Purpose: Import of shapefiles, DXF drawings and CSV tables into the project, with field mapping.
@@ -25,7 +25,7 @@
 #pragma once
 
 #include "ProjectDocument.h"
-#include "anahita/interop/Import.h"
+#include "mirab/interop/Import.h"
 
 #include <QDialog>
 
@@ -41,7 +41,7 @@ class QListWidget;
 class QPushButton;
 class QTableWidget;
 
-namespace anahita::app
+namespace mirab::app
 {
 
 class ImportDialog : public QDialog
@@ -86,4 +86,4 @@ private:
     int imported_ = 0;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

@@ -1,6 +1,6 @@
 # Writing plugins
 
-Plugins add menu actions to Anahita. A plugin is a Qt plugin library that implements `anahita::app::AnahitaPlugin` from [`src/app/include/anahita/app/PluginInterface.h`](../src/app/include/anahita/app/PluginInterface.h).
+Plugins add menu actions to Mirab. A plugin is a Qt plugin library that implements `mirab::app::MirabPlugin` from [`src/app/include/mirab/app/PluginInterface.h`](../src/app/include/mirab/app/PluginInterface.h).
 
 ## What a plugin can do
 
@@ -15,20 +15,20 @@ Through the `PluginHost` it receives, a plugin can:
 ## Minimal plugin
 
 ```cpp
-#include "anahita/app/PluginInterface.h"
+#include "mirab/app/PluginInterface.h"
 #include <QAction>
 #include <QObject>
 
-class HelloPlugin : public QObject, public anahita::app::AnahitaPlugin
+class HelloPlugin : public QObject, public mirab::app::MirabPlugin
 {
     Q_OBJECT
-    Q_PLUGIN_METADATA(IID AnahitaPlugin_iid)
-    Q_INTERFACES(anahita::app::AnahitaPlugin)
+    Q_PLUGIN_METADATA(IID MirabPlugin_iid)
+    Q_INTERFACES(mirab::app::MirabPlugin)
 public:
     QString name() const override { return "Hello"; }
     QString description() const override { return "Counts nodes."; }
     QString version() const override { return "1.0"; }
-    QList<QAction*> actions(anahita::app::PluginHost* host, QObject* parent) override
+    QList<QAction*> actions(mirab::app::PluginHost* host, QObject* parent) override
     {
         auto* a = new QAction("Count nodes", parent);
         QObject::connect(a, &QAction::triggered, parent, [host] {
@@ -44,10 +44,10 @@ See [`plugins/network-statistics`](../plugins/network-statistics) for a complete
 
 ## Building and installing
 
-Build the plugin with the same Qt major version and the same compiler family as Anahita, and link it to `Anahita::core` (or compile the core sources into it). Copy the library to one of:
+Build the plugin with the same Qt major version and the same compiler family as Mirab, and link it to `Mirab::core` (or compile the core sources into it). Copy the library to one of:
 
-- `plugins/` next to the Anahita executable,
-- `../lib/anahita/plugins` on Linux, `Anahita.app/Contents/PlugIns/anahita` on macOS,
+- `plugins/` next to the Mirab executable,
+- `../lib/mirab/plugins` on Linux, `Mirab.app/Contents/PlugIns/mirab` on macOS,
 - the per-user plugin folder opened by *Tools > Plugins > Open plugin folder*.
 
-Anahita lists loaded plugins in the Messages panel at start-up, and explains why a library was not loaded.
+Mirab lists loaded plugins in the Messages panel at start-up, and explains why a library was not loaded.

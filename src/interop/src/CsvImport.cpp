@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/interop/src/CsvImport.cpp
  * Purpose: Reads delimited text tables (CSV/TSV) as point layers or attribute tables.
@@ -27,18 +27,18 @@
 // Values (CSV) Files: quoted fields, doubled quotes inside quoted fields and
 // line breaks inside quoted fields. Semicolon and tab delimiters and a UTF-8
 // byte order mark are accepted as written by common spreadsheet programs.
-#include "anahita/interop/Import.h"
+#include "mirab/interop/Import.h"
 
 #include "ImportDetail.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <initializer_list>
 #include <optional>
 #include <set>
 #include <stdexcept>
 
-namespace anahita::interop
+namespace mirab::interop
 {
 
 namespace fs = std::filesystem;
@@ -238,4 +238,4 @@ ImportedLayer readCsv(const fs::path& path, const CsvOptions& options)
     return layer;
 }
 
-} // namespace anahita::interop
+} // namespace mirab::interop

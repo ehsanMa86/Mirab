@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/EngineDownloader.cpp
  * Purpose: Implementation of the engine downloader and installer.
@@ -25,8 +25,8 @@
 #include "EngineDownloader.h"
 
 #include "SolverProcess.h"
-#include "anahita/AnahitaConfig.h"
-#include "anahita/engine/EngineInstall.h"
+#include "mirab/MirabConfig.h"
+#include "mirab/engine/EngineInstall.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -38,7 +38,7 @@
 #include <QSettings>
 #include <QTemporaryDir>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 EngineDownloader::EngineDownloader(QObject* parent) : QObject(parent) {}
@@ -105,7 +105,7 @@ void EngineDownloader::fetchNext()
         return;
     }
     QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Anahita/" ANAHITA_VERSION_STRING));
+    request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Mirab/" MIRAB_VERSION_STRING));
     request.setTransferTimeout(60000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     reply_ = network_.get(request);
@@ -222,4 +222,4 @@ void EngineDownloader::cancel()
         reply_->abort();
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

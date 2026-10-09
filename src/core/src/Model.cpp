@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/Model.cpp
  * Purpose: Builds the network graph from an input document and applies schema-aware edits.
@@ -22,9 +22,9 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/Model.h"
+#include "mirab/core/Model.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <algorithm>
 #include <map>
@@ -32,7 +32,7 @@
 #include <stdexcept>
 #include <unordered_map>
 
-namespace anahita::core
+namespace mirab::core
 {
 
 using text::iequals;
@@ -150,7 +150,7 @@ Model Model::newProject(Dialect dialect, std::string_view flowUnits)
     if (dialect == Dialect::Swmm)
     {
         const std::string fu = flowUnits.empty() ? "CMS" : toUpper(flowUnits);
-        doc.ensure("TITLE").appendRow({"New", "Anahita", "SWMM", "project"});
+        doc.ensure("TITLE").appendRow({"New", "Mirab", "SWMM", "project"});
         auto& o = doc.ensure("OPTIONS");
         o.appendRow({"FLOW_UNITS", fu});
         o.appendRow({"INFILTRATION", "HORTON"});
@@ -182,7 +182,7 @@ Model Model::newProject(Dialect dialect, std::string_view flowUnits)
     else
     {
         const std::string fu = flowUnits.empty() ? "LPS" : toUpper(flowUnits);
-        doc.ensure("TITLE").appendRow({"New", "Anahita", "EPANET", "project"});
+        doc.ensure("TITLE").appendRow({"New", "Mirab", "EPANET", "project"});
         auto& t = doc.ensure("TIMES");
         t.appendRow({"DURATION", "24:00"});
         t.appendRow({"HYDRAULIC", "TIMESTEP", "1:00"});
@@ -1098,4 +1098,4 @@ std::vector<ModelIssue> Model::validate() const
     return issues;
 }
 
-} // namespace anahita::core
+} // namespace mirab::core

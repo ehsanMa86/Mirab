@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/ProjectDocument.cpp
  * Purpose: Project document implementation with snapshot-based undo and redo.
@@ -27,7 +27,7 @@
 #include <QFileInfo>
 #include <QUndoCommand>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 namespace
@@ -209,4 +209,4 @@ void ProjectDocument::select(const Selection& s)
     emit selectionChanged();
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

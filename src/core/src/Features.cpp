@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/Features.cpp
  * Purpose: Scans an input document for features that only some engines support.
@@ -22,11 +22,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/Features.h"
+#include "mirab/core/Features.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
-namespace anahita::core
+namespace mirab::core
 {
 
 const char* featureName(Feature f)
@@ -155,4 +155,4 @@ std::vector<FeatureUse> detectFeatures(const Model& model)
     return out;
 }
 
-} // namespace anahita::core
+} // namespace mirab::core

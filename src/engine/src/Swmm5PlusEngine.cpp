@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/Swmm5PlusEngine.cpp
  * Purpose: Adapter that runs SWMM5+ through the swmm5plus-capi C interface.
@@ -24,19 +24,19 @@
  */
 //
 // The C interface is defined by the companion project swmm5plus-capi
-// (include/swmm5plus.h). Functions are resolved at run time, so Anahita
+// (include/swmm5plus.h). Functions are resolved at run time, so Mirab
 // builds without a Fortran compiler and works whether or not SWMM5+ is
 // installed.
 #include "Adapters.h"
 
-#include "anahita/core/Model.h"
-#include "anahita/core/Units.h"
+#include "mirab/core/Model.h"
+#include "mirab/core/Units.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 
-namespace anahita::engine::detail
+namespace mirab::engine::detail
 {
 
 namespace
@@ -283,4 +283,4 @@ std::unique_ptr<Engine> makeSwmm5PlusEngine(EngineDescriptor d, std::filesystem:
     return std::make_unique<Swmm5PlusEngine>(std::move(d), std::move(library));
 }
 
-} // namespace anahita::engine::detail
+} // namespace mirab::engine::detail

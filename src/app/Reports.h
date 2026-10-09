@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Reports.h
  * Purpose: Report tabs: network tables, time series, profile, frequency, variability, system flow, energy and status.
@@ -29,7 +29,7 @@
 #include <QString>
 #include <QWidget>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 struct ReportInfo
@@ -47,4 +47,4 @@ QList<ReportInfo> availableReports(core::Dialect dialect);
 /// used by the status report. Returns nullptr for an unknown kind.
 QWidget* createReport(const QString& kind, ProjectDocument* doc, const QString& reportFile, QWidget* parent);
 
-} // namespace anahita::app
+} // namespace mirab::app

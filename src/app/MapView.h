@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/MapView.h
  * Purpose: Network map: drawing, basemap, result coloring and interactive editing.
@@ -35,7 +35,7 @@
 #include <utility>
 #include <vector>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 class Basemap;
@@ -165,4 +165,4 @@ private:
     QRectF backdropWorld_;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

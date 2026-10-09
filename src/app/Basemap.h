@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Basemap.h
  * Purpose: Web basemap layer: XYZ map tiles projected into the coordinate system of the model.
@@ -38,12 +38,12 @@
 class QNetworkAccessManager;
 class QPainter;
 
-namespace anahita::crs
+namespace mirab::crs
 {
 struct Crs;
 }
 
-namespace anahita::app
+namespace mirab::app
 {
 
 class Basemap : public QObject
@@ -109,4 +109,4 @@ private:
     int generation_ = 0;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/Crs.cpp
  * Purpose: Coordinate reference systems and map projections.
@@ -22,7 +22,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/Crs.h"
+#include "mirab/core/Crs.h"
 
 #include <algorithm>
 #include <cctype>
@@ -34,7 +34,7 @@
 #include <map>
 #include <utility>
 
-namespace anahita::crs
+namespace mirab::crs
 {
 
 namespace
@@ -3749,4 +3749,4 @@ void webMercatorToLonLat(double x, double y, double& lon, double& lat)
     lat = std::atan(std::sinh(y / kWebRadius)) / kDeg;
 }
 
-} // namespace anahita::crs
+} // namespace mirab::crs

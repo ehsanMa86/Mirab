@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/EpanetRun.h
  * Purpose: Shared EPANET simulation loop used by the EPANET and EPANET-MSX adapters.
@@ -24,13 +24,13 @@
  */
 #pragma once
 
-#include "anahita/engine/Engine.h"
-#include "anahita/engine/EpanetToolkit.h"
+#include "mirab/engine/Engine.h"
+#include "mirab/engine/EpanetToolkit.h"
 
 #include <filesystem>
 #include <string>
 
-namespace anahita::engine::detail
+namespace mirab::engine::detail
 {
 
 std::string formatEpanetVersion(int v);
@@ -43,4 +43,4 @@ bool runEpanetLoop(EpanetSession& session, const std::filesystem::path& inputFil
                    core::ResultSet& results, const RunCallbacks& callbacks,
                    double progressFrom = 0.0, double progressTo = 1.0);
 
-} // namespace anahita::engine::detail
+} // namespace mirab::engine::detail

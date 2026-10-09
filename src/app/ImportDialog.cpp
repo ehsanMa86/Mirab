@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/ImportDialog.cpp
  * Purpose: Import of shapefiles, DXF drawings and CSV tables into the project, with field mapping.
@@ -25,8 +25,8 @@
 #include "ImportDialog.h"
 
 #include "Icons.h"
-#include "anahita/core/Crs.h"
-#include "anahita/core/Text.h"
+#include "mirab/core/Crs.h"
+#include "mirab/core/Text.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -49,7 +49,7 @@
 #include <cmath>
 #include <limits>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 using core::Category;
@@ -457,4 +457,4 @@ void ImportDialog::runImport()
         item->setIcon(icons::get("info"));
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

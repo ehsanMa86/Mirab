@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/engine/src/Adapters.h
  * Purpose: Internal factory functions for the engine adapters.
@@ -24,12 +24,12 @@
  */
 #pragma once
 
-#include "anahita/engine/Engine.h"
+#include "mirab/engine/Engine.h"
 
 #include <filesystem>
 #include <memory>
 
-namespace anahita::engine::detail
+namespace mirab::engine::detail
 {
 
 std::unique_ptr<Engine> makeEpanetEngine(EngineDescriptor d, std::filesystem::path library);
@@ -38,4 +38,4 @@ std::unique_ptr<Engine> makeMsxEngine(EngineDescriptor d, std::filesystem::path 
 std::unique_ptr<Engine> makeSwmmEngine(EngineDescriptor d, std::filesystem::path library);
 std::unique_ptr<Engine> makeSwmm5PlusEngine(EngineDescriptor d, std::filesystem::path library);
 
-} // namespace anahita::engine::detail
+} // namespace mirab::engine::detail

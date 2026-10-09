@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    tests/test_core.cpp
  * Purpose: Unit tests of the core library: text, JSON, input documents, model editing and results files.
@@ -24,30 +24,30 @@
  */
 #include "TestFramework.h"
 
-#include "anahita/core/Features.h"
-#include "anahita/core/Hash.h"
-#include "anahita/core/Json.h"
-#include "anahita/core/Model.h"
-#include "anahita/core/ProjectSettings.h"
-#include "anahita/core/Results.h"
-#include "anahita/core/Text.h"
+#include "mirab/core/Features.h"
+#include "mirab/core/Hash.h"
+#include "mirab/core/Json.h"
+#include "mirab/core/Model.h"
+#include "mirab/core/ProjectSettings.h"
+#include "mirab/core/Results.h"
+#include "mirab/core/Text.h"
 
 #include <filesystem>
 #include <fstream>
 
-using namespace anahita;
+using namespace mirab;
 namespace fs = std::filesystem;
 
 namespace
 {
 fs::path example(const char* rel)
 {
-    return fs::path(ANAHITA_SOURCE_DIR) / "examples" / rel;
+    return fs::path(MIRAB_SOURCE_DIR) / "examples" / rel;
 }
 
 fs::path scratch(const char* name)
 {
-    const auto dir = fs::temp_directory_path() / "anahita-tests";
+    const auto dir = fs::temp_directory_path() / "mirab-tests";
     fs::create_directories(dir);
     return dir / name;
 }
@@ -105,7 +105,7 @@ TEST_CASE("json: parse and dump round trip")
 
 TEST_CASE("inp: unchanged documents round trip byte for byte")
 {
-    for (const char* f : {"epanet/anahita-demo.inp", "swmm/anahita-urban.inp", "msx/anahita-demo.msx"})
+    for (const char* f : {"epanet/mirab-demo.inp", "swmm/mirab-urban.inp", "msx/mirab-demo.msx"})
     {
         std::ifstream in(example(f), std::ios::binary);
         std::string original((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -129,7 +129,7 @@ TEST_CASE("inp: key/value options with multi-word keys")
 
 TEST_CASE("model: EPANET demo network structure")
 {
-    const auto m = core::Model::fromFile(example("epanet/anahita-demo.inp"));
+    const auto m = core::Model::fromFile(example("epanet/mirab-demo.inp"));
     CHECK(m.dialect() == core::Dialect::Epanet);
     CHECK_EQ(m.nodes().size(), std::size_t(11));
     CHECK_EQ(m.links().size(), std::size_t(14));
@@ -145,7 +145,7 @@ TEST_CASE("model: EPANET demo network structure")
 
 TEST_CASE("model: SWMM demo network structure")
 {
-    const auto m = core::Model::fromFile(example("swmm/anahita-urban.inp"));
+    const auto m = core::Model::fromFile(example("swmm/mirab-urban.inp"));
     CHECK(m.dialect() == core::Dialect::Swmm);
     CHECK_EQ(m.nodes().size(), std::size_t(6));
     CHECK_EQ(m.links().size(), std::size_t(5));
@@ -158,7 +158,7 @@ TEST_CASE("model: SWMM demo network structure")
 
 TEST_CASE("model: add, rename and remove elements")
 {
-    auto m = core::Model::fromFile(example("epanet/anahita-demo.inp"));
+    auto m = core::Model::fromFile(example("epanet/mirab-demo.inp"));
     std::string err;
     CHECK(m.addNode("Junction", "J10", {3500, 1000}, &err));
     CHECK(m.addLink("Pipe", "P14", "J9", "J10", &err));
@@ -193,7 +193,7 @@ TEST_CASE("model: new projects are valid input files")
 
 TEST_CASE("features: OWA EPANET 2.3 features are detected")
 {
-    const auto m = core::Model::fromFile(example("epanet/anahita-demo-leakage.inp"));
+    const auto m = core::Model::fromFile(example("epanet/mirab-demo-leakage.inp"));
     bool leakage = false, pda = false;
     for (const auto& f : core::detectFeatures(m))
     {

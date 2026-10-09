@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/PropertyPanel.cpp
  * Purpose: Schema-driven property editor with engine-aware greying of unsupported data.
@@ -26,8 +26,8 @@
 
 #include "Icons.h"
 #include "Theme.h"
-#include "anahita/core/Features.h"
-#include "anahita/core/Text.h"
+#include "mirab/core/Features.h"
+#include "mirab/core/Text.h"
 
 #include <QComboBox>
 #include <QHash>
@@ -43,7 +43,7 @@
 #include <map>
 #include <set>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 using core::Category;
@@ -560,4 +560,4 @@ void PropertyPanel::populateAddMenu()
     addButton_->setEnabled(!menu->isEmpty());
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

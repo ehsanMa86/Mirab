@@ -1,4 +1,4 @@
-# Anahita user guide
+# Mirab user guide
 
 ![The map with an OpenStreetMap basemap, pressure colors and a time series](images/map-basemap.jpg)
 
@@ -13,7 +13,7 @@
 - **Properties panel** (right). It shows the selected element, or the simulation options when nothing is selected. Click a value to edit it, and type in the filter box to find a property quickly.
 - **Messages and Time series** (bottom). The Messages tab shows compatibility notes and the run log. The Time series tab plots the selected element over time.
 
-Panels can be resized, moved, closed and floated. *View > Panels* shows a closed panel again and *View > Reset layout* restores the default arrangement. Anahita always uses a light theme.
+Panels can be resized, moved, closed and floated. *View > Panels* shows a closed panel again and *View > Reset layout* restores the default arrangement. Mirab always uses a light theme.
 
 ## Creating a model
 
@@ -28,7 +28,7 @@ Panels can be resized, moved, closed and floated. *View > Panels* shows a closed
 4. Edit values in *Properties*. Renaming the ID updates every reference to it, including controls and rules.
 5. *Add data* attaches extra rows to the selected element, such as demand categories, emitters, FAVAD leakage, water quality sources, losses or cross sections.
 
-Anahita writes standard EPANET and SWMM input files, so models stay usable in any other tool.
+Mirab writes standard EPANET and SWMM input files, so models stay usable in any other tool.
 
 ## Importing GIS and CAD data
 
@@ -41,9 +41,9 @@ Anahita writes standard EPANET and SWMM input files, so models stay usable in an
    - **Points** become nodes, such as junctions, tanks or outfalls.
    - **Lines** become links, such as pipes or conduits.
    - **Polygons** become subcatchments in SWMM models.
-3. Choose the ID field, or let Anahita generate IDs with a prefix.
+3. Choose the ID field, or let Mirab generate IDs with a prefix.
 4. For links, line ends within the *snap tolerance* connect to existing nodes, and new nodes are created for the others. Alternatively, choose the fields that hold the start and end node IDs; a CSV table of pipes needs no coordinates this way.
-5. Map attribute fields to properties such as elevation, diameter, roughness or length. Anahita suggests fields with common names, and computes lengths and subcatchment areas from the geometry when no field is chosen.
+5. Map attribute fields to properties such as elevation, diameter, roughness or length. Mirab suggests fields with common names, and computes lengths and subcatchment areas from the geometry when no field is chosen.
 6. When the file has a `.prj`, its coordinate system is shown:
    - If the project already has a coordinate system, the points are reprojected to it.
    - If not, *Use it as the coordinate system of the project* sets it, which also enables basemaps.
@@ -62,22 +62,22 @@ Basemaps need to know where the coordinates are on Earth. Use *View > Coordinate
 
 Coordinates that are plain longitude and latitude are recognised automatically. Datum shifts are not applied, so data on older datums such as NAD27 can appear tens of metres away from the basemap. The coordinate system is also written into GeoPackage and GeoJSON exports.
 
-The example `examples/epanet/anahita-demo-tabriz.inp` is placed in Tabriz in UTM zone 38N and opens with an OpenStreetMap basemap.
+The example `examples/epanet/mirab-demo-longbeach.inp` is placed in downtown Long Beach, California, in NAD83 / California zone 5 State Plane coordinates (US survey feet, EPSG:2229). It uses US customary units and opens with an OpenStreetMap basemap.
 
 ## Choosing an engine
 
 The engine box on the tool bar lists the engines for the model type. Engines that are not installed are disabled; *Project > Simulation engines* explains why.
 
-SWMM5+ is an optional engine. Open *Project > Simulation engines* and click *Install SWMM5+*: Anahita downloads it, checks every file and adds it to the engine box. Without internet access, download the files for your computer from the swmm5plus-capi release page and use *Install from file...*. See [engines.md](engines.md#installing-swmm5) for details.
+SWMM5+ is an optional engine. Open *Project > Simulation engines* and click *Install SWMM5+*: Mirab downloads it, checks every file and adds it to the engine box. Without internet access, download the files for your computer from the swmm5plus-capi release page and use *Install from file...*. See [engines.md](engines.md#installing-swmm5) for details.
 
 - **MSX:** for EPANET models, tick *MSX* to run EPANET-MSX on top of the selected EPANET engine, and choose the `.msx` file.
 - **Messages:** the panel always shows how the project fits the selected engine.
   - **Information:** the project is fully supported.
-  - **Warning:** this engine ignores a feature. Anahita removes it from the copy sent to the engine and tells you.
+  - **Warning:** this engine ignores a feature. Mirab removes it from the copy sent to the engine and tells you.
   - **Error:** the engine cannot run the project, and the Run button is disabled.
 - **Greyed-out data:** data the selected engine does not model is greyed out in *Properties*. For example, the `[LEAKAGE]` rows of a pipe are greyed out under EPA EPANET 2.2, and PCV is not offered as a valve type.
 
-The choice of engine, the MSX file, the coordinate system, the basemap and the backdrop are saved next to the model in `<model>.inp.anahita.json`.
+The choice of engine, the MSX file, the coordinate system, the basemap and the backdrop are saved next to the model in `<model>.inp.mirab.json`.
 
 ## Running and viewing results
 
@@ -124,7 +124,7 @@ Double-click a pattern, curve or time series in the *Project* panel to edit it i
 ## GIS and QGIS
 
 - *File > Export > GeoPackage* writes one layer per element type (junctions, pipes, conduits, subcatchments, ...) with every input value and, when results are loaded, the values of the current period.
-- *File > Open in QGIS* writes `<model>.gpkg` and starts QGIS with it. QGIS is never loaded inside Anahita, so a QGIS installation problem cannot affect it. Set the QGIS program in *Tools > Settings* if it is not found.
+- *File > Open in QGIS* writes `<model>.gpkg` and starts QGIS with it. QGIS is never loaded inside Mirab, so a QGIS installation problem cannot affect it. Set the QGIS program in *Tools > Settings* if it is not found.
 - *View > Backdrop image* shows a PNG, JPEG or TIFF behind the network. With a world file (`.pgw`, `.jgw`, `.tfw` or `.wld`) the image is georeferenced; without one it is stretched over the network.
 
 ## WNTR
@@ -148,7 +148,7 @@ Double-click a pattern, curve or time series in the *Project* panel to edit it i
 
 ## Command-line options
 
-`anahita [file.inp]` opens a project. Other options:
+`mirab [file.inp]` opens a project. Other options:
 
 | Option | Effect |
 |---|---|
@@ -158,4 +158,4 @@ Double-click a pattern, curve or time series in the *Project* panel to edit it i
 | `--install-engine swmm5plus` | Installs SWMM5+ without opening a window (also a manifest URL or file). |
 | `--screenshot FILE.png` | Saves a picture of the window and quits; with `--run` (run first), `--report KIND` (open a report: tables, timeseries, profile, frequency, variability, systemflow, energy, status) and `--delay MS`. |
 
-Every analysis is also available without a window through `anahita-cli`; run `anahita-cli` without arguments for its commands.
+Every analysis is also available without a window through `mirab-cli`; run `mirab-cli` without arguments for its commands.

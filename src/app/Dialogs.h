@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Dialogs.h
  * Purpose: Dialogs of the desktop application: new project, engines, resilience, settings and about.
@@ -25,7 +25,7 @@
 #pragma once
 
 #include "ProjectDocument.h"
-#include "anahita/engine/EngineRegistry.h"
+#include "mirab/engine/EngineRegistry.h"
 
 #include <QDialog>
 #include <QJsonObject>
@@ -41,7 +41,7 @@ class QStackedWidget;
 class QTableWidget;
 class QCheckBox;
 
-namespace anahita::app
+namespace mirab::app
 {
 
 class ChartWidget;
@@ -158,4 +158,4 @@ public:
     explicit AboutDialog(QWidget* parent = nullptr);
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

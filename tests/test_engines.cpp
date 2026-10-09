@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    tests/test_engines.cpp
  * Purpose: Integration tests that run every bundled engine, the resilience tools and the interchange formats.
@@ -24,39 +24,39 @@
  */
 #include "TestFramework.h"
 
-#include "anahita/core/Model.h"
-#include "anahita/core/Text.h"
-#include "anahita/core/Hash.h"
-#include "anahita/engine/Compatibility.h"
-#include "anahita/engine/EngineInstall.h"
-#include "anahita/engine/EngineRegistry.h"
-#include "anahita/interop/Interop.h"
-#include "anahita/resilience/Resilience.h"
+#include "mirab/core/Model.h"
+#include "mirab/core/Text.h"
+#include "mirab/core/Hash.h"
+#include "mirab/engine/Compatibility.h"
+#include "mirab/engine/EngineInstall.h"
+#include "mirab/engine/EngineRegistry.h"
+#include "mirab/interop/Interop.h"
+#include "mirab/resilience/Resilience.h"
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 
-using namespace anahita;
+using namespace mirab;
 namespace fs = std::filesystem;
 
 namespace
 {
 fs::path example(const char* rel)
 {
-    return fs::path(ANAHITA_SOURCE_DIR) / "examples" / rel;
+    return fs::path(MIRAB_SOURCE_DIR) / "examples" / rel;
 }
 
 fs::path scratch(const std::string& name)
 {
-    const auto dir = fs::temp_directory_path() / "anahita-tests";
+    const auto dir = fs::temp_directory_path() / "mirab-tests";
     fs::create_directories(dir);
     return dir / name;
 }
 
 engine::EngineRegistry& registry()
 {
-    static engine::EngineRegistry r({fs::u8path(ANAHITA_ENGINE_DIR)});
+    static engine::EngineRegistry r({fs::u8path(MIRAB_ENGINE_DIR)});
     return r;
 }
 
@@ -112,8 +112,8 @@ TEST_CASE("engines: bundled engines are discovered")
 
 TEST_CASE("engines: EPA 2.2 and OWA 2.3 agree on a plain network")
 {
-    const auto a = run("epanet-2.2-epa", example("epanet/anahita-demo.inp"));
-    const auto b = run("epanet-2.3-owa", example("epanet/anahita-demo.inp"));
+    const auto a = run("epanet-2.2-epa", example("epanet/mirab-demo.inp"));
+    const auto b = run("epanet-2.3-owa", example("epanet/mirab-demo.inp"));
     CHECK_EQ(a.periodCount(), 25);
     CHECK_EQ(b.periodCount(), 25);
     for (int p : {0, 8, 24})
@@ -127,14 +127,14 @@ TEST_CASE("engines: EPA 2.2 and OWA 2.3 agree on a plain network")
 
 TEST_CASE("engines: OWA 2.3 models FAVAD leakage, EPA 2.2 skips it")
 {
-    const auto model = core::Model::fromFile(example("epanet/anahita-demo-leakage.inp"));
+    const auto model = core::Model::fromFile(example("epanet/mirab-demo-leakage.inp"));
     const auto* epa = registry().descriptor("epanet-2.2-epa");
     const auto report = engine::checkCompatibility(model, *epa);
     CHECK(report.runnable());
     CHECK_EQ(report.count(engine::Support::Ignored), 1);
     CHECK(engine::prepareInput(model, *epa).find("[LEAKAGE]") == std::string::npos);
 
-    const auto owa = run("epanet-2.3-owa", example("epanet/anahita-demo-leakage.inp"));
+    const auto owa = run("epanet-2.3-owa", example("epanet/mirab-demo-leakage.inp"));
     double total = 0.0;
     const auto* nodes = owa.table("node");
     const int v = nodes->variableIndex("Leakage");
@@ -142,7 +142,7 @@ TEST_CASE("engines: OWA 2.3 models FAVAD leakage, EPA 2.2 skips it")
     for (int e = 0; e < nodes->elementCount(); ++e)
         total += nodes->value(8, v, e);
     CHECK(total > 0.1);
-    const auto old = run("epanet-2.2-epa", example("epanet/anahita-demo-leakage.inp"));
+    const auto old = run("epanet-2.2-epa", example("epanet/mirab-demo-leakage.inp"));
     CHECK(old.table("node")->variableIndex("Leakage") < 0);
 }
 
@@ -150,7 +150,7 @@ TEST_CASE("engines: EPANET-MSX runs on both EPANET bases")
 {
     for (const char* id : {"epanet-msx-2.0-epa22", "epanet-msx-2.0-owa23"})
     {
-        const auto r = run(id, example("epanet/anahita-demo.inp"), example("msx/anahita-demo.msx"));
+        const auto r = run(id, example("epanet/mirab-demo.inp"), example("msx/mirab-demo.msx"));
         CHECK_NEAR(value(r, "node", "CL2", "R1", 0), 1.2, 1e-6);
         const double cl = value(r, "node", "CL2", "J9", 20);
         CHECK(cl > 0.5 && cl < 1.2);
@@ -161,7 +161,7 @@ TEST_CASE("engines: EPANET-MSX runs on both EPANET bases")
 
 TEST_CASE("engines: EPA SWMM 5.2 routes the design storm")
 {
-    const auto r = run("swmm-5.2-epa", example("swmm/anahita-urban.inp"));
+    const auto r = run("swmm-5.2-epa", example("swmm/mirab-urban.inp"));
     CHECK_EQ(r.periodCount(), 72);
     double peak = 0.0;
     const auto* links = r.table("link");
@@ -176,8 +176,8 @@ TEST_CASE("engines: EPA SWMM 5.2 routes the design storm")
 
 TEST_CASE("resilience: Todini, topology, criticality and fire flow")
 {
-    const auto model = core::Model::fromFile(example("epanet/anahita-demo.inp"));
-    const auto results = run("epanet-2.3-owa", example("epanet/anahita-demo.inp"));
+    const auto model = core::Model::fromFile(example("epanet/mirab-demo.inp"));
+    const auto results = run("epanet-2.3-owa", example("epanet/mirab-demo.inp"));
     const auto todini = resilience::todiniIndex(model, results, 20.0);
     CHECK_EQ(todini.index.size(), std::size_t(25));
     CHECK(todini.minimum > 0.0 && todini.minimum < 1.0);
@@ -194,14 +194,14 @@ TEST_CASE("resilience: Todini, topology, criticality and fire flow")
     CHECK(lib.load(*registry().locate(*registry().descriptor("epanet-2.3-owa")), &error));
     resilience::CriticalityOptions co;
     co.pressureThreshold = 20.0;
-    const auto crit = resilience::pipeCriticality(lib.api(), example("epanet/anahita-demo.inp"), co);
+    const auto crit = resilience::pipeCriticality(lib.api(), example("epanet/mirab-demo.inp"), co);
     CHECK_EQ(crit.size(), std::size_t(13));
 
     resilience::FireFlowOptions fo;
     fo.fireFlow = 30.0;
     fo.residualPressure = 14.0;
     fo.nodes = {"J5"};
-    const auto ff = resilience::fireFlow(lib.api(), example("epanet/anahita-demo.inp"), fo);
+    const auto ff = resilience::fireFlow(lib.api(), example("epanet/mirab-demo.inp"), fo);
     CHECK_EQ(ff.size(), std::size_t(1));
     CHECK(ff[0].adequate);
     CHECK(ff[0].availableFlow > 30.0);
@@ -209,7 +209,7 @@ TEST_CASE("resilience: Todini, topology, criticality and fire flow")
 
 TEST_CASE("resilience: water service availability from a pressure-driven run")
 {
-    const auto r = run("epanet-2.3-owa", example("epanet/anahita-demo-leakage.inp"));
+    const auto r = run("epanet-2.3-owa", example("epanet/mirab-demo-leakage.inp"));
     const auto s = resilience::waterServiceAvailability(r);
     CHECK(s.note.empty());
     CHECK(s.overall > 0.9 && s.overall <= 1.0);
@@ -217,14 +217,14 @@ TEST_CASE("resilience: water service availability from a pressure-driven run")
 
 TEST_CASE("interop: WNTR JSON round trip reproduces the hydraulics")
 {
-    const auto model = core::Model::fromFile(example("epanet/anahita-demo.inp"));
+    const auto model = core::Model::fromFile(example("epanet/mirab-demo.inp"));
     const auto json = interop::toWntrJson(model);
     CHECK_EQ(json.get("nodes").size(), std::size_t(11));
     CHECK_EQ(json.get("links").size(), std::size_t(14));
     const auto back = interop::fromWntrJson(json::Value::parse(json.dump()));
     const auto file = scratch("wntr-roundtrip.inp");
     back.save(file);
-    const auto a = run("epanet-2.3-owa", example("epanet/anahita-demo.inp"));
+    const auto a = run("epanet-2.3-owa", example("epanet/mirab-demo.inp"));
     const auto b = run("epanet-2.3-owa", file);
     for (int p : {0, 7, 19})
         CHECK_NEAR(value(a, "node", "Pressure", "J8", p), value(b, "node", "Pressure", "J8", p), 1e-3);
@@ -232,7 +232,7 @@ TEST_CASE("interop: WNTR JSON round trip reproduces the hydraulics")
 
 TEST_CASE("interop: GeoJSON and GeoPackage export")
 {
-    const auto model = core::Model::fromFile(example("swmm/anahita-urban.inp"));
+    const auto model = core::Model::fromFile(example("swmm/mirab-urban.inp"));
     interop::GisOptions g;
     g.crs = "EPSG:32614";
     const auto gj = interop::toGeoJson(model, g);
@@ -250,7 +250,7 @@ TEST_CASE("interop: GeoJSON and GeoPackage export")
 
 TEST_CASE("engines: SWMM5+ manifest adapts SWMM 5.2 models")
 {
-    const auto model = core::Model::fromFile(example("swmm/anahita-urban.inp"));
+    const auto model = core::Model::fromFile(example("swmm/mirab-urban.inp"));
     const auto* s5p = registry().descriptor("swmm5plus-1.0");
     CHECK(s5p != nullptr);
     const auto report = engine::checkCompatibility(model, *s5p);
@@ -276,7 +276,7 @@ TEST_CASE("engines: packages install only when every checksum matches")
     std::ofstream(src / "asset-a.bin", std::ios::binary) << "first library";
     std::ofstream(src / "asset-b.bin", std::ios::binary) << "second library";
     auto manifestText = [&](const std::string& platform, const std::string& shaB, const std::string& nameB) {
-        return std::string("{\"format\":\"anahita-engine/1\",\"engine\":\"swmm5plus-1.0\",\"name\":\"SWMM5+\",") +
+        return std::string("{\"format\":\"mirab-engine/1\",\"engine\":\"swmm5plus-1.0\",\"name\":\"SWMM5+\",") +
                "\"version\":\"1.0.3\",\"packageVersion\":\"0.1.0\",\"apiVersion\":1,\"platform\":\"" + platform +
                "\",\"files\":[{\"name\":\"a.so\",\"asset\":\"asset-a.bin\",\"size\":13,\"sha256\":\"" +
                core::sha256Hex("first library") + "\"},{\"name\":\"" + nameB +

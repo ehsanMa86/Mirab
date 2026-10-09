@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    tests/test_crs.cpp
  * Purpose: Tests for coordinate reference systems and map projections.
@@ -24,13 +24,13 @@
  */
 #include "TestFramework.h"
 
-#include "anahita/core/Crs.h"
+#include "mirab/core/Crs.h"
 
 #include <cmath>
 #include <set>
 #include <string>
 
-using namespace anahita;
+using namespace mirab;
 using crs::Crs;
 using crs::Method;
 

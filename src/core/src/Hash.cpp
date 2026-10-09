@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/core/src/Hash.cpp
  * Purpose: Implementation of SHA-256 (FIPS 180-4).
@@ -22,14 +22,14 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/core/Hash.h"
+#include "mirab/core/Hash.h"
 
 #include <array>
 #include <fstream>
 #include <stdexcept>
 #include <vector>
 
-namespace anahita::core
+namespace mirab::core
 {
 
 namespace
@@ -161,4 +161,4 @@ std::string sha256File(const std::filesystem::path& path)
     return s.finish();
 }
 
-} // namespace anahita::core
+} // namespace mirab::core

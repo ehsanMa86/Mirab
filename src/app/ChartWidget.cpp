@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/ChartWidget.cpp
  * Purpose: Plot widget for time series, profiles, frequency and variability charts.
@@ -25,7 +25,7 @@
 #include "ChartWidget.h"
 
 #include "Theme.h"
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -40,7 +40,7 @@
 #include <cmath>
 #include <limits>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 namespace
@@ -495,4 +495,4 @@ void ChartWidget::contextMenuEvent(QContextMenuEvent* e)
     menu.exec(e->globalPos());
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

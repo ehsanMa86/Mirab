@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/Dialogs.cpp
  * Purpose: Implementation of the application dialogs.
@@ -27,11 +27,11 @@
 #include "ChartWidget.h"
 #include "EngineDownloader.h"
 #include "SolverProcess.h"
-#include "anahita/AnahitaConfig.h"
-#include "anahita/core/Crs.h"
-#include "anahita/core/Text.h"
-#include "anahita/engine/EngineInstall.h"
-#include "anahita/resilience/Resilience.h"
+#include "mirab/MirabConfig.h"
+#include "mirab/core/Crs.h"
+#include "mirab/core/Text.h"
+#include "mirab/engine/EngineInstall.h"
+#include "mirab/resilience/Resilience.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -65,7 +65,7 @@
 
 #include <cmath>
 
-namespace anahita::app
+namespace mirab::app
 {
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ EnginesDialog::EnginesDialog(const engine::EngineRegistry& registry, QWidget* pa
         if (engine::uninstallEngine("swmm5plus-1.0", engine::userEngineDirectory()))
             status_->setText(tr("SWMM5+ was removed."));
         else
-            status_->setText(tr("SWMM5+ was not installed by Anahita, so it was left in place."));
+            status_->setText(tr("SWMM5+ was not installed by Mirab, so it was left in place."));
         populate();
         emit enginesChanged();
     });
@@ -591,7 +591,7 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent)
     row->addWidget(qgis_, 1);
     row->addWidget(browse);
     form->addRow(tr("QGIS program"), row);
-    auto* note = new QLabel(tr("Anahita never loads QGIS. \"Open in QGIS\" exports a GeoPackage and starts QGIS "
+    auto* note = new QLabel(tr("Mirab never loads QGIS. \"Open in QGIS\" exports a GeoPackage and starts QGIS "
                                "as a separate program."),
                             this);
     note->setWordWrap(true);
@@ -657,15 +657,15 @@ QString SettingsDialog::findQgis()
 // ---------------------------------------------------------------------------
 AboutDialog::AboutDialog(QWidget* parent) : QDialog(parent)
 {
-    setWindowTitle(tr("About Anahita"));
+    setWindowTitle(tr("About Mirab"));
     resize(620, 520);
     auto* layout = new QVBoxLayout(this);
     auto* header = new QHBoxLayout;
     auto* icon = new QLabel(this);
     icon->setPixmap(QApplication::windowIcon().pixmap(72, 72));
-    auto* title = new QLabel(QString("<h2>Anahita %1</h2><p>Unified modeling environment for water distribution "
+    auto* title = new QLabel(QString("<h2>Mirab %1</h2><p>Unified modeling environment for water distribution "
                                      "and stormwater systems.</p><p>%2<br><a href=\"%3\">%3</a></p>")
-                                 .arg(ANAHITA_VERSION_STRING, QString(ANAHITA_COPYRIGHT).toHtmlEscaped(), ANAHITA_HOMEPAGE),
+                                 .arg(MIRAB_VERSION_STRING, QString(MIRAB_COPYRIGHT).toHtmlEscaped(), MIRAB_HOMEPAGE),
                              this);
     title->setOpenExternalLinks(true);
     title->setWordWrap(true);
@@ -690,7 +690,7 @@ AboutDialog::AboutDialog(QWidget* parent) : QDialog(parent)
         "<li>Qt 6, The Qt Company, LGPL 3</li></ul>"
         "<p>The resilience metrics follow the published methods of Todini (2000), Buhl et al. (2004) and the "
         "service-availability definition used by the Water Network Tool for Resilience (WNTR).</p>"
-        "<p>Anahita is not affiliated with or endorsed by the U.S. EPA, Open Water Analytics or CIMM.</p>"));
+        "<p>Mirab is not affiliated with or endorsed by the U.S. EPA, Open Water Analytics or CIMM.</p>"));
     layout->addWidget(body, 1);
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -846,4 +846,4 @@ void CoordinateSystemDialog::validate()
     ok_->setEnabled(true);
 }
 
-} // namespace anahita::app
+} // namespace mirab::app

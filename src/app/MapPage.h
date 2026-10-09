@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/MapPage.h
  * Purpose: Map tab: display bar (result colors, time playback, basemap), the map and the start page.
@@ -35,7 +35,7 @@ class QSlider;
 class QTimer;
 class QToolButton;
 
-namespace anahita::app
+namespace mirab::app
 {
 
 class MapView;
@@ -103,4 +103,4 @@ private:
     QWidget* zoomBox_;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

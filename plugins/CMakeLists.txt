@@ -1,8 +1,8 @@
-# Anahita - Unified Water Infrastructure Modeling Environment
-# https://github.com/ehsanMa86/Anahita
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
 #
 # File:    plugins/CMakeLists.txt
-# Purpose: Build definition of the example plugins shipped with Anahita.
+# Purpose: Build definition of the example plugins shipped with Mirab.
 #
 # Copyright (C) 2026 Ehsan Madadi
 #
@@ -20,7 +20,7 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-option(ANAHITA_BUILD_EXAMPLE_PLUGINS "Build the example plugins" ON)
-if(ANAHITA_BUILD_EXAMPLE_PLUGINS)
+option(MIRAB_BUILD_EXAMPLE_PLUGINS "Build the example plugins" ON)
+if(MIRAB_BUILD_EXAMPLE_PLUGINS)
     add_subdirectory(network-statistics)
 endif()

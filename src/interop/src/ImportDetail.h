@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/interop/src/ImportDetail.h
  * Purpose: Internal helpers shared by the shapefile, DXF and CSV importers.
@@ -28,7 +28,7 @@
 #include <string>
 #include <string_view>
 
-namespace anahita::interop::detail
+namespace mirab::interop::detail
 {
 
 /// Reads a whole file as bytes. Throws std::runtime_error when it cannot be read.
@@ -46,4 +46,4 @@ std::string toUtf8Auto(std::string_view s);
 /// Lower-case letters and digits only: "Max Depth" -> "maxdepth".
 std::string normalizedName(std::string_view s);
 
-} // namespace anahita::interop::detail
+} // namespace mirab::interop::detail

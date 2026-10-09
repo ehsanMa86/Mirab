@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    tests/test_import.cpp
  * Purpose: Tests for the shapefile, DXF and CSV importers.
@@ -24,9 +24,9 @@
  */
 #include "TestFramework.h"
 
-#include "anahita/core/Model.h"
-#include "anahita/core/Text.h"
-#include "anahita/interop/Import.h"
+#include "mirab/core/Model.h"
+#include "mirab/core/Text.h"
+#include "mirab/interop/Import.h"
 
 #include <algorithm>
 #include <chrono>
@@ -36,7 +36,7 @@
 #include <fstream>
 #include <iostream>
 
-using namespace anahita;
+using namespace mirab;
 using core::Category;
 using core::Point;
 using interop::GeometryType;
@@ -47,7 +47,7 @@ namespace
 
 fs::path scratchDir(const char* name)
 {
-    const auto dir = fs::temp_directory_path() / "anahita-tests" / "import" / name;
+    const auto dir = fs::temp_directory_path() / "mirab-tests" / "import" / name;
     fs::remove_all(dir);
     fs::create_directories(dir);
     return dir;

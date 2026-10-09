@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/app/PropertyPanel.h
  * Purpose: Property editor for the selected element and for project options.
@@ -25,7 +25,7 @@
 #pragma once
 
 #include "ProjectDocument.h"
-#include "anahita/engine/Engine.h"
+#include "mirab/engine/Engine.h"
 
 #include <QWidget>
 
@@ -35,7 +35,7 @@ class QToolButton;
 class QLabel;
 class QLineEdit;
 
-namespace anahita::app
+namespace mirab::app
 {
 
 class PropertyPanel : public QWidget
@@ -72,4 +72,4 @@ private:
     bool populating_ = false;
 };
 
-} // namespace anahita::app
+} // namespace mirab::app

@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    src/interop/src/ImportModel.cpp
  * Purpose: Turns imported GIS/CAD/CSV feature layers into nodes, links and subcatchments.
@@ -22,11 +22,11 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#include "anahita/interop/Import.h"
+#include "mirab/interop/Import.h"
 
 #include "ImportDetail.h"
 
-#include "anahita/core/Text.h"
+#include "mirab/core/Text.h"
 
 #include <algorithm>
 #include <cmath>
@@ -41,7 +41,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace anahita::interop
+namespace mirab::interop
 {
 
 namespace fs = std::filesystem;
@@ -197,9 +197,9 @@ int ImportedLayer::fieldIndex(const std::string& field) const
 namespace
 {
 
-const char* const kElementId = "ANAHITA_IMPORT_E";
-const char* const kFromId = "ANAHITA_IMPORT_A";
-const char* const kToId = "ANAHITA_IMPORT_B";
+const char* const kElementId = "MIRAB_IMPORT_E";
+const char* const kFromId = "MIRAB_IMPORT_A";
+const char* const kToId = "MIRAB_IMPORT_B";
 
 bool isGeometrySection(const std::string& name)
 {
@@ -1459,4 +1459,4 @@ ImportMapping suggestMapping(const core::Model& model, const ImportedLayer& laye
     return m;
 }
 
-} // namespace anahita::interop
+} // namespace mirab::interop

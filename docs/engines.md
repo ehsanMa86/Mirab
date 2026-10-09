@@ -4,11 +4,11 @@
 
 | ID | Name | Library | Notes |
 |---|---|---|---|
-| `epanet-2.2-epa` | EPA EPANET 2.2 | `anahita_epanet22_epa` | USEPA/epanet-engine |
-| `epanet-2.3-owa` | OWA EPANET 2.3 | `anahita_epanet23_owa` | OpenWaterAnalytics/EPANET v2.3.5, default for EPANET models |
-| `epanet-msx-2.0-epa22` | EPANET-MSX 2.0 on EPANET 2.2 | `anahita_msx20_22_epa` | linked to `anahita_epanet22_epa` |
-| `epanet-msx-2.0-owa23` | EPANET-MSX 2.0 on EPANET 2.3 | `anahita_msx20_23_owa` | linked to `anahita_epanet23_owa` |
-| `swmm-5.2-epa` | EPA SWMM 5.2 | `anahita_swmm52_epa` | USEPA/Stormwater-Management-Model v5.2.4, default for SWMM models |
+| `epanet-2.2-epa` | EPA EPANET 2.2 | `mirab_epanet22_epa` | USEPA/epanet-engine |
+| `epanet-2.3-owa` | OWA EPANET 2.3 | `mirab_epanet23_owa` | OpenWaterAnalytics/EPANET v2.3.5, default for EPANET models |
+| `epanet-msx-2.0-epa22` | EPANET-MSX 2.0 on EPANET 2.2 | `mirab_msx20_22_epa` | linked to `mirab_epanet22_epa` |
+| `epanet-msx-2.0-owa23` | EPANET-MSX 2.0 on EPANET 2.3 | `mirab_msx20_23_owa` | linked to `mirab_epanet23_owa` |
+| `swmm-5.2-epa` | EPA SWMM 5.2 | `mirab_swmm52_epa` | USEPA/Stormwater-Management-Model v5.2.4, default for SWMM models |
 | `swmm5plus-1.0` | SWMM5+ 1.0 | `swmm5plus_capi` | optional, from the swmm5plus-capi project |
 
 Every engine is compiled from unmodified upstream sources into a library with a unique name. Several versions of one solver can therefore be installed side by side, and MSX can run on either EPANET engine.
@@ -17,13 +17,13 @@ Every engine is compiled from unmodified upstream sources into a library with a 
 
 In this order:
 
-1. folders listed in the `ANAHITA_ENGINE_PATH` environment variable (`;` separated on Windows, `:` elsewhere),
+1. folders listed in the `MIRAB_ENGINE_PATH` environment variable (`;` separated on Windows, `:` elsewhere),
 2. `engines/` next to the executable (Windows and development builds),
-3. `../lib/anahita/engines` (Linux),
+3. `../lib/mirab/engines` (Linux),
 4. `../Frameworks/engines` (macOS application bundle),
-5. the per-user folder: `%LOCALAPPDATA%\Anahita\engines`, `~/Library/Application Support/Anahita/engines` or `~/.local/share/anahita/engines`.
+5. the per-user folder: `%LOCALAPPDATA%\Mirab\engines`, `~/Library/Application Support/Mirab/engines` or `~/.local/share/mirab/engines`.
 
-`anahita-cli engines` lists each engine, whether it was found, and the folders searched.
+`mirab-cli engines` lists each engine, whether it was found, and the folders searched.
 
 ## Capability manifest
 
@@ -47,7 +47,7 @@ Each engine declares how it handles features whose support differs between engin
 
 ## Why engines run in a separate process
 
-The desktop application never loads an engine. It starts `anahita-cli run ... --machine`, which loads the engine, runs it and streams progress as JSON lines (see [file-formats.md](file-formats.md)). This gives:
+The desktop application never loads an engine. It starts `mirab-cli run ... --machine`, which loads the engine, runs it and streams progress as JSON lines (see [file-formats.md](file-formats.md)). This gives:
 
 - **crash isolation**: an access violation in C code, or a Fortran `STOP` inside SWMM5+, ends the solver process only,
 - **reliable cancellation**: the process is told to stop and is terminated if it does not,
@@ -64,31 +64,31 @@ SWMM5+ is written in modern Fortran and uses coarrays. It is built separately by
 
 Prebuilt SWMM5+ libraries for Windows (x64), Linux (x86_64) and macOS (Apple silicon and Intel) are published with each [swmm5plus-capi release](https://github.com/ehsanMa86/swmm5plus-capi/releases). Each platform has a manifest, `swmm5plus-capi-<platform>.json`, that lists the files with their sizes and SHA-256 checksums.
 
-- **From the application:** *Tools > Simulation engines > Install SWMM5+*. Anahita downloads the manifest for this computer and every file it lists, checks each checksum, installs the files into the per-user engine folder, and then loads the engine once in the solver process to confirm that it works. The same button reads *Update SWMM5+* once it is installed, and *Remove SWMM5+* deletes the installed files.
+- **From the application:** *Project > Simulation engines > Install SWMM5+*. Mirab downloads the manifest for this computer and every file it lists, checks each checksum, installs the files into the per-user engine folder, and then loads the engine once in the solver process to confirm that it works. The same button reads *Update SWMM5+* once it is installed, and *Remove SWMM5+* deletes the installed files.
 - **Offline:** download the manifest and the files of one platform from the release page into one folder, then choose the manifest with *Install from file...*, or run:
 
   ```
-  anahita-cli engines install swmm5plus-capi-windows-x86_64.json
-  anahita-cli engines verify swmm5plus
+  mirab-cli engines install swmm5plus-capi-windows-x86_64.json
+  mirab-cli engines verify swmm5plus
   ```
 
-- **Without a window** (scripts and managed installations): `anahita --install-engine swmm5plus`, or pass a manifest URL or file instead of `swmm5plus`. The command returns 0 on success, so it can follow the Anahita installer in a deployment script, for example `anahita.exe --install-engine swmm5plus` on Windows.
+- **Without a window** (scripts and managed installations): `mirab --install-engine swmm5plus`, or pass a manifest URL or file instead of `swmm5plus`. The command returns 0 on success, so it can follow the Mirab installer in a deployment script, for example `mirab.exe --install-engine swmm5plus` on Windows.
 
-Nothing is installed unless every file matches its checksum. A package for another platform, or one with a C interface version other than 1, is refused. The files are placed in the per-user folder (item 5 above); `anahita-cli engines where` prints it, and `--target DIR` installs elsewhere, for example into a shared folder listed in `ANAHITA_ENGINE_PATH`.
+Nothing is installed unless every file matches its checksum. A package for another platform, or one with a C interface version other than 1, is refused. The files are placed in the per-user folder (item 5 above); `mirab-cli engines where` prints it, and `--target DIR` installs elsewhere, for example into a shared folder listed in `MIRAB_ENGINE_PATH`.
 
-To use a different download location, such as a mirror on an internal network, set the `ANAHITA_SWMM5PLUS_MANIFEST_URL` environment variable to the manifest URL.
+To use a different download location, such as a mirror on an internal network, set the `MIRAB_SWMM5PLUS_MANIFEST_URL` environment variable to the manifest URL.
 
-`anahita-cli` commands accept `swmm5plus` (or `swmm5+`) as a short name for `swmm5plus-1.0`.
+`mirab-cli` commands accept `swmm5plus` (or `swmm5+`) as a short name for `swmm5plus-1.0`.
 
 ### Building SWMM5+ yourself
 
-Build swmm5plus-capi as described in its README and copy both libraries, with the Fortran runtime if it is not installed system-wide (Windows builds link it into the DLLs), into any engine folder above. Anahita checks the interface version (`s5p_api_version`) before using it. The C interface is documented in the swmm5plus-capi repository.
+Build swmm5plus-capi as described in its README and copy both libraries, with the Fortran runtime if it is not installed system-wide (Windows builds link it into the DLLs), into any engine folder above. Mirab checks the interface version (`s5p_api_version`) before using it. The C interface is documented in the swmm5plus-capi repository.
 
 Status: SWMM5+ upstream is developed with Intel Fortran. swmm5plus-capi builds it with GNU gfortran on Windows (MinGW-w64), Linux and macOS, and with Intel ifx on Linux. It replaces the Intel-only extensions with standard Fortran, and the shell commands SWMM5+ runs (`mkdir`, `cp`, `rm`) with portable code, so no shell is started. Check the swmm5plus-capi README for the current state of each compiler.
 
-SWMM5+ also has modeling rules of its own, which Anahita applies or reports:
+SWMM5+ also has modeling rules of its own, which Mirab applies or reports:
 
-- only `INERTIAL_DAMPING NONE` is supported; Anahita sets it for the run,
+- only `INERTIAL_DAMPING NONE` is supported; Mirab sets it for the run,
 - routing is always dynamic wave; other routing options are ignored,
 - pollutants and LID controls are not modeled,
 - a subcatchment must drain to a storage node or to a junction next to a conduit; SWMM5+ stops with a configuration error otherwise.

@@ -1,6 +1,6 @@
 /*
- * Anahita - Unified Water Infrastructure Modeling Environment
- * https://github.com/ehsanMa86/Anahita
+ * Mirab - Unified Water Infrastructure Modeling Environment
+ * https://github.com/ehsanMa86/Mirab
  *
  * File:    engines/compat/apple/malloc.h
  * Purpose: Portable stand-in for <malloc.h> on macOS, where the header does not exist.
@@ -22,7 +22,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#ifndef ANAHITA_COMPAT_MALLOC_H
-#define ANAHITA_COMPAT_MALLOC_H
+#ifndef MIRAB_COMPAT_MALLOC_H
+#define MIRAB_COMPAT_MALLOC_H
 #include <stdlib.h>
 #endif
