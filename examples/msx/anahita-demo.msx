@@ -1,0 +1,58 @@
+; Anahita - Unified Water Infrastructure Modeling Environment
+; https://github.com/ehsanMa86/Anahita
+;
+; File:    examples/msx/anahita-demo.msx
+; Purpose: Two-species chlorine and organic carbon reaction model for the demonstration network.
+;
+; Copyright (C) 2026 Ehsan Madadi
+;
+; This program is free software: you can redistribute it and/or modify it
+; under the terms of the GNU General Public License as published by the Free
+; Software Foundation, either version 3 of the License, or (at your option)
+; any later version.
+;
+; This program is distributed in the hope that it will be useful, but WITHOUT
+; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+; FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+; more details.
+;
+; You should have received a copy of the GNU General Public License along
+; with this program. If not, see <https://www.gnu.org/licenses/>.
+;
+; SPDX-License-Identifier: GPL-3.0-or-later
+[TITLE]
+Chlorine consumption by organic carbon
+
+[OPTIONS]
+  AREA_UNITS M2
+  RATE_UNITS HR
+  SOLVER     RK5
+  TIMESTEP   300
+  RTOL       0.001
+  ATOL       0.0001
+
+[SPECIES]
+  BULK CL2   MG             ;free chlorine
+  BULK TOC   MG             ;total organic carbon
+
+[COEFFICIENTS]
+  CONSTANT kCl  0.05         ;chlorine consumption rate, L/mg/hr
+  CONSTANT kOx  0.01         ;carbon oxidation rate, L/mg/hr
+
+[PIPES]
+  RATE  CL2  -kCl*CL2*TOC
+  RATE  TOC  -kOx*CL2*TOC
+
+[TANKS]
+  RATE  CL2  -kCl*CL2*TOC
+  RATE  TOC  -kOx*CL2*TOC
+
+[QUALITY]
+  GLOBAL TOC 1.5
+  NODE   R1  CL2 1.2
+  NODE   R1  TOC 1.5
+
+[REPORT]
+  NODES   ALL
+  SPECIES CL2 YES
+  SPECIES TOC YES

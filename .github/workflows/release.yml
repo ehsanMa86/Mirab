@@ -1,0 +1,140 @@
+# Anahita - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Anahita
+#
+# File:    .github/workflows/release.yml
+# Purpose: Release pipeline: builds installers for Windows, macOS and Linux and attaches them to a GitHub release.
+#
+# Copyright (C) 2026 Ehsan Madadi
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  QT_VERSION: "6.8.3"
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_mingw
+          tools: tools_mingw1310
+          cache: true
+      - name: Toolchain on PATH
+        shell: bash
+        run: |
+          echo "$RUNNER_WORKSPACE/Qt/Tools/mingw1310_64/bin" >> "$GITHUB_PATH"
+          echo "${QT_ROOT_DIR}/../../Tools/mingw1310_64/bin" >> "$GITHUB_PATH"
+          echo "C:/Program Files (x86)/NSIS" >> "$GITHUB_PATH"
+          choco install ninja -y --no-progress
+      - shell: bash
+        run: cmake --preset release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+      - run: cmake --build --preset release
+      - shell: bash
+        run: |
+          export PATH="$QT_ROOT_DIR/bin:$PATH"
+          ctest --preset release
+      - run: cmake --build --preset release --target package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            build/release/Anahita-*.exe
+            build/release/Anahita-*.zip
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install ninja
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: clang_64
+          cache: true
+      - run: cmake --preset release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+      - run: cmake --build --preset release
+      - run: ctest --preset release
+      - run: cmake --build --preset release --target package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: build/release/Anahita-*.dmg
+
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-0 \
+            libxcb-cursor0 libfontconfig1-dev libfreetype-dev libegl1 libfuse2 file
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: linux_gcc_64
+          cache: true
+      - run: cmake --preset release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" -DCMAKE_INSTALL_PREFIX=/usr
+      - run: cmake --build --preset release
+      - run: ctest --preset release
+      - run: cmake --build --preset release --target package
+      - name: AppImage
+        run: |
+          DESTDIR="$PWD/AppDir" cmake --install build/release
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          export QMAKE="$QT_ROOT_DIR/bin/qmake"
+          export LD_LIBRARY_PATH="$QT_ROOT_DIR/lib:$LD_LIBRARY_PATH"
+          VERSION=$(grep -m1 -oP '^\s+VERSION \K[0-9.]+' CMakeLists.txt)
+          export LINUXDEPLOY_OUTPUT_VERSION="$VERSION"
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \
+            --desktop-file AppDir/usr/share/applications/io.github.ehsanma86.Anahita.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/anahita.png \
+            --executable AppDir/usr/bin/anahita
+          mv Anahita-*.AppImage "build/release/Anahita-${VERSION}-linux-x86_64.AppImage"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            build/release/Anahita-*.AppImage
+            build/release/Anahita-*.tar.gz
+
+  publish:
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

@@ -1,0 +1,114 @@
+# Anahita - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Anahita
+#
+# File:    .github/workflows/ci.yml
+# Purpose: Continuous integration: build and test Anahita on Windows, macOS and Linux.
+#
+# Copyright (C) 2026 Ehsan Madadi
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QT_VERSION: "6.8.3"
+
+jobs:
+  headers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/license_headers.py --check
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            qt_arch: win64_mingw
+            qt_tools: tools_mingw1310
+          - os: macos-14
+            qt_arch: clang_64
+            qt_tools: ""
+          - os: ubuntu-24.04
+            qt_arch: linux_gcc_64
+            qt_tools: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux system packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-0 \
+            libxcb-cursor0 libfontconfig1-dev libfreetype-dev libegl1
+
+      - name: macOS tools
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qt_arch }}
+          tools: ${{ matrix.qt_tools }}
+          cache: true
+
+      - name: MinGW on PATH
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          echo "$RUNNER_WORKSPACE/Qt/Tools/mingw1310_64/bin" >> "$GITHUB_PATH"
+          echo "${QT_ROOT_DIR}/../../Tools/mingw1310_64/bin" >> "$GITHUB_PATH"
+          choco install ninja -y --no-progress
+
+      - name: Configure
+        shell: bash
+        run: cmake --preset release -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Test
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then export PATH="$QT_ROOT_DIR/bin:$PATH"; fi
+          ctest --preset release
+
+      - name: Engine report
+        shell: bash
+        run: ./build/release/bin/anahita-cli engines
+
+  headless:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake --preset headless
+      - run: cmake --build --preset headless
+      - run: ctest --preset headless

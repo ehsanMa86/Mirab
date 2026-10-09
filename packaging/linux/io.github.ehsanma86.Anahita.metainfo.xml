@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Anahita - Unified Water Infrastructure Modeling Environment
+  https://github.com/ehsanMa86/Anahita
+
+  File:    packaging/linux/io.github.ehsanma86.Anahita.metainfo.xml
+  Purpose: AppStream metadata describing Anahita for Linux software centers.
+
+  Copyright (C) 2026 Ehsan Madadi
+
+  This program is free software: you can redistribute it and/or modify it
+  under the terms of the GNU General Public License as published by the Free
+  Software Foundation, either version 3 of the License, or (at your option)
+  any later version.
+
+  This program is distributed in the hope that it will be useful, but WITHOUT
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+  more details.
+
+  You should have received a copy of the GNU General Public License along
+  with this program. If not, see <https://www.gnu.org/licenses/>.
+
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<component type="desktop-application">
+  <id>io.github.ehsanma86.Anahita</id>
+  <name>Anahita</name>
+  <summary>Unified modeling of water distribution and stormwater systems</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer id="io.github.ehsanma86">
+    <name>Ehsan Madadi</name>
+  </developer>
+  <description>
+    <p>Anahita brings EPA EPANET 2.2, OWA EPANET 2.3, EPANET-MSX, EPA SWMM 5.2 and SWMM5+ under one
+    interface. Choose the solver, edit the network on a map, run simulations, compare results,
+    evaluate resilience and exchange data with QGIS and WNTR.</p>
+  </description>
+  <launchable type="desktop-id">io.github.ehsanma86.Anahita.desktop</launchable>
+  <url type="homepage">https://github.com/ehsanMa86/Anahita</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-08"/>
+  </releases>
+</component>

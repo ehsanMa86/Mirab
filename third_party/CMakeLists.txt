@@ -1,0 +1,22 @@
+# @anahita-header Fetches and builds third-party libraries used by Anahita (SQLite).
+include(FetchContent)
+
+if(ANAHITA_WITH_GEOPACKAGE)
+    # SQLite is in the public domain; it backs the GeoPackage exporter.
+    FetchContent_Declare(anahita_sqlite_src
+        URL      https://www.sqlite.org/2026/sqlite-amalgamation-3530400.zip
+        URL_HASH SHA256=1e71ddf93849c6a6ecf58b827c0692073d2dd7ee40196158068f7b29f422e87d
+        SOURCE_SUBDIR do-not-add
+        DOWNLOAD_EXTRACT_TIMESTAMP ON)
+    FetchContent_MakeAvailable(anahita_sqlite_src)
+
+    add_library(anahita_sqlite STATIC "${anahita_sqlite_src_SOURCE_DIR}/sqlite3.c")
+    add_library(Anahita::sqlite ALIAS anahita_sqlite)
+    target_include_directories(anahita_sqlite SYSTEM PUBLIC "${anahita_sqlite_src_SOURCE_DIR}")
+    target_compile_definitions(anahita_sqlite PRIVATE
+        SQLITE_OMIT_LOAD_EXTENSION SQLITE_THREADSAFE=1 SQLITE_DEFAULT_FOREIGN_KEYS=1)
+    if(UNIX)
+        find_package(Threads REQUIRED)
+        target_link_libraries(anahita_sqlite PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+    endif()
+endif()

@@ -1,0 +1,22 @@
+# Build trees
+/build*/
+/out/
+/dist/
+/_deps/
+CMakeUserPresets.json
+
+# IDE and OS clutter
+.vs/
+.vscode/
+.idea/
+*.user
+.DS_Store
+Thumbs.db
+
+# Simulation byproducts
+*.rpt
+*.out
+*.bin
+*.anr
+*.hyd
+!examples/**/*.rpt
