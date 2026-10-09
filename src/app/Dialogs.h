@@ -34,6 +34,7 @@ class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
 class QLineEdit;
+class QListWidget;
 class QProgressBar;
 class QPushButton;
 class QStackedWidget;
@@ -90,6 +91,8 @@ public:
     /// @param inputFile engine-ready copy of the model for analyses that re-run hydraulics
     ResilienceDialog(ProjectDocument* doc, const QString& engineId, const QString& inputFile,
                      QWidget* parent = nullptr);
+    /// Shows one analysis: "todini", "service", "topology", "criticality" or "fireflow".
+    void selectAnalysis(const QString& key);
 
 private:
     void run();
@@ -114,6 +117,26 @@ private:
     QProgressBar* progress_;
     QPushButton* runButton_;
     SolverProcess* solver_;
+};
+
+/// Chooses the coordinate reference system of the map coordinates.
+class CoordinateSystemDialog : public QDialog
+{
+    Q_OBJECT
+public:
+    CoordinateSystemDialog(const QString& current, const core::Model& model, QWidget* parent = nullptr);
+    /// "EPSG:nnnn", a WKT or PROJ definition, or empty for unknown.
+    QString crs() const;
+
+private:
+    void validate();
+
+    const core::Model& model_;
+    QLineEdit* search_;
+    QListWidget* list_;
+    QLineEdit* code_;
+    QLabel* status_;
+    QPushButton* ok_;
 };
 
 class SettingsDialog : public QDialog

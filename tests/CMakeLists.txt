@@ -20,7 +20,7 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_executable(anahita-tests main.cpp test_core.cpp test_engines.cpp)
+add_executable(anahita-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp)
 target_link_libraries(anahita-tests PRIVATE
     Anahita::core Anahita::engine Anahita::resilience Anahita::interop Anahita::warnings)
 target_compile_definitions(anahita-tests PRIVATE
@@ -33,7 +33,7 @@ if(TARGET anahita_engines)
     add_dependencies(anahita-tests anahita_engines)
 endif()
 
-foreach(group IN ITEMS text json inp model features results settings hash)
+foreach(group IN ITEMS text json inp model features results settings hash crs import)
     add_test(NAME ${group} COMMAND anahita-tests "${group}:")
 endforeach()
 if(ANAHITA_BUILD_ENGINES)

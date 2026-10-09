@@ -56,6 +56,7 @@ ProjectSettings ProjectSettings::loadFor(const std::filesystem::path& inpFile)
         s.msxFile = v.get("msxFile").asString();
         s.crs = v.get("crs").asString();
         s.backdropImage = v.get("backdropImage").asString();
+        s.basemap = v.get("basemap").asString();
         s.pressureThreshold = v.get("pressureThreshold").asNumber();
     }
     catch (const json::ParseError&)
@@ -74,6 +75,8 @@ void ProjectSettings::saveFor(const std::filesystem::path& inpFile) const
     v.set("msxFile", msxFile);
     v.set("crs", crs);
     v.set("backdropImage", backdropImage);
+    if (!basemap.empty())
+        v.set("basemap", basemap);
     v.set("pressureThreshold", pressureThreshold);
     std::ofstream out(sidecarPath(inpFile), std::ios::binary | std::ios::trunc);
     if (!out)

@@ -66,12 +66,16 @@ int ResultTable::variableIndex(std::string_view name) const
 
 int ResultTable::elementIndex(std::string_view id) const
 {
-    for (std::size_t i = 0; i < ids.size(); ++i)
+    if (indexed_ != ids.size())
     {
-        if (ids[i] == id)
-            return static_cast<int>(i);
+        index_.clear();
+        index_.reserve(ids.size());
+        for (std::size_t i = 0; i < ids.size(); ++i)
+            index_.emplace(ids[i], static_cast<int>(i));
+        indexed_ = ids.size();
     }
-    return -1;
+    const auto it = index_.find(std::string(id));
+    return it == index_.end() ? -1 : it->second;
 }
 
 float ResultTable::value(int period, int variable, int element) const

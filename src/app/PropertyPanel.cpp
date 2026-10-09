@@ -24,12 +24,16 @@
  */
 #include "PropertyPanel.h"
 
+#include "Icons.h"
+#include "Theme.h"
 #include "anahita/core/Features.h"
 #include "anahita/core/Text.h"
 
 #include <QComboBox>
+#include <QHash>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMenu>
 #include <QStyledItemDelegate>
 #include <QTableWidget>
@@ -111,37 +115,103 @@ std::size_t keyLength(const std::vector<std::string>& tokens)
 PropertyPanel::PropertyPanel(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(doc)
 {
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 4);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    auto* head = new QWidget(this);
+    head->setObjectName("panelHeader");
+    head->setAttribute(Qt::WA_StyledBackground, true);
+    auto* hl = new QVBoxLayout(head);
+    hl->setContentsMargins(10, 8, 10, 8);
+    hl->setSpacing(6);
     auto* top = new QHBoxLayout;
-    title_ = new QLabel(this);
-    title_->setWordWrap(true);
-    QFont f = title_->font();
-    f.setBold(true);
-    title_->setFont(f);
-    addButton_ = new QToolButton(this);
+    top->setSpacing(8);
+    icon_ = new QLabel(head);
+    icon_->setFixedSize(28, 28);
+    auto* titles = new QVBoxLayout;
+    titles->setSpacing(0);
+    title_ = new QLabel(head);
+    title_->setObjectName("panelTitle");
+    title_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    subtitle_ = new QLabel(head);
+    subtitle_->setObjectName("panelSubtitle");
+    subtitle_->setWordWrap(false);
+    titles->addWidget(title_);
+    titles->addWidget(subtitle_);
+    addButton_ = new QToolButton(head);
     addButton_->setText(tr("Add data"));
+    addButton_->setIcon(icons::get("new"));
+    addButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     addButton_->setToolTip(tr("Attach more data to the selected element (demands, emitters, leakage, losses, ...)"));
     addButton_->setPopupMode(QToolButton::InstantPopup);
     addButton_->setMenu(new QMenu(addButton_));
-    top->addWidget(title_, 1);
-    top->addWidget(addButton_);
-    layout->addLayout(top);
+    top->addWidget(icon_);
+    top->addLayout(titles, 1);
+    top->addWidget(addButton_, 0, Qt::AlignTop);
+    hl->addLayout(top);
+    filter_ = new QLineEdit(head);
+    filter_->setPlaceholderText(tr("Filter properties"));
+    filter_->setClearButtonEnabled(true);
+    filter_->addAction(icons::get("find"), QLineEdit::LeadingPosition);
+    hl->addWidget(filter_);
+    layout->addWidget(head);
+
     table_ = new QTableWidget(this);
     table_->setColumnCount(3);
     table_->setHorizontalHeaderLabels({tr("Property"), tr("Value"), tr("Units")});
-    table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
     table_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     table_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    table_->horizontalHeader()->setHighlightSections(false);
+    table_->setColumnWidth(0, 170);
     table_->verticalHeader()->hide();
+    table_->verticalHeader()->setDefaultSectionSize(26);
+    table_->setShowGrid(false);
+    table_->setAlternatingRowColors(true);
+    table_->setSelectionMode(QAbstractItemView::SingleSelection);
+    table_->setWordWrap(false);
     table_->setItemDelegate(new ChoiceDelegate(table_));
     table_->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::SelectedClicked |
                             QAbstractItemView::EditKeyPressed | QAbstractItemView::AnyKeyPressed);
-    layout->addWidget(table_);
+    // One click on a value starts editing it.
+    connect(table_, &QTableWidget::cellClicked, this, [this](int row, int column) {
+        QTableWidgetItem* item = table_->item(row, column);
+        if (column == 1 && item && (item->flags() & Qt::ItemIsEditable))
+            table_->editItem(item);
+    });
+    layout->addWidget(table_, 1);
     connect(table_, &QTableWidget::itemChanged, this, &PropertyPanel::commit);
+    connect(filter_, &QLineEdit::textChanged, this, &PropertyPanel::applyFilter);
     connect(doc_, &ProjectDocument::selectionChanged, this, &PropertyPanel::rebuild);
     connect(doc_, &ProjectDocument::modelChanged, this, &PropertyPanel::rebuild);
     connect(doc_, &ProjectDocument::modelReset, this, &PropertyPanel::rebuild);
+    connect(doc_, &ProjectDocument::periodChanged, this, &PropertyPanel::rebuild);
     rebuild();
+}
+
+void PropertyPanel::applyFilter()
+{
+    const QString text = filter_->text().trimmed();
+    int header = -1;
+    bool headerHasMatch = false;
+    auto closeHeader = [&] {
+        if (header >= 0)
+            table_->setRowHidden(header, !text.isEmpty() && !headerHasMatch);
+    };
+    for (int r = 0; r < table_->rowCount(); ++r)
+    {
+        const bool isHeader = table_->columnSpan(r, 0) > 1;
+        if (isHeader)
+        {
+            closeHeader();
+            header = r;
+            headerHasMatch = false;
+            continue;
+        }
+        const bool match = text.isEmpty() || table_->item(r, 0)->text().contains(text, Qt::CaseInsensitive);
+        table_->setRowHidden(r, !match);
+        headerHasMatch = headerHasMatch || match;
+    }
+    closeHeader();
 }
 
 void PropertyPanel::setEngine(const engine::EngineDescriptor* engine)
@@ -187,6 +257,7 @@ void PropertyPanel::rebuild()
         showElement(sel);
     populateAddMenu();
     populating_ = false;
+    applyFilter();
 }
 
 void PropertyPanel::addHeader(const QString& text, bool enabled, const QString& tip)
@@ -201,7 +272,8 @@ void PropertyPanel::addHeader(const QString& text, bool enabled, const QString& 
     if (!enabled)
         item->setForeground(palette().color(QPalette::Disabled, QPalette::Text));
     item->setToolTip(tip);
-    item->setBackground(palette().color(QPalette::AlternateBase));
+    item->setBackground(QColor(236, 241, 248));
+    item->setForeground(enabled ? theme::kText : QColor(160, 170, 182));
     table_->setItem(r, 0, item);
     table_->setSpan(r, 0, 1, 3);
 }
@@ -255,7 +327,10 @@ void PropertyPanel::showElement(const Selection& sel)
         kind = tr("Subcatchment");
     else if (sel.category == Category::Gage)
         kind = tr("Rain gage");
-    title_->setText(kind + " " + sel.id);
+    title_->setText(sel.id);
+    subtitle_->setText(kind);
+    subtitle_->setToolTip({});
+    icon_->setPixmap(icons::element(sel.category == Category::Gage ? "RainGage" : sel.category == Category::Area ? "Subcatchment" : kind).pixmap(28, 28));
     const auto units = model.units();
 
     std::map<std::string, int> occurrence;
@@ -264,12 +339,11 @@ void PropertyPanel::showElement(const Selection& sel)
         QString why;
         const bool supported = sectionSupported(er.section, &why);
         const int n = ++occurrence[er.section];
-        QString header = "[" + QString::fromStdString(er.section) + "]";
+        QString header = er.def && !er.def->description.empty() ? QString::fromStdString(er.def->description)
+                                                                 : "[" + QString::fromStdString(er.section) + "]";
         if (er.def && er.def->multiRowPerKey)
-            header += " #" + QString::number(n);
-        if (er.def && !er.def->description.empty())
-            header += "  " + QString::fromStdString(er.def->description);
-        addHeader(header, supported, why);
+            header += "  #" + QString::number(n);
+        addHeader(header, supported, why.isEmpty() ? "[" + QString::fromStdString(er.section) + "]" : why);
         const auto& cols = er.def ? er.def->columns : std::vector<core::ColumnDef>{};
         const std::size_t ncols = std::max(cols.size(), er.tokens.size());
         for (std::size_t c = 0; c < ncols; ++c)
@@ -334,7 +408,10 @@ void PropertyPanel::showElement(const Selection& sel)
 void PropertyPanel::showOptions()
 {
     const auto& model = doc_->model();
-    title_->setText(tr("Project: %1").arg(doc_->displayName()));
+    title_->setText(doc_->displayName());
+    subtitle_->setText(tr("Simulation options"));
+    subtitle_->setToolTip(tr("Select an element on the map to edit it."));
+    icon_->setPixmap(icons::get("options").pixmap(28, 28));
     const std::vector<std::string> sections = model.dialect() == core::Dialect::Swmm
                                                   ? std::vector<std::string>{"OPTIONS"}
                                                   : std::vector<std::string>{"OPTIONS", "TIMES", "REACTIONS", "ENERGY"};
@@ -343,7 +420,13 @@ void PropertyPanel::showOptions()
         const auto* s = model.document().find(name);
         if (!s)
             continue;
-        addHeader("[" + QString::fromStdString(name) + "]", true);
+        static const QHash<QString, QString> friendly = {
+            {"OPTIONS", QObject::tr("General and hydraulic options")},
+            {"TIMES", QObject::tr("Time settings")},
+            {"REACTIONS", QObject::tr("Water quality reactions")},
+            {"ENERGY", QObject::tr("Energy and pumping costs")}};
+        const QString key = QString::fromStdString(name);
+        addHeader(friendly.value(key, "[" + key + "]"), true, "[" + key + "]");
         for (int r = 0; r < s->rowCount(); ++r)
         {
             const auto tokens = s->rowTokens(r);
@@ -352,7 +435,11 @@ void PropertyPanel::showOptions()
             const std::size_t k = std::min(keyLength(tokens), tokens.size());
             std::vector<std::string> key(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(k));
             std::vector<std::string> rest(tokens.begin() + static_cast<std::ptrdiff_t>(k), tokens.end());
-            addRow(QString::fromStdString(text::join(key, " ")), QString::fromStdString(text::join(rest, " ")), {}, {},
+            QString label = QString::fromStdString(text::toLower(text::join(key, " "))).replace('_', ' ');
+            for (int i = 0; i < label.size(); ++i)
+                if (i == 0 || label[i - 1] == ' ')
+                    label[i] = label[i].toUpper();
+            addRow(label, QString::fromStdString(text::join(rest, " ")), {}, {},
                    QString::fromStdString(name), r, static_cast<int>(k), true, {}, true);
         }
     }

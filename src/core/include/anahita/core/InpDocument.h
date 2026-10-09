@@ -51,6 +51,8 @@ public:
     int rowCount() const;
 
     std::vector<std::string> rowTokens(int row) const;
+    /// Tokens of every data row in one pass (rowTokens(r) scans from the start).
+    std::vector<std::vector<std::string>> allRowTokens() const;
     std::string rowComment(int row) const;
 
     /// Replaces the tokens of a row and keeps its trailing comment.

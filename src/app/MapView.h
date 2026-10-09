@@ -3,7 +3,7 @@
  * https://github.com/ehsanMa86/Anahita
  *
  * File:    src/app/MapView.h
- * Purpose: Interactive network map: drawing, selection, editing tools and result coloring.
+ * Purpose: Network map: drawing, basemap, result coloring and interactive editing.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -32,10 +32,13 @@
 #include <QWidget>
 
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace anahita::app
 {
+
+class Basemap;
 
 class MapView : public QWidget
 {
@@ -45,6 +48,7 @@ public:
     {
         Select,
         Pan,
+        ZoomWindow,
         AddNode,
         AddLink,
         AddArea,
@@ -57,17 +61,33 @@ public:
     Tool tool() const { return tool_; }
     void fitToWindow();
     void zoomBy(double factor);
+    /// Centers the view on an element and makes sure it is visible.
+    void zoomTo(const Selection& sel);
 
     void setNodeVariable(const QString& name);
     void setLinkVariable(const QString& name);
     void setAreaVariable(const QString& name);
     void setShowLabels(bool on);
+    void setShowArrows(bool on);
+    void setShowLegend(bool on);
     /// Loads an image with a world file (.pgw/.jgw/.wld) or fits it to the network.
     bool setBackdrop(const QString& imagePath, QString* error = nullptr);
     void clearBackdrop();
 
+    // Web basemap
+    static std::vector<std::pair<QString, QString>> basemapProviders();
+    static QString basemapLabel(const QString& id);
+    void setBasemap(const QString& id);
+    QString basemap() const;
+    bool basemapUsable(QString* why = nullptr) const;
+    /// Coordinate system of the model coordinates ("EPSG:32614", WKT, ...).
+    void setCoordinateSystem(const QString& crs);
+    QString coordinateSystemName() const;
+
     /// Snapshot of the map as currently displayed.
     QImage renderImage();
+    /// Converts a screen position to model coordinates.
+    QPointF worldAt(const QPoint& screen) const;
 
 signals:
     void statusMessage(const QString& text);
@@ -75,6 +95,7 @@ signals:
     void toolFinished();
     void elementActivated();
     void contextMenuForSelection(const QPoint& globalPos);
+    void contextMenuForMap(const QPoint& globalPos, const QPointF& world);
 
 protected:
     void paintEvent(QPaintEvent*) override;
@@ -94,25 +115,35 @@ private:
     Selection hitTest(const QPointF& screen) const;
     void paintTo(QPainter& p, const QRect& area);
     void drawLegend(QPainter& p, const QRect& area);
+    void drawScaleBar(QPainter& p, const QRect& area);
+    void drawAttribution(QPainter& p, const QRect& area);
+    void drawLabel(QPainter& p, const QPointF& at, const QString& text);
     QColor colorFor(double value) const;
     void recomputeRanges();
     std::optional<double> resultValue(const char* table, int variable, const std::string& id) const;
+    int flowVariable() const;
     void finishArea();
     void cancelPending();
+    void userMovedView();
     QString prefixFor(const QString& kind) const;
+    void updateCoordinateSystem();
 
     ProjectDocument* doc_;
+    Basemap* basemap_;
+    QString crsText_;
     Tool tool_ = Tool::Select;
     QString kind_;
     double scale_ = 1.0;   ///< pixels per world unit
     core::Point center_;   ///< world point at the widget center
     bool fitted_ = false;
+    bool userView_ = false; ///< the user zoomed or panned since the last fit
 
     // interaction state
     QPoint pressPos_;
     QPoint lastPos_;
     bool panning_ = false;
     bool dragging_ = false;
+    bool rubberBand_ = false;
     QString dragNode_;
     core::Point dragTo_;
     QString linkStart_;
@@ -127,6 +158,8 @@ private:
     double rangeMin_ = 0.0, rangeMax_ = 1.0;
     QString legendTitle_;
     bool showLabels_ = true;
+    bool showArrows_ = true;
+    bool showLegend_ = true;
 
     QImage backdrop_;
     QRectF backdropWorld_;

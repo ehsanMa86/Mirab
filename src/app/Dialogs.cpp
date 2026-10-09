@@ -28,6 +28,7 @@
 #include "EngineDownloader.h"
 #include "SolverProcess.h"
 #include "anahita/AnahitaConfig.h"
+#include "anahita/core/Crs.h"
 #include "anahita/core/Text.h"
 #include "anahita/engine/EngineInstall.h"
 #include "anahita/resilience/Resilience.h"
@@ -49,6 +50,7 @@
 #include <QJsonArray>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
@@ -60,6 +62,8 @@
 #include <QTextBrowser>
 #include <QUrl>
 #include <QVBoxLayout>
+
+#include <cmath>
 
 namespace anahita::app
 {
@@ -691,6 +695,155 @@ AboutDialog::AboutDialog(QWidget* parent) : QDialog(parent)
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     layout->addWidget(buttons);
+}
+
+// ---------------------------------------------------------------------------
+// ResilienceDialog::selectAnalysis
+// ---------------------------------------------------------------------------
+void ResilienceDialog::selectAnalysis(const QString& key)
+{
+    const int idx = analysis_->findData(key);
+    if (idx >= 0)
+        analysis_->setCurrentIndex(idx);
+}
+
+// ---------------------------------------------------------------------------
+// CoordinateSystemDialog
+// ---------------------------------------------------------------------------
+CoordinateSystemDialog::CoordinateSystemDialog(const QString& current, const core::Model& model, QWidget* parent)
+    : QDialog(parent), model_(model)
+{
+    setWindowTitle(tr("Coordinate system"));
+    resize(640, 560);
+    auto* layout = new QVBoxLayout(this);
+    auto* intro = new QLabel(tr("Choose the coordinate reference system of the node coordinates. It places the "
+                                "network on web basemaps and in GIS exports. Search by name or EPSG code, enter a "
+                                "code, or load the .prj file of a shapefile."),
+                             this);
+    intro->setWordWrap(true);
+    layout->addWidget(intro);
+    search_ = new QLineEdit(this);
+    search_->setPlaceholderText(tr("Search, e.g. UTM 14N, Web Mercator, 32614"));
+    search_->setClearButtonEnabled(true);
+    layout->addWidget(search_);
+    list_ = new QListWidget(this);
+    for (const auto& e : crs::commonSystems())
+    {
+        auto* item = new QListWidgetItem(QStringLiteral("EPSG:%1   %2").arg(e.epsg).arg(QString::fromStdString(e.name)), list_);
+        item->setData(Qt::UserRole, QStringLiteral("EPSG:%1").arg(e.epsg));
+    }
+    layout->addWidget(list_, 1);
+    auto* row = new QHBoxLayout;
+    code_ = new QLineEdit(current, this);
+    code_->setPlaceholderText(tr("EPSG code, PROJ string or WKT; empty when unknown"));
+    auto* prj = new QPushButton(tr("Load .prj file..."), this);
+    auto* none = new QPushButton(tr("Unknown"), this);
+    row->addWidget(new QLabel(tr("Definition"), this));
+    row->addWidget(code_, 1);
+    row->addWidget(prj);
+    row->addWidget(none);
+    layout->addLayout(row);
+    status_ = new QLabel(this);
+    status_->setWordWrap(true);
+    status_->setMinimumHeight(40);
+    layout->addWidget(status_);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+    ok_ = buttons->button(QDialogButtonBox::Ok);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    connect(search_, &QLineEdit::textChanged, this, [this](const QString& t) {
+        for (int i = 0; i < list_->count(); ++i)
+        {
+            const QStringList words = t.split(' ', Qt::SkipEmptyParts);
+            bool show = true;
+            for (const QString& w : words)
+                show = show && list_->item(i)->text().contains(w, Qt::CaseInsensitive);
+            list_->item(i)->setHidden(!show);
+        }
+    });
+    connect(list_, &QListWidget::currentItemChanged, this, [this](QListWidgetItem* item) {
+        if (item)
+            code_->setText(item->data(Qt::UserRole).toString());
+    });
+    connect(list_, &QListWidget::itemDoubleClicked, this, [this] {
+        if (ok_->isEnabled())
+            accept();
+    });
+    connect(code_, &QLineEdit::textChanged, this, &CoordinateSystemDialog::validate);
+    connect(none, &QPushButton::clicked, this, [this] { code_->clear(); });
+    connect(prj, &QPushButton::clicked, this, [this] {
+        const QString f = QFileDialog::getOpenFileName(this, tr("Projection file"), QDir::homePath(),
+                                                       tr("Projection files (*.prj *.wkt);;All files (*)"));
+        if (f.isEmpty())
+            return;
+        QFile file(f);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text))
+            code_->setText(QString::fromUtf8(file.readAll()).simplified());
+    });
+    for (int i = 0; i < list_->count(); ++i)
+    {
+        if (list_->item(i)->data(Qt::UserRole).toString().compare(current, Qt::CaseInsensitive) == 0)
+        {
+            list_->setCurrentRow(i);
+            list_->scrollToItem(list_->item(i));
+        }
+    }
+    validate();
+}
+
+QString CoordinateSystemDialog::crs() const
+{
+    const QString text = code_->text().trimmed();
+    if (text.isEmpty())
+        return {};
+    bool numeric = false;
+    const int code = text.toInt(&numeric);
+    if (numeric)
+        return QStringLiteral("EPSG:%1").arg(code);
+    if (auto c = crs::parse(text.toStdString()); c && c->epsg > 0)
+        return QStringLiteral("EPSG:%1").arg(c->epsg);
+    return text;
+}
+
+void CoordinateSystemDialog::validate()
+{
+    const QString text = code_->text().trimmed();
+    if (text.isEmpty())
+    {
+        status_->setText(tr("Unknown coordinate system. Basemaps are available only when the coordinates are "
+                            "longitudes and latitudes."));
+        ok_->setEnabled(true);
+        return;
+    }
+    const auto c = crs::parse(crs().toStdString());
+    if (!c)
+    {
+        status_->setText("<span style='color:#c84b4b'>" + tr("Not recognized. Use an EPSG code from the list, a PROJ "
+                                                            "string or the WKT of a .prj file.") + "</span>");
+        ok_->setEnabled(false);
+        return;
+    }
+    QString where;
+    for (const auto& n : model_.nodes())
+    {
+        if (!n.placed)
+            continue;
+        double lon = 0, lat = 0;
+        if (crs::toLonLat(*c, n.pos.x, n.pos.y, lon, lat))
+            where = tr("Node %1 would be at %2° %3, %4° %5.")
+                        .arg(QString::fromStdString(n.id))
+                        .arg(std::fabs(lat), 0, 'f', 5)
+                        .arg(lat >= 0 ? "N" : "S")
+                        .arg(std::fabs(lon), 0, 'f', 5)
+                        .arg(lon >= 0 ? "E" : "W");
+        if (std::fabs(lat) > 90 || std::fabs(lon) > 180 || !std::isfinite(lat) || !std::isfinite(lon))
+            where = tr("The coordinates do not fit this system: node %1 falls outside the globe.").arg(QString::fromStdString(n.id));
+        break;
+    }
+    status_->setText("<b>" + QString::fromStdString(c->name.empty() ? crs::toString(*c) : c->name).toHtmlEscaped() +
+                     "</b><br>" + where);
+    ok_->setEnabled(true);
 }
 
 } // namespace anahita::app

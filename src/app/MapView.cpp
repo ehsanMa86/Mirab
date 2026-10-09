@@ -3,7 +3,7 @@
  * https://github.com/ehsanMa86/Anahita
  *
  * File:    src/app/MapView.cpp
- * Purpose: Implementation of the network map widget.
+ * Purpose: Network map: drawing, basemap, result coloring and interactive editing.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -24,6 +24,8 @@
  */
 #include "MapView.h"
 
+#include "Basemap.h"
+#include "Theme.h"
 #include "anahita/core/Text.h"
 
 #include <QFile>
@@ -48,8 +50,11 @@ using core::Point;
 
 namespace
 {
-const QColor kRamp[] = {QColor(43, 103, 199), QColor(0, 170, 210), QColor(40, 180, 90),
-                        QColor(240, 200, 30), QColor(220, 50, 40)};
+constexpr double kPi = 3.14159265358979323846;
+
+// Color classes of the legend, from low to high values.
+const QColor kRamp[] = {QColor(43, 103, 199), QColor(0, 166, 214), QColor(46, 178, 96), QColor(242, 188, 26),
+                        QColor(224, 64, 48)};
 
 double segDistance(const QPointF& p, const QPointF& a, const QPointF& b)
 {
@@ -72,18 +77,38 @@ bool insidePolygon(const std::vector<Point>& poly, const Point& p)
     }
     return in;
 }
+
+double haversineMeters(double lon1, double lat1, double lon2, double lat2)
+{
+    const double r = 6371008.8;
+    const double p1 = lat1 * kPi / 180, p2 = lat2 * kPi / 180;
+    const double dp = p2 - p1, dl = (lon2 - lon1) * kPi / 180;
+    const double a = std::sin(dp / 2) * std::sin(dp / 2) + std::cos(p1) * std::cos(p2) * std::sin(dl / 2) * std::sin(dl / 2);
+    return 2 * r * std::asin(std::min(1.0, std::sqrt(a)));
+}
+
+double niceStep(double raw)
+{
+    const double e = std::pow(10.0, std::floor(std::log10(raw)));
+    const double f = raw / e;
+    return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * e;
+}
 } // namespace
 
-MapView::MapView(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(doc)
+MapView::MapView(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(doc), basemap_(new Basemap(this))
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(320, 240);
     setAttribute(Qt::WA_OpaquePaintEvent);
+    connect(basemap_, &Basemap::updated, this, qOverload<>(&QWidget::update));
     connect(doc_, &ProjectDocument::modelReset, this, [this] {
         fitted_ = false;
+        userView_ = false;
         cancelPending();
         recomputeRanges();
+        updateCoordinateSystem();
+        basemap_->setProvider(QString::fromStdString(doc_->settings().basemap));
         fitToWindow();
     });
     connect(doc_, &ProjectDocument::modelChanged, this, [this] {
@@ -99,6 +124,66 @@ MapView::MapView(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(
     connect(doc_, &ProjectDocument::periodChanged, this, qOverload<>(&QWidget::update));
 }
 
+// ---------------------------------------------------------------------------
+// Basemap and coordinate system
+// ---------------------------------------------------------------------------
+std::vector<std::pair<QString, QString>> MapView::basemapProviders()
+{
+    std::vector<std::pair<QString, QString>> list;
+    for (const auto& p : Basemap::providers())
+        list.emplace_back(p.id, p.label);
+    return list;
+}
+
+QString MapView::basemapLabel(const QString& id)
+{
+    const auto* p = Basemap::find(id);
+    return p ? p->label : QString();
+}
+
+void MapView::setBasemap(const QString& id)
+{
+    basemap_->setProvider(id);
+    update();
+}
+
+QString MapView::basemap() const
+{
+    return basemap_->provider();
+}
+
+bool MapView::basemapUsable(QString* why) const
+{
+    if (why)
+        *why = basemap_->unusableReason();
+    return basemap_->usable();
+}
+
+void MapView::setCoordinateSystem(const QString& crs)
+{
+    crsText_ = crs;
+    updateCoordinateSystem();
+    update();
+}
+
+QString MapView::coordinateSystemName() const
+{
+    return basemap_->crsName();
+}
+
+void MapView::updateCoordinateSystem()
+{
+    crsText_ = QString::fromStdString(doc_->settings().crs);
+    const core::Bounds b = doc_->model().bounds();
+    if (b.valid)
+        basemap_->setCoordinateSystem(crsText_, b.minX, b.minY, b.maxX, b.maxY);
+    else
+        basemap_->setCoordinateSystem(crsText_, 1e9, 1e9, -1e9, -1e9);
+}
+
+// ---------------------------------------------------------------------------
+// View
+// ---------------------------------------------------------------------------
 void MapView::setTool(Tool tool, const QString& kind)
 {
     cancelPending();
@@ -117,11 +202,14 @@ void MapView::setTool(Tool tool, const QString& kind)
         break;
     }
     if (tool == Tool::AddLink)
-        emit statusMessage(tr("Click the start node, optional bend points, then the end node."));
+        emit statusMessage(tr("Click the start node, optional bend points, then the end node. Right-click or Esc to finish."));
     else if (tool == Tool::AddArea)
         emit statusMessage(tr("Click the outline corners; double-click or press Enter to finish."));
     else if (tool == Tool::AddNode || tool == Tool::AddGage)
-        emit statusMessage(tr("Click on the map to place the %1.").arg(kind.isEmpty() ? tr("rain gage") : kind.toLower()));
+        emit statusMessage(tr("Click on the map to place the %1. Right-click or Esc to finish.")
+                               .arg(kind.isEmpty() ? tr("rain gage") : kind.toLower()));
+    else if (tool == Tool::ZoomWindow)
+        emit statusMessage(tr("Drag a rectangle to zoom into."));
     update();
 }
 
@@ -131,6 +219,7 @@ void MapView::cancelPending()
     pendingVertices_.clear();
     pendingPolygon_.clear();
     dragging_ = false;
+    rubberBand_ = false;
     dragNode_.clear();
     update();
 }
@@ -143,6 +232,12 @@ QPointF MapView::toScreen(const Point& p) const
 Point MapView::toWorld(const QPointF& s) const
 {
     return Point{center_.x + (s.x() - width() / 2.0) / scale_, center_.y - (s.y() - height() / 2.0) / scale_};
+}
+
+QPointF MapView::worldAt(const QPoint& screen) const
+{
+    const Point w = toWorld(screen);
+    return {w.x, w.y};
 }
 
 void MapView::fitToWindow()
@@ -162,22 +257,92 @@ void MapView::fitToWindow()
     if (b.width() < 1e-6 && b.height() < 1e-6)
         w = h = 100.0;
     center_ = {(b.minX + b.maxX) / 2.0, (b.minY + b.maxY) / 2.0};
-    const double sx = (width() - 60) / w;
-    const double sy = (height() - 60) / h;
+    const double margin = 70.0;
+    const double sx = (width() - 2 * margin) / w;
+    const double sy = (height() - 2 * margin) / h;
     scale_ = std::max(1e-9, std::min(sx > 0 ? sx : 1.0, sy > 0 ? sy : 1.0));
     fitted_ = true;
+    userView_ = false;
     update();
+}
+
+void MapView::userMovedView()
+{
+    userView_ = true;
 }
 
 void MapView::zoomBy(double factor)
 {
     scale_ = std::clamp(scale_ * factor, 1e-9, 1e9);
+    userMovedView();
+    update();
+}
+
+void MapView::zoomTo(const Selection& sel)
+{
+    const auto& m = doc_->model();
+    const std::string id = sel.id.toStdString();
+    core::Bounds b;
+    if (sel.category == Category::Node)
+    {
+        if (const auto* n = m.findNode(id); n && n->placed)
+            b.include(n->pos);
+    }
+    else if (sel.category == Category::Link)
+    {
+        if (const auto* l = m.findLink(id))
+        {
+            for (const auto* n : {m.findNode(l->from), m.findNode(l->to)})
+            {
+                if (n && n->placed)
+                    b.include(n->pos);
+            }
+            for (const auto& v : l->vertices)
+                b.include(v);
+        }
+    }
+    else if (sel.category == Category::Area)
+    {
+        if (const auto* a = m.findArea(id))
+        {
+            for (const auto& v : a->polygon)
+                b.include(v);
+        }
+    }
+    else if (sel.category == Category::Gage)
+    {
+        if (const auto* g = m.findGage(id); g && g->placed)
+            b.include(g->pos);
+    }
+    if (!b.valid)
+        return;
+    center_ = {(b.minX + b.maxX) / 2.0, (b.minY + b.maxY) / 2.0};
+    const double extent = std::max(b.width(), b.height());
+    if (extent > 0)
+    {
+        const double needed = std::min(width(), height()) * 0.5 / extent;
+        if (scale_ > needed)
+            scale_ = needed;
+    }
+    userMovedView();
     update();
 }
 
 void MapView::setShowLabels(bool on)
 {
     showLabels_ = on;
+    update();
+}
+
+void MapView::setShowArrows(bool on)
+{
+    showArrows_ = on;
+    update();
+}
+
+void MapView::setShowLegend(bool on)
+{
+    showLegend_ = on;
     update();
 }
 
@@ -290,6 +455,15 @@ std::optional<double> MapView::resultValue(const char* table, int variable, cons
     if (e < 0)
         return std::nullopt;
     return t->value(doc_->period(), variable, e);
+}
+
+int MapView::flowVariable() const
+{
+    const auto* r = doc_->results();
+    if (!r)
+        return -1;
+    const auto* t = r->table("link");
+    return t ? t->variableIndex("Flow") : -1;
 }
 
 bool MapView::setBackdrop(const QString& imagePath, QString* error)
@@ -422,6 +596,9 @@ QString MapView::prefixFor(const QString& kind) const
     return prefixes.value(kind, kind.left(1).toUpper());
 }
 
+// ---------------------------------------------------------------------------
+// Painting
+// ---------------------------------------------------------------------------
 void MapView::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
@@ -433,16 +610,56 @@ QImage MapView::renderImage()
     return grab().toImage();
 }
 
+void MapView::drawLabel(QPainter& p, const QPointF& at, const QString& text)
+{
+    // Text with a light halo, readable on basemaps and on dense networks.
+    QPainterPath path;
+    path.addText(at, p.font(), text);
+    p.setPen(QPen(QColor(255, 255, 255, 220), 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    p.setBrush(Qt::NoBrush);
+    p.drawPath(path);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(38, 50, 66));
+    p.drawPath(path);
+}
+
 void MapView::paintTo(QPainter& p, const QRect& area)
 {
     p.setRenderHint(QPainter::Antialiasing);
-    const QPalette pal = palette();
-    p.fillRect(area, pal.color(QPalette::Base));
+    p.fillRect(area, theme::kMapBackground);
     const auto& m = doc_->model();
     const Selection& sel = doc_->selection();
-    const bool dark = pal.color(QPalette::Base).lightness() < 128;
-    const QColor ink = dark ? QColor(220, 225, 232) : QColor(40, 48, 60);
-    const QColor selColor(255, 140, 0);
+    const QColor ink(78, 92, 112);
+    const QColor nodeInk(44, 58, 78);
+    const QColor selColor = theme::kSelection;
+    const QColor hoverColor(31, 111, 235, 90);
+
+    const bool base = basemap_->active();
+    if (base)
+    {
+        basemap_->paint(p, QRectF(area), [this](double x, double y) { return toScreen(x, y); },
+                        [this](const QPointF& s) {
+                            const Point w = toWorld(s);
+                            return QPointF(w.x, w.y);
+                        });
+        // A light veil keeps the network readable over busy imagery.
+        p.fillRect(area, QColor(255, 255, 255, basemap_->provider() == "esri-imagery" ? 30 : 70));
+    }
+    else
+    {
+        // Subtle grid gives a sense of scale and motion while panning.
+        const double step = niceStep(80.0 / scale_);
+        const Point tl = toWorld(QPointF(area.left(), area.top()));
+        const Point br = toWorld(QPointF(area.right(), area.bottom()));
+        p.setPen(QPen(QColor(234, 238, 243), 1.0));
+        if (step * scale_ > 12)
+        {
+            for (double x = std::floor(tl.x / step) * step; x <= br.x; x += step)
+                p.drawLine(QPointF(toScreen(x, 0).x(), area.top()), QPointF(toScreen(x, 0).x(), area.bottom()));
+            for (double y = std::floor(br.y / step) * step; y <= tl.y; y += step)
+                p.drawLine(QPointF(area.left(), toScreen(0, y).y()), QPointF(area.right(), toScreen(0, y).y()));
+        }
+    }
 
     if (!backdrop_.isNull())
     {
@@ -461,14 +678,15 @@ void MapView::paintTo(QPainter& p, const QRect& area)
         QPolygonF poly;
         for (const auto& v : a.polygon)
             poly << toScreen(v);
-        QColor fill = dark ? QColor(70, 120, 80, 110) : QColor(150, 205, 150, 120);
+        QColor fill(150, 205, 150, 110);
         if (auto v = resultValue("subcatchment", areaVarIndex_, a.id); v && nodeVarIndex_ < 0 && linkVarIndex_ < 0)
         {
             fill = colorFor(*v);
             fill.setAlpha(150);
         }
         const bool selected = sel.category == Category::Area && sel.id.toStdString() == a.id;
-        p.setPen(QPen(selected ? selColor : QColor(60, 140, 70), selected ? 2.5 : 1.2));
+        const bool hovered = hover_.category == Category::Area && hover_.id.toStdString() == a.id;
+        p.setPen(QPen(selected ? selColor : QColor(60, 140, 70), selected ? 2.5 : hovered ? 2.0 : 1.2));
         p.setBrush(fill);
         p.drawPolygon(poly);
         if (const auto* out = m.findNode(a.outlet); out && out->placed)
@@ -483,7 +701,8 @@ void MapView::paintTo(QPainter& p, const QRect& area)
     }
 
     // Links
-    const double lw = std::clamp(scale_ * 1.5, 1.6, 4.0);
+    const double lw = std::clamp(scale_ * 1.2, 1.8, 4.0);
+    const int flowVar = showArrows_ ? flowVariable() : -1;
     for (const auto& l : m.links())
     {
         const auto* a = m.findNode(l.from);
@@ -499,30 +718,84 @@ void MapView::paintTo(QPainter& p, const QRect& area)
         line << toScreen(b->pos);
         if (!dragNode_.isEmpty() && dragging_ && b->id == dragNode_.toStdString())
             line.last() = toScreen(dragTo_);
+        if (!line.boundingRect().adjusted(-10, -10, 10, 10).intersects(area))
+            continue;
         QColor c = ink;
         if (auto v = resultValue("link", linkVarIndex_, l.id))
             c = colorFor(std::fabs(*v));
         const bool selected = sel.category == Category::Link && sel.id.toStdString() == l.id;
-        p.setPen(QPen(selected ? selColor : c, selected ? lw + 2.0 : lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        const bool hovered = hover_.category == Category::Link && hover_.id.toStdString() == l.id;
         p.setBrush(Qt::NoBrush);
+        if (selected || hovered)
+        {
+            p.setPen(QPen(selected ? QColor(255, 140, 0, 110) : hoverColor, lw + 7.0, Qt::SolidLine, Qt::RoundCap,
+                          Qt::RoundJoin));
+            p.drawPolyline(line);
+        }
+        p.setPen(QPen(selected ? selColor : c, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         p.drawPolyline(line);
+
+        // Flow direction arrow at the middle of the longest segment.
+        if (flowVar >= 0)
+        {
+            if (auto f = resultValue("link", flowVar, l.id); f && std::fabs(*f) > 1e-9)
+            {
+                int best = 0;
+                double bestLen = 0;
+                for (int i = 0; i + 1 < line.size(); ++i)
+                {
+                    const double len = std::hypot(line[i + 1].x() - line[i].x(), line[i + 1].y() - line[i].y());
+                    if (len > bestLen)
+                    {
+                        bestLen = len;
+                        best = i;
+                    }
+                }
+                if (bestLen > 28)
+                {
+                    QPointF s0 = line[best], s1 = line[best + 1];
+                    if (*f < 0)
+                        std::swap(s0, s1);
+                    const QPointF dir = (s1 - s0) / bestLen;
+                    const double off = (l.kind == "Pipe" || l.kind == "Conduit") ? 0.5 : 0.78;
+                    const QPointF tip = s0 + (s1 - s0) * off + dir * 4.5;
+                    const QPointF nrm(-dir.y(), dir.x());
+                    const double size = std::max(4.5, lw * 2.0);
+                    QPolygonF head;
+                    head << tip << tip - dir * size + nrm * size * 0.6 << tip - dir * size - nrm * size * 0.6;
+                    p.setPen(Qt::NoPen);
+                    p.setBrush(selected ? selColor : c.darker(115));
+                    p.drawPolygon(head);
+                }
+            }
+        }
+
         if (l.kind == "Pump" || l.kind == "Valve" || l.kind == "Orifice" || l.kind == "Weir" || l.kind == "Outlet")
         {
             const QPointF mid = (line.first() + line.last()) / 2.0;
-            p.setBrush(pal.color(QPalette::Base));
-            p.setPen(QPen(selected ? selColor : c, 1.5));
+            p.setBrush(Qt::white);
+            p.setPen(QPen(selected ? selColor : c.darker(110), 1.6));
             if (l.kind == "Pump")
-                p.drawEllipse(mid, 5.5, 5.5);
+            {
+                p.drawEllipse(mid, 6.5, 6.5);
+                p.setBrush(selected ? selColor : c.darker(110));
+                const QPointF d = line.last() - line.first();
+                const double len = std::max(1.0, std::hypot(d.x(), d.y()));
+                const QPointF u = d / len, n(-u.y(), u.x());
+                QPolygonF tri;
+                tri << mid + u * 4.0 << mid - u * 2.5 + n * 3.0 << mid - u * 2.5 - n * 3.0;
+                p.drawPolygon(tri);
+            }
             else
             {
                 QPolygonF bow;
-                bow << mid + QPointF(-6, -4) << mid + QPointF(6, 4) << mid + QPointF(6, -4) << mid + QPointF(-6, 4);
+                bow << mid + QPointF(-7, -4.5) << mid + QPointF(7, 4.5) << mid + QPointF(7, -4.5) << mid + QPointF(-7, 4.5);
                 p.drawPolygon(bow);
             }
         }
     }
 
-    // Pending link and polygon
+    // Pending link, polygon and rubber band
     if (tool_ == Tool::AddLink && !linkStart_.isEmpty())
     {
         if (const auto* a = m.findNode(linkStart_.toStdString()))
@@ -532,7 +805,7 @@ void MapView::paintTo(QPainter& p, const QRect& area)
             for (const auto& v : pendingVertices_)
                 line << toScreen(v);
             line << hoverScreen_;
-            p.setPen(QPen(selColor, 1.5, Qt::DashLine));
+            p.setPen(QPen(theme::kAccent, 1.8, Qt::DashLine));
             p.drawPolyline(line);
         }
     }
@@ -546,12 +819,18 @@ void MapView::paintTo(QPainter& p, const QRect& area)
         p.setBrush(QColor(150, 205, 150, 60));
         p.drawPolygon(poly);
     }
+    if (rubberBand_)
+    {
+        p.setPen(QPen(theme::kAccent, 1.2, Qt::DashLine));
+        p.setBrush(QColor(31, 111, 235, 30));
+        p.drawRect(QRectF(pressPos_, hoverScreen_).normalized());
+    }
 
     // Nodes
-    const double r = std::clamp(scale_ * 3.0, 3.5, 7.0);
+    const double r = std::clamp(scale_ * 2.4, 3.2, 6.5);
     const bool labels = showLabels_ && (m.nodes().size() < 400 || scale_ > 0.5);
     QFont f = font();
-    f.setPointSizeF(std::max(7.0, f.pointSizeF() - 1.0));
+    f.setPointSizeF(std::max(7.5, f.pointSizeF() - 1.0));
     p.setFont(f);
     for (const auto& n : m.nodes())
     {
@@ -562,40 +841,50 @@ void MapView::paintTo(QPainter& p, const QRect& area)
             c = toScreen(dragTo_);
         if (!area.adjusted(-20, -20, 20, 20).contains(c.toPoint()))
             continue;
-        QColor fill = dark ? QColor(150, 160, 175) : QColor(90, 100, 115);
+        QColor fill = n.kind == "Junction" ? QColor(255, 255, 255) : QColor(66, 133, 230);
+        if (n.kind == "Outfall")
+            fill = QColor(120, 120, 200);
         if (auto v = resultValue("node", nodeVarIndex_, n.id))
             fill = colorFor(*v);
         const bool selected = sel.category == Category::Node && sel.id.toStdString() == n.id;
-        p.setPen(QPen(selected ? selColor : ink, selected ? 2.5 : 1.0));
+        const bool hovered = hover_.category == Category::Node && hover_.id.toStdString() == n.id;
+        if (selected || hovered)
+        {
+            p.setPen(Qt::NoPen);
+            p.setBrush(selected ? QColor(255, 140, 0, 90) : hoverColor);
+            p.drawEllipse(c, r * 2.6, r * 2.6);
+        }
+        p.setPen(QPen(selected ? selColor : nodeInk, selected ? 2.4 : 1.4));
         p.setBrush(fill);
         if (n.kind == "Junction")
             p.drawEllipse(c, r, r);
         else if (n.kind == "Reservoir")
         {
             QPolygonF shape;
-            shape << c + QPointF(-r * 1.6, -r) << c + QPointF(r * 1.6, -r) << c + QPointF(r * 1.1, r * 1.2)
-                  << c + QPointF(-r * 1.1, r * 1.2);
+            shape << c + QPointF(-r * 1.8, -r * 1.1) << c + QPointF(r * 1.8, -r * 1.1) << c + QPointF(r * 1.2, r * 1.3)
+                  << c + QPointF(-r * 1.2, r * 1.3);
             p.drawPolygon(shape);
         }
         else if (n.kind == "Tank" || n.kind == "Storage")
-            p.drawRect(QRectF(c.x() - r * 1.3, c.y() - r * 1.6, r * 2.6, r * 3.2));
+        {
+            p.drawRoundedRect(QRectF(c.x() - r * 1.4, c.y() - r * 1.7, r * 2.8, r * 3.4), 1.5, 1.5);
+            p.setBrush(Qt::white);
+            p.drawRect(QRectF(c.x() - r * 1.4, c.y() - r * 1.7, r * 2.8, r * 1.1));
+        }
         else if (n.kind == "Outfall")
         {
             QPolygonF tri;
-            tri << c + QPointF(-r * 1.4, -r) << c + QPointF(r * 1.4, -r) << c + QPointF(0, r * 1.4);
+            tri << c + QPointF(-r * 1.5, -r * 1.1) << c + QPointF(r * 1.5, -r * 1.1) << c + QPointF(0, r * 1.5);
             p.drawPolygon(tri);
         }
         else
         {
             QPolygonF dia;
-            dia << c + QPointF(0, -r * 1.4) << c + QPointF(r * 1.4, 0) << c + QPointF(0, r * 1.4) << c + QPointF(-r * 1.4, 0);
+            dia << c + QPointF(0, -r * 1.5) << c + QPointF(r * 1.5, 0) << c + QPointF(0, r * 1.5) << c + QPointF(-r * 1.5, 0);
             p.drawPolygon(dia);
         }
         if (labels)
-        {
-            p.setPen(ink);
-            p.drawText(c + QPointF(r + 3, -r - 1), QString::fromStdString(n.id));
-        }
+            drawLabel(p, c + QPointF(r + 4, -r - 2), QString::fromStdString(n.id));
     }
 
     // Rain gages
@@ -606,7 +895,7 @@ void MapView::paintTo(QPainter& p, const QRect& area)
         const QPointF c = toScreen(g.pos);
         const bool selected = sel.category == Category::Gage && sel.id.toStdString() == g.id;
         p.setPen(QPen(selected ? selColor : QColor(40, 110, 200), selected ? 2.5 : 1.5));
-        p.setBrush(QColor(170, 205, 245));
+        p.setBrush(QColor(190, 215, 248));
         QPainterPath cloud;
         cloud.addEllipse(c + QPointF(-7, -3), 6, 5);
         cloud.addEllipse(c + QPointF(0, -6), 7, 6);
@@ -615,45 +904,124 @@ void MapView::paintTo(QPainter& p, const QRect& area)
         for (int i = -1; i <= 1; ++i)
             p.drawLine(c + QPointF(i * 5, 4), c + QPointF(i * 5 - 2, 10));
         if (labels)
-        {
-            p.setPen(ink);
-            p.drawText(c + QPointF(12, -6), QString::fromStdString(g.id));
-        }
+            drawLabel(p, c + QPointF(12, -8), QString::fromStdString(g.id));
     }
 
-    drawLegend(p, area);
+    if (showLegend_)
+        drawLegend(p, area);
+    drawScaleBar(p, area);
+    if (base)
+        drawAttribution(p, area);
 }
 
 void MapView::drawLegend(QPainter& p, const QRect& area)
 {
     if (legendTitle_.isEmpty())
         return;
-    const QFontMetrics fm(p.font());
-    const int w = std::max(150, fm.horizontalAdvance(legendTitle_) + 20);
-    const int h = 5 * (fm.height() + 2) + fm.height() + 16;
-    QRect box(area.left() + 10, area.bottom() - h - 10, w, h);
-    QColor bg = palette().color(QPalette::Window);
-    bg.setAlpha(225);
-    p.setPen(palette().color(QPalette::Mid));
-    p.setBrush(bg);
-    p.drawRoundedRect(box, 6, 6);
-    p.setPen(palette().color(QPalette::WindowText));
-    p.drawText(box.adjusted(8, 6, -8, 0), Qt::AlignLeft | Qt::AlignTop, legendTitle_);
+    QFont f = font();
+    p.setFont(f);
+    const QFontMetrics fm(f);
+    QFont bold = f;
+    bold.setBold(true);
+    const QFontMetrics fmb(bold);
+    const int rowH = fm.height() + 4;
+    QStringList rows;
+    int textW = fmb.horizontalAdvance(legendTitle_);
     for (int i = 0; i < 5; ++i)
     {
         const double lo = rangeMin_ + (rangeMax_ - rangeMin_) * i / 5.0;
         const double hi = rangeMin_ + (rangeMax_ - rangeMin_) * (i + 1) / 5.0;
-        const int y = box.top() + 10 + fm.height() + (4 - i) * (fm.height() + 2);
-        p.fillRect(QRect(box.left() + 10, y + 2, 18, fm.height() - 4), kRamp[i]);
-        p.drawText(QPoint(box.left() + 36, y + fm.ascent()),
-                   QString::fromStdString(text::formatDouble(lo, 3)) + " - " +
-                       QString::fromStdString(text::formatDouble(hi, 3)));
+        rows << QString::fromStdString(text::formatDouble(lo, 3)) + "  –  " + QString::fromStdString(text::formatDouble(hi, 3));
+        textW = std::max(textW, fm.horizontalAdvance(rows.last()) + 30);
+    }
+    const int w = textW + 28;
+    const int h = fmb.height() + 5 * rowH + 22;
+    const QRect box(area.left() + 12, area.top() + 12, w, h);
+    p.setPen(QPen(theme::kBorder, 1));
+    p.setBrush(QColor(255, 255, 255, 238));
+    p.drawRoundedRect(box, 8, 8);
+    p.setFont(bold);
+    p.setPen(theme::kText);
+    p.drawText(box.adjusted(12, 9, -10, 0), Qt::AlignLeft | Qt::AlignTop, legendTitle_);
+    p.setFont(f);
+    for (int i = 0; i < 5; ++i)
+    {
+        const int y = box.top() + 14 + fmb.height() + (4 - i) * rowH;
+        p.setPen(Qt::NoPen);
+        p.setBrush(kRamp[i]);
+        p.drawRoundedRect(QRect(box.left() + 12, y + 3, 18, rowH - 7), 3, 3);
+        p.setPen(theme::kText);
+        p.drawText(QPoint(box.left() + 38, y + fm.ascent() + 1), rows[i]);
     }
 }
 
+void MapView::drawScaleBar(QPainter& p, const QRect& area)
+{
+    // Ground distance of 100 screen pixels, in meters when the CRS is known.
+    const QPointF a(area.left() + 40, area.bottom() - 30);
+    const QPointF b = a + QPointF(100, 0);
+    const Point wa = toWorld(a), wb = toWorld(b);
+    double perPixel = 0;
+    QString unit;
+    double lon1, lat1, lon2, lat2;
+    if (basemap_->usable() && basemap_->toLonLat(wa.x, wa.y, lon1, lat1) && basemap_->toLonLat(wb.x, wb.y, lon2, lat2))
+    {
+        perPixel = haversineMeters(lon1, lat1, lon2, lat2) / 100.0;
+        unit = "m";
+    }
+    else
+    {
+        perPixel = std::hypot(wb.x - wa.x, wb.y - wa.y) / 100.0;
+        unit = doc_->model().units().system == core::UnitSystem::SI ? "m" : "ft";
+    }
+    if (!(perPixel > 0) || !std::isfinite(perPixel))
+        return;
+    double length = niceStep(perPixel * 110.0);
+    QString label;
+    if (unit == "m" && length >= 1000)
+        label = QString::fromStdString(text::formatDouble(length / 1000.0, 3)) + " km";
+    else if (unit == "ft" && length >= 5280)
+        label = QString::fromStdString(text::formatDouble(length / 5280.0, 3)) + " mi";
+    else
+        label = QString::fromStdString(text::formatDouble(length, 3)) + " " + unit;
+    const double px = length / perPixel;
+    const QFontMetrics fm(font());
+    const QRectF box(a.x() - 10, a.y() - fm.height() - 12, px + 20, fm.height() + 22);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(255, 255, 255, 210));
+    p.drawRoundedRect(box, 6, 6);
+    p.setPen(QPen(theme::kText, 1.6));
+    p.drawLine(a, a + QPointF(px, 0));
+    p.drawLine(a + QPointF(0, -5), a + QPointF(0, 2));
+    p.drawLine(a + QPointF(px, -5), a + QPointF(px, 2));
+    p.setFont(font());
+    p.drawText(QRectF(a.x(), a.y() - fm.height() - 6, px, fm.height()), Qt::AlignCenter, label);
+}
+
+void MapView::drawAttribution(QPainter& p, const QRect& area)
+{
+    const QString text = basemap_->attribution();
+    if (text.isEmpty())
+        return;
+    QFont f = font();
+    f.setPointSizeF(std::max(7.0, f.pointSizeF() - 1.5));
+    p.setFont(f);
+    const QFontMetrics fm(f);
+    const int w = fm.horizontalAdvance(text) + 12;
+    const QRect box(area.right() - w - 4, area.bottom() - fm.height() - 6, w, fm.height() + 4);
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(255, 255, 255, 200));
+    p.drawRect(box);
+    p.setPen(QColor(60, 70, 85));
+    p.drawText(box, Qt::AlignCenter, text);
+}
+
+// ---------------------------------------------------------------------------
+// Interaction
+// ---------------------------------------------------------------------------
 void MapView::resizeEvent(QResizeEvent*)
 {
-    if (!fitted_)
+    if (!fitted_ || !userView_)
         fitToWindow();
 }
 
@@ -668,6 +1036,7 @@ void MapView::wheelEvent(QWheelEvent* e)
     const Point after = toWorld(pos);
     center_.x += before.x - after.x;
     center_.y += before.y - after.y;
+    userMovedView();
     update();
 }
 
@@ -696,6 +1065,11 @@ void MapView::mousePressEvent(QMouseEvent* e)
             doc_->select(hit);
             emit contextMenuForSelection(e->globalPosition().toPoint());
         }
+        else
+        {
+            const Point w = toWorld(e->position());
+            emit contextMenuForMap(e->globalPosition().toPoint(), QPointF(w.x, w.y));
+        }
         return;
     }
     if (e->button() != Qt::LeftButton)
@@ -720,6 +1094,10 @@ void MapView::mousePressEvent(QMouseEvent* e)
         }
         break;
     }
+    case Tool::ZoomWindow:
+        rubberBand_ = true;
+        hoverScreen_ = e->position();
+        break;
     case Tool::AddNode:
     {
         const QString id = QString::fromStdString(m.uniqueId(Category::Node, prefixFor(kind_).toStdString()));
@@ -800,6 +1178,13 @@ void MapView::mouseMoveEvent(QMouseEvent* e)
         center_.x -= d.x() / scale_;
         center_.y += d.y() / scale_;
         lastPos_ = e->pos();
+        if ((e->pos() - pressPos_).manhattanLength() > 2)
+            userMovedView();
+        update();
+        return;
+    }
+    if (rubberBand_)
+    {
         update();
         return;
     }
@@ -820,9 +1205,19 @@ void MapView::mouseMoveEvent(QMouseEvent* e)
     if (!(h == hover_))
     {
         hover_ = h;
+        update();
         if (!h.isEmpty())
         {
-            QString tip = h.id;
+            QString kind;
+            if (h.category == Category::Node)
+                kind = QString::fromStdString(doc_->model().findNode(h.id.toStdString())->kind);
+            else if (h.category == Category::Link)
+                kind = QString::fromStdString(doc_->model().findLink(h.id.toStdString())->kind);
+            else if (h.category == Category::Area)
+                kind = tr("Subcatchment");
+            else
+                kind = tr("Rain gage");
+            QString tip = "<b>" + kind + " " + h.id.toHtmlEscaped() + "</b>";
             const char* table = h.category == Category::Node ? "node" : h.category == Category::Link ? "link" : "subcatchment";
             if (const auto* r = doc_->results())
             {
@@ -831,10 +1226,13 @@ void MapView::mouseMoveEvent(QMouseEvent* e)
                     const int el = t->elementIndex(h.id.toStdString());
                     if (el >= 0)
                     {
+                        tip += "<table style='margin-top:4px'>";
                         for (int v = 0; v < t->variableCount() && v < 8; ++v)
-                            tip += "\n" + QString::fromStdString(t->variables[v].name) + ": " +
-                                   QString::fromStdString(text::formatDouble(t->value(doc_->period(), v, el), 5)) + " " +
-                                   QString::fromStdString(t->variables[v].unit);
+                            tip += "<tr><td>" + QString::fromStdString(t->variables[v].name) + "&nbsp;&nbsp;</td><td align='right'>" +
+                                   QString::fromStdString(text::formatDouble(t->value(doc_->period(), v, el), 5)) +
+                                   "</td><td>&nbsp;" + QString::fromStdString(t->variables[v].unit).toHtmlEscaped() +
+                                   "</td></tr>";
+                        tip += "</table>";
                     }
                 }
             }
@@ -849,6 +1247,20 @@ void MapView::mouseMoveEvent(QMouseEvent* e)
 
 void MapView::mouseReleaseEvent(QMouseEvent* e)
 {
+    if (rubberBand_)
+    {
+        rubberBand_ = false;
+        const QRectF r = QRectF(pressPos_, e->position()).normalized();
+        if (r.width() > 6 && r.height() > 6)
+        {
+            const Point c = toWorld(r.center());
+            center_ = c;
+            scale_ = std::clamp(scale_ * std::min(width() / r.width(), height() / r.height()), 1e-9, 1e9);
+            userMovedView();
+        }
+        update();
+        return;
+    }
     if (panning_)
     {
         panning_ = false;
@@ -932,8 +1344,10 @@ void MapView::finishArea()
 
 void MapView::keyPressEvent(QKeyEvent* e)
 {
-    if (e->key() == Qt::Key_Escape)
+    const double panStep = 80.0 / scale_;
+    switch (e->key())
     {
+    case Qt::Key_Escape:
         if (tool_ != Tool::Select)
         {
             setTool(Tool::Select);
@@ -944,19 +1358,46 @@ void MapView::keyPressEvent(QKeyEvent* e)
             doc_->select({});
         }
         return;
-    }
-    if ((e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) && tool_ == Tool::AddArea)
-    {
-        finishArea();
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        if (tool_ == Tool::AddArea)
+        {
+            finishArea();
+            return;
+        }
+        break;
+    case Qt::Key_Left:
+        center_.x -= panStep;
+        break;
+    case Qt::Key_Right:
+        center_.x += panStep;
+        break;
+    case Qt::Key_Up:
+        center_.y += panStep;
+        break;
+    case Qt::Key_Down:
+        center_.y -= panStep;
+        break;
+    case Qt::Key_Plus:
+    case Qt::Key_Equal:
+        zoomBy(1.4);
+        return;
+    case Qt::Key_Minus:
+        zoomBy(1 / 1.4);
+        return;
+    default:
+        QWidget::keyPressEvent(e);
         return;
     }
-    QWidget::keyPressEvent(e);
+    userMovedView();
+    update();
 }
 
 void MapView::leaveEvent(QEvent*)
 {
     hover_ = {};
     QToolTip::hideText();
+    update();
 }
 
 } // namespace anahita::app

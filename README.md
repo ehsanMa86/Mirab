@@ -18,10 +18,16 @@ Anahita runs on Windows, macOS and Linux. It needs no Python, no QGIS and no oth
 
 ## What you can do
 
-- **Build and edit networks** on a map: junctions, tanks, reservoirs, pipes, pumps and valves for EPANET; junctions, outfalls, storage, conduits, orifices, weirs, outlets, subcatchments and rain gages for SWMM.
+![Anahita with an OpenStreetMap basemap, pressure colors and a time series](docs/images/map-basemap.jpg)
+
+- **Build and edit networks** in a clean, light interface with a start page, a project tree, a searchable property editor and context menus: junctions, tanks, reservoirs, pipes, pumps and valves for EPANET; junctions, outfalls, storage, conduits, orifices, weirs, outlets, subcatchments and rain gages for SWMM.
 - **Switch engines** from a drop-down. Anahita checks the project against each engine's capability manifest and tells you what will be ignored or cannot run. Data an engine does not support is greyed out in the property editor.
 - **Run simulations** in an isolated solver process, so a solver crash can never close the application. Progress and cancellation work for every engine.
-- **Explore results** with map coloring, an animated time slider, time-series charts and CSV export.
+- **Work on real maps**: OpenStreetMap, satellite, topographic and light basemaps under the network, in any of about 1,950 coordinate systems (UTM, State Plane, national grids, or a `.prj` file).
+- **Import GIS and CAD data** from shapefiles, DXF drawings and CSV tables, with field mapping, endpoint snapping and reprojection.
+- **Explore results** with map coloring, flow arrows, an animated time slider, hover read-outs and time-series charts.
+- **Report** with network tables (sortable, with filters such as `Pressure < 20`), multi-element time series, profile plots, frequency and variability plots, system flow balances, pump energy audits and the engine's status report; every report exports CSV.
+- **Edit patterns, curves and time series** in tabs with live charts.
 - **Evaluate resilience** with native implementations of the Todini index, water service availability, network topology (bridges and articulation points), pipe criticality and fire-flow capacity.
 - **Exchange data** as GeoPackage or GeoJSON for QGIS and other GIS tools, and as WNTR JSON for the Python water community. "Open in QGIS" exports and launches QGIS in one step.
 - **Edit the input file directly** in a syntax-highlighted text view. The `.inp` file stays the master copy, and Anahita preserves every comment and line you did not change.

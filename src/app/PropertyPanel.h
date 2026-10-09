@@ -33,6 +33,7 @@ class QTableWidget;
 class QTableWidgetItem;
 class QToolButton;
 class QLabel;
+class QLineEdit;
 
 namespace anahita::app
 {
@@ -57,11 +58,15 @@ private:
     void addHeader(const QString& text, bool enabled, const QString& tip = {});
     void commit(QTableWidgetItem* item);
     void populateAddMenu();
+    void applyFilter();
     bool sectionSupported(const std::string& section, QString* why) const;
 
     ProjectDocument* doc_;
     const engine::EngineDescriptor* engine_ = nullptr;
+    QLabel* icon_ = nullptr;
     QLabel* title_ = nullptr;
+    QLabel* subtitle_ = nullptr;
+    QLineEdit* filter_ = nullptr;
     QTableWidget* table_ = nullptr;
     QToolButton* addButton_ = nullptr;
     bool populating_ = false;

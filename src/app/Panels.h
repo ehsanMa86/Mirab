@@ -44,36 +44,26 @@ namespace anahita::app
 {
 
 class ChartWidget;
-class MapView;
 
-/// Map coloring, time navigation and the time-series chart.
+/// Time-series chart of the selected element (bottom panel).
 class ResultsPanel : public QWidget
 {
     Q_OBJECT
 public:
-    ResultsPanel(ProjectDocument* doc, MapView* map, QWidget* parent = nullptr);
+    ResultsPanel(ProjectDocument* doc, QWidget* parent = nullptr);
     QString csvForSelection() const;
 
 private:
-    void resultsChanged();
     void refreshChart();
-    void updateTimeLabel();
 
     ProjectDocument* doc_;
-    MapView* map_;
-    QComboBox* nodeVar_;
-    QComboBox* linkVar_;
-    QComboBox* areaVar_;
-    QLabel* areaLabel_;
     QComboBox* chartVar_;
-    QSlider* slider_;
-    QLabel* timeLabel_;
-    QToolButton* play_;
-    QTimer* timer_;
+    QLabel* title_;
     ChartWidget* chart_;
 };
 
-/// Tree of every element in the model, with a filter box.
+/// Project tree: options, every element by type, and data such as patterns
+/// and curves, with a filter box and context menus.
 class ProjectBrowser : public QWidget
 {
     Q_OBJECT
@@ -82,15 +72,20 @@ public:
 
 signals:
     void elementActivated();
+    void zoomToRequested(const Selection& sel);
+    void deleteRequested();
+    void dataActivated(const QString& section, const QString& id);
 
 private:
     void rebuild();
     void syncSelection();
     void applyFilter(const QString& text);
+    void showContextMenu(const QPoint& pos);
 
     ProjectDocument* doc_;
     QLineEdit* filter_;
     QTreeWidget* tree_;
+    QLabel* summary_;
     bool syncing_ = false;
 };
 

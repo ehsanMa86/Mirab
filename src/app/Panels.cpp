@@ -25,7 +25,7 @@
 #include "Panels.h"
 
 #include "ChartWidget.h"
-#include "MapView.h"
+#include "Icons.h"
 #include "anahita/core/Text.h"
 
 #include <QComboBox>
@@ -36,6 +36,8 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
+#include <QSet>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QSlider>
@@ -46,6 +48,8 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include <functional>
+
 namespace anahita::app
 {
 
@@ -54,127 +58,31 @@ using core::Category;
 // ---------------------------------------------------------------------------
 // ResultsPanel
 // ---------------------------------------------------------------------------
-ResultsPanel::ResultsPanel(ProjectDocument* doc, MapView* map, QWidget* parent)
-    : QWidget(parent), doc_(doc), map_(map)
+ResultsPanel::ResultsPanel(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(doc)
 {
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 4);
+    layout->setContentsMargins(8, 6, 8, 6);
+    layout->setSpacing(4);
     auto* row = new QHBoxLayout;
-    nodeVar_ = new QComboBox(this);
-    linkVar_ = new QComboBox(this);
-    areaVar_ = new QComboBox(this);
-    areaLabel_ = new QLabel(tr("Subcatchments"), this);
-    row->addWidget(new QLabel(tr("Nodes"), this));
-    row->addWidget(nodeVar_, 1);
-    row->addWidget(new QLabel(tr("Links"), this));
-    row->addWidget(linkVar_, 1);
-    row->addWidget(areaLabel_);
-    row->addWidget(areaVar_, 1);
-    layout->addLayout(row);
-
-    auto* time = new QHBoxLayout;
-    play_ = new QToolButton(this);
-    play_->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
-    play_->setCheckable(true);
-    play_->setToolTip(tr("Animate the results"));
-    slider_ = new QSlider(Qt::Horizontal, this);
-    timeLabel_ = new QLabel(tr("No results"), this);
-    timeLabel_->setMinimumWidth(110);
-    time->addWidget(play_);
-    time->addWidget(slider_, 1);
-    time->addWidget(timeLabel_);
-    layout->addLayout(time);
-
-    auto* chartRow = new QHBoxLayout;
+    title_ = new QLabel(this);
+    title_->setObjectName("panelTitle");
     chartVar_ = new QComboBox(this);
-    chartRow->addWidget(new QLabel(tr("Chart"), this));
-    chartRow->addWidget(chartVar_, 1);
-    layout->addLayout(chartRow);
+    chartVar_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    chartVar_->setToolTip(tr("Result to plot for the selected element"));
+    row->addWidget(title_, 1);
+    row->addWidget(chartVar_);
+    layout->addLayout(row);
     chart_ = new ChartWidget(this);
     layout->addWidget(chart_, 1);
 
-    timer_ = new QTimer(this);
-    timer_->setInterval(350);
-    connect(timer_, &QTimer::timeout, this, [this] {
-        if (!doc_->results())
-            return;
-        int p = doc_->period() + 1;
-        if (p >= doc_->results()->periodCount())
-            p = 0;
-        doc_->setPeriod(p);
-    });
-    connect(play_, &QToolButton::toggled, this, [this](bool on) {
-        on ? timer_->start() : timer_->stop();
-        play_->setIcon(style()->standardIcon(on ? QStyle::SP_MediaPause : QStyle::SP_MediaPlay));
-    });
-    connect(slider_, &QSlider::valueChanged, doc_, &ProjectDocument::setPeriod);
     connect(doc_, &ProjectDocument::periodChanged, this, [this](int p) {
-        slider_->blockSignals(true);
-        slider_->setValue(p);
-        slider_->blockSignals(false);
-        updateTimeLabel();
         if (doc_->results())
             chart_->setMarker(doc_->results()->times[static_cast<std::size_t>(p)]);
     });
-    connect(nodeVar_, &QComboBox::currentTextChanged, map_, &MapView::setNodeVariable);
-    connect(linkVar_, &QComboBox::currentTextChanged, map_, &MapView::setLinkVariable);
-    connect(areaVar_, &QComboBox::currentTextChanged, map_, &MapView::setAreaVariable);
     connect(chartVar_, &QComboBox::currentTextChanged, this, &ResultsPanel::refreshChart);
-    connect(doc_, &ProjectDocument::resultsChanged, this, &ResultsPanel::resultsChanged);
+    connect(doc_, &ProjectDocument::resultsChanged, this, &ResultsPanel::refreshChart);
     connect(doc_, &ProjectDocument::selectionChanged, this, &ResultsPanel::refreshChart);
-    resultsChanged();
-}
-
-void ResultsPanel::resultsChanged()
-{
-    const auto* r = doc_->results();
-    auto fill = [&](QComboBox* box, const char* table, const QString& preferred) {
-        const QString keep = box->currentText();
-        box->blockSignals(true);
-        box->clear();
-        box->addItem(tr("(none)"));
-        if (r)
-        {
-            if (const auto* t = r->table(table))
-            {
-                for (const auto& v : t->variables)
-                    box->addItem(QString::fromStdString(v.name));
-            }
-        }
-        int idx = box->findText(keep);
-        if (idx <= 0)
-            idx = box->findText(preferred);
-        box->setCurrentIndex(idx > 0 ? idx : 0);
-        box->blockSignals(false);
-        emit box->currentTextChanged(box->currentText());
-    };
-    const bool swmm = doc_->model().dialect() == core::Dialect::Swmm;
-    fill(nodeVar_, "node", swmm ? "Depth" : "Pressure");
-    fill(linkVar_, "link", "Flow");
-    fill(areaVar_, "subcatchment", "Runoff");
-    areaVar_->setVisible(swmm);
-    areaLabel_->setVisible(swmm);
-    slider_->setRange(0, r ? std::max(0, r->periodCount() - 1) : 0);
-    slider_->setEnabled(r != nullptr);
-    play_->setEnabled(r != nullptr);
-    if (!r)
-        play_->setChecked(false);
-    updateTimeLabel();
     refreshChart();
-}
-
-void ResultsPanel::updateTimeLabel()
-{
-    const auto* r = doc_->results();
-    if (!r || r->periodCount() == 0)
-    {
-        timeLabel_->setText(tr("No results"));
-        return;
-    }
-    timeLabel_->setText(tr("%1  (%2 of %3)")
-                            .arg(QString::fromStdString(text::formatDuration(r->times[static_cast<std::size_t>(doc_->period())])))
-                            .arg(doc_->period() + 1)
-                            .arg(r->periodCount()));
 }
 
 void ResultsPanel::refreshChart()
@@ -193,20 +101,30 @@ void ResultsPanel::refreshChart()
     {
         for (const auto& v : t->variables)
             chartVar_->addItem(QString::fromStdString(v.name));
-        const int idx = chartVar_->findText(keep);
-        chartVar_->setCurrentIndex(idx >= 0 ? idx : 0);
+        int idx = chartVar_->findText(keep);
+        if (idx < 0)
+            idx = std::max(0, chartVar_->findText(sel.category == Category::Link ? "Flow" : "Pressure"));
+        chartVar_->setCurrentIndex(idx);
     }
+    chartVar_->setVisible(t != nullptr);
     chartVar_->blockSignals(false);
+    if (!r)
+    {
+        title_->clear();
+        chart_->clear(tr("Run a simulation, then select a node or link on the map to plot its results over time."));
+        return;
+    }
     if (!t)
     {
-        chart_->clear();
+        title_->clear();
+        chart_->clear(tr("Select a node, link or subcatchment on the map to plot its results over time."));
         return;
     }
     const int e = t->elementIndex(sel.id.toStdString());
     const int v = t->variableIndex(chartVar_->currentText().toStdString());
     if (e < 0 || v < 0)
     {
-        chart_->clear();
+        chart_->clear(tr("No results for %1.").arg(sel.id));
         return;
     }
     ChartWidget::Series s;
@@ -214,8 +132,9 @@ void ResultsPanel::refreshChart()
     for (int p = 0; p < r->periodCount(); ++p)
         s.points.append(QPointF(r->times[static_cast<std::size_t>(p)], t->value(p, v, e)));
     const auto& var = t->variables[static_cast<std::size_t>(v)];
-    chart_->setSeries({s}, QString::fromStdString(var.name) + (var.unit.empty() ? QString() : " (" + QString::fromStdString(var.unit) + ")"),
-                      sel.id);
+    title_->setText(sel.id + "  ·  " + QString::fromStdString(var.name));
+    chart_->setXAxis(tr("Time"), true);
+    chart_->setSeries({s}, QString::fromStdString(var.name) + (var.unit.empty() ? QString() : " (" + QString::fromStdString(var.unit) + ")"));
     chart_->setMarker(r->times[static_cast<std::size_t>(doc_->period())]);
 }
 
@@ -249,71 +168,158 @@ QString ResultsPanel::csvForSelection() const
 // ---------------------------------------------------------------------------
 // ProjectBrowser
 // ---------------------------------------------------------------------------
+namespace
+{
+enum BrowserRole
+{
+    CategoryRole = Qt::UserRole,
+    KindRole = Qt::UserRole + 1,
+    DataSectionRole = Qt::UserRole + 2
+};
+
+constexpr int kOptionsCategory = -1;
+} // namespace
+
 ProjectBrowser::ProjectBrowser(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(doc)
 {
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 4);
-    filter_ = new QLineEdit(this);
-    filter_->setPlaceholderText(tr("Filter by ID"));
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    auto* head = new QWidget(this);
+    head->setObjectName("panelHeader");
+    head->setAttribute(Qt::WA_StyledBackground, true);
+    auto* hl = new QVBoxLayout(head);
+    hl->setContentsMargins(10, 8, 10, 8);
+    hl->setSpacing(6);
+    summary_ = new QLabel(head);
+    summary_->setObjectName("panelSubtitle");
+    summary_->setWordWrap(true);
+    filter_ = new QLineEdit(head);
+    filter_->setPlaceholderText(tr("Search elements by ID"));
     filter_->setClearButtonEnabled(true);
+    filter_->addAction(icons::get("find"), QLineEdit::LeadingPosition);
+    hl->addWidget(summary_);
+    hl->addWidget(filter_);
+    layout->addWidget(head);
     tree_ = new QTreeWidget(this);
     tree_->setHeaderHidden(true);
     tree_->setUniformRowHeights(true);
-    layout->addWidget(filter_);
-    layout->addWidget(tree_);
+    tree_->setIconSize(QSize(18, 18));
+    tree_->setIndentation(14);
+    tree_->setAnimated(true);
+    tree_->setContextMenuPolicy(Qt::CustomContextMenu);
+    layout->addWidget(tree_, 1);
     connect(filter_, &QLineEdit::textChanged, this, &ProjectBrowser::applyFilter);
     connect(tree_, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* item) {
-        if (syncing_ || !item || item->data(0, Qt::UserRole).isNull())
+        if (syncing_ || !item || item->data(0, CategoryRole).isNull())
             return;
-        doc_->select({static_cast<Category>(item->data(0, Qt::UserRole).toInt()), item->text(0)});
+        const int cat = item->data(0, CategoryRole).toInt();
+        if (cat == kOptionsCategory)
+        {
+            doc_->select({});
+            return;
+        }
+        if (!item->data(0, DataSectionRole).isNull())
+            return;
+        doc_->select({static_cast<Category>(cat), item->text(0)});
     });
     connect(tree_, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* item) {
-        if (item && !item->data(0, Qt::UserRole).isNull())
+        if (!item || item->data(0, CategoryRole).isNull())
+            return;
+        if (!item->data(0, DataSectionRole).isNull())
+        {
+            emit dataActivated(item->data(0, DataSectionRole).toString(), item->text(0));
+            return;
+        }
+        if (item->data(0, CategoryRole).toInt() != kOptionsCategory)
+        {
+            emit zoomToRequested(doc_->selection());
             emit elementActivated();
+        }
     });
+    connect(tree_, &QTreeWidget::customContextMenuRequested, this, &ProjectBrowser::showContextMenu);
     connect(doc_, &ProjectDocument::modelChanged, this, &ProjectBrowser::rebuild);
     connect(doc_, &ProjectDocument::modelReset, this, &ProjectBrowser::rebuild);
     connect(doc_, &ProjectDocument::selectionChanged, this, &ProjectBrowser::syncSelection);
     rebuild();
 }
 
+void ProjectBrowser::showContextMenu(const QPoint& pos)
+{
+    QTreeWidgetItem* item = tree_->itemAt(pos);
+    if (!item || item->data(0, CategoryRole).isNull())
+        return;
+    QMenu menu(this);
+    if (!item->data(0, DataSectionRole).isNull())
+    {
+        const QString section = item->data(0, DataSectionRole).toString();
+        const QString id = item->text(0);
+        menu.addAction(icons::get("chart"), tr("Open editor"), this, [this, section, id] { emit dataActivated(section, id); });
+    }
+    else if (item->data(0, CategoryRole).toInt() != kOptionsCategory)
+    {
+        tree_->setCurrentItem(item);
+        menu.addAction(icons::get("zoom-fit"), tr("Zoom to"), this, [this] { emit zoomToRequested(doc_->selection()); });
+        menu.addAction(icons::get("properties"), tr("Properties"), this, &ProjectBrowser::elementActivated);
+        menu.addSeparator();
+        menu.addAction(icons::get("delete"), tr("Delete"), this, &ProjectBrowser::deleteRequested);
+    }
+    if (!menu.isEmpty())
+        menu.exec(tree_->viewport()->mapToGlobal(pos));
+}
+
 void ProjectBrowser::rebuild()
 {
     syncing_ = true;
     QSet<QString> expanded;
+    bool any = false;
+    std::function<void(QTreeWidgetItem*)> collect = [&](QTreeWidgetItem* it) {
+        any = true;
+        if (it->isExpanded())
+            expanded.insert(it->data(0, KindRole).toString());
+        for (int j = 0; j < it->childCount(); ++j)
+            collect(it->child(j));
+    };
     for (int i = 0; i < tree_->topLevelItemCount(); ++i)
-    {
-        auto* top = tree_->topLevelItem(i);
-        if (top->isExpanded())
-            expanded.insert(top->text(0).section(' ', 0, 0));
-        for (int j = 0; j < top->childCount(); ++j)
-        {
-            if (top->child(j)->isExpanded())
-                expanded.insert(top->child(j)->text(0).section(' ', 0, 0));
-        }
-    }
+        collect(tree_->topLevelItem(i));
     tree_->clear();
     const auto& m = doc_->model();
-    auto group = [&](const QString& name, Category cat, const std::vector<std::pair<std::string, std::string>>& items) {
-        if (items.empty())
-            return;
-        auto* top = new QTreeWidgetItem(tree_, {name + " (" + QString::number(items.size()) + ")"});
+    const bool swmm = m.dialect() == core::Dialect::Swmm;
+
+    QFont bold = tree_->font();
+    bold.setBold(true);
+    auto* options = new QTreeWidgetItem(tree_, {tr("Simulation options")});
+    options->setIcon(0, icons::get("options"));
+    options->setData(0, CategoryRole, kOptionsCategory);
+    options->setToolTip(0, tr("Units, hydraulics, quality and time settings of the project"));
+
+    auto group = [&](const QString& name, const QString& key, const QString& icon, Category cat,
+                     const std::vector<std::pair<std::string, std::string>>& items) {
+        auto* top = new QTreeWidgetItem(tree_, {name + "  (" + QString::number(items.size()) + ")"});
+        top->setIcon(0, icons::get(icon));
+        top->setFont(0, bold);
+        top->setData(0, KindRole, key);
         QMap<QString, QTreeWidgetItem*> kinds;
         for (const auto& [kind, id] : items)
         {
             const QString k = QString::fromStdString(kind);
             QTreeWidgetItem*& sub = kinds[k];
             if (!sub)
+            {
                 sub = new QTreeWidgetItem(top, {k});
+                sub->setIcon(0, icons::element(k == tr("Rain gage") ? "RainGage" : k));
+                sub->setData(0, KindRole, key + "/" + k);
+            }
             auto* leaf = new QTreeWidgetItem(sub, {QString::fromStdString(id)});
-            leaf->setData(0, Qt::UserRole, static_cast<int>(cat));
+            leaf->setData(0, CategoryRole, static_cast<int>(cat));
         }
         for (auto* sub : kinds)
         {
-            sub->setText(0, sub->text(0) + " (" + QString::number(sub->childCount()) + ")");
-            sub->setExpanded(expanded.contains(sub->text(0).section(' ', 0, 0)));
+            sub->setText(0, sub->text(0) + "  (" + QString::number(sub->childCount()) + ")");
+            sub->setExpanded(expanded.contains(sub->data(0, KindRole).toString()) ||
+                             (!any && sub->childCount() <= 30));
         }
-        top->setExpanded(expanded.isEmpty() || expanded.contains(name));
+        top->setExpanded(!any || expanded.contains(key));
     };
     std::vector<std::pair<std::string, std::string>> nodes, links, areas, gages;
     for (const auto& n : m.nodes())
@@ -323,11 +329,64 @@ void ProjectBrowser::rebuild()
     for (const auto& a : m.areas())
         areas.emplace_back("Subcatchment", a.id);
     for (const auto& g : m.gages())
-        gages.emplace_back("Rain gage", g.id);
-    group(tr("Nodes"), Category::Node, nodes);
-    group(tr("Links"), Category::Link, links);
-    group(tr("Subcatchments"), Category::Area, areas);
-    group(tr("Rain gages"), Category::Gage, gages);
+        gages.emplace_back(tr("Rain gage").toStdString(), g.id);
+    if (swmm)
+    {
+        group(tr("Rain gages"), "gages", "RainGage", Category::Gage, gages);
+        group(tr("Subcatchments"), "areas", "Subcatchment", Category::Area, areas);
+    }
+    group(tr("Nodes"), "nodes", "Junction", Category::Node, nodes);
+    group(tr("Links"), "links", swmm ? "Conduit" : "Pipe", Category::Link, links);
+
+    // Data sections: patterns, curves, time series, controls
+    auto data = [&](const QString& name, const QString& key, const QString& icon, const char* section) {
+        const auto* s = m.document().find(section);
+        QStringList ids;
+        if (s)
+        {
+            for (int r = 0; r < s->rowCount(); ++r)
+            {
+                const auto tokens = s->rowTokens(r);
+                if (tokens.empty())
+                    continue;
+                const QString id = QString::fromStdString(tokens[0]);
+                if (!ids.contains(id))
+                    ids << id;
+            }
+        }
+        auto* top = new QTreeWidgetItem(tree_, {name + "  (" + QString::number(ids.size()) + ")"});
+        top->setIcon(0, icons::get(icon));
+        top->setFont(0, bold);
+        top->setData(0, KindRole, key);
+        for (const QString& id : ids)
+        {
+            auto* leaf = new QTreeWidgetItem(top, {id});
+            leaf->setData(0, CategoryRole, 0);
+            leaf->setData(0, DataSectionRole, QString::fromLatin1(section));
+            leaf->setIcon(0, icons::get(icon));
+        }
+        top->setExpanded(expanded.contains(key));
+    };
+    if (swmm)
+    {
+        data(tr("Time series"), "timeseries", "chart", "TIMESERIES");
+        data(tr("Curves"), "curves", "curve", "CURVES");
+    }
+    else
+    {
+        data(tr("Patterns"), "patterns", "pattern", "PATTERNS");
+        data(tr("Curves"), "curves", "curve", "CURVES");
+    }
+
+    const auto units = m.units();
+    QString summary = tr("%1 model  ·  %2 nodes, %3 links")
+                          .arg(swmm ? tr("Stormwater (SWMM)") : tr("Water distribution (EPANET)"))
+                          .arg(m.nodes().size())
+                          .arg(m.links().size());
+    if (swmm)
+        summary += tr(", %1 subcatchments").arg(m.areas().size());
+    summary += tr("  ·  flow in %1").arg(QString::fromStdString(units.flow));
+    summary_->setText(summary);
     syncing_ = false;
     applyFilter(filter_->text());
     syncSelection();
@@ -335,23 +394,31 @@ void ProjectBrowser::rebuild()
 
 void ProjectBrowser::applyFilter(const QString& text)
 {
+    std::function<int(QTreeWidgetItem*)> filter = [&](QTreeWidgetItem* it) -> int {
+        if (it->childCount() == 0)
+        {
+            const bool leaf = !it->data(0, CategoryRole).isNull();
+            const bool show = text.isEmpty() || (leaf && it->text(0).contains(text, Qt::CaseInsensitive));
+            it->setHidden(!show);
+            return show ? 1 : 0;
+        }
+        int visible = 0;
+        for (int i = 0; i < it->childCount(); ++i)
+            visible += filter(it->child(i));
+        it->setHidden(!text.isEmpty() && visible == 0);
+        if (!text.isEmpty() && visible > 0)
+            it->setExpanded(true);
+        return visible;
+    };
     for (int i = 0; i < tree_->topLevelItemCount(); ++i)
     {
         auto* top = tree_->topLevelItem(i);
-        for (int j = 0; j < top->childCount(); ++j)
+        if (top->data(0, CategoryRole).toInt() == kOptionsCategory && !top->data(0, CategoryRole).isNull())
         {
-            auto* sub = top->child(j);
-            int visible = 0;
-            for (int k = 0; k < sub->childCount(); ++k)
-            {
-                const bool show = text.isEmpty() || sub->child(k)->text(0).contains(text, Qt::CaseInsensitive);
-                sub->child(k)->setHidden(!show);
-                visible += show ? 1 : 0;
-            }
-            sub->setHidden(visible == 0);
-            if (!text.isEmpty() && visible > 0)
-                sub->setExpanded(true);
+            top->setHidden(!text.isEmpty());
+            continue;
         }
+        filter(top);
     }
 }
 
@@ -361,14 +428,15 @@ void ProjectBrowser::syncSelection()
     syncing_ = true;
     if (sel.isEmpty())
     {
-        tree_->setCurrentItem(nullptr);
+        tree_->setCurrentItem(tree_->topLevelItemCount() > 0 ? tree_->topLevelItem(0) : nullptr);
     }
     else
     {
         const auto found = tree_->findItems(sel.id, Qt::MatchExactly | Qt::MatchRecursive);
         for (auto* item : found)
         {
-            if (item->data(0, Qt::UserRole).toInt() == static_cast<int>(sel.category))
+            if (!item->data(0, CategoryRole).isNull() && item->data(0, DataSectionRole).isNull() &&
+                item->data(0, CategoryRole).toInt() == static_cast<int>(sel.category))
             {
                 tree_->setCurrentItem(item);
                 tree_->scrollToItem(item);

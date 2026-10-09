@@ -24,12 +24,12 @@
 
 ## Libraries
 
-- **core** (`src/core`, no Qt): the section-preserving input document, the column schemas of EPANET and SWMM sections, the network model used for drawing and editing, feature detection, units, the results model and the `.anr` results format, and readers for EPANET and SWMM binary output.
+- **core** (`src/core`, no Qt): the section-preserving input document, the column schemas of EPANET and SWMM sections, the network model used for drawing and editing, feature detection, units, the results model and the `.anr` results format, readers for EPANET and SWMM binary output, and coordinate reference systems (`Crs.h`: EPSG table, WKT and PROJ parsing, Transverse Mercator, Lambert conformal conic, Albers, Mercator and polar stereographic projections).
 - **engine** (`src/engine`, no Qt): the `Engine` interface, the registry with each engine's capability manifest, discovery of engine libraries, compatibility checking and input preparation, and one adapter per engine family.
 - **resilience** (`src/resilience`, no Qt): the five analyses.
-- **interop** (`src/interop`, no Qt): GIS layers, GeoJSON and GeoPackage writers (on the bundled SQLite) and WNTR conversion.
+- **interop** (`src/interop`, no Qt): GIS layers, GeoJSON and GeoPackage writers (on the bundled SQLite), WNTR conversion, and importers for shapefiles, DXF and CSV (`Import.h`) that build network elements with field mapping and snapping.
 - **cli** (`src/cli`): the `anahita-cli` program. It is both the user's command-line tool and the solver process used by the desktop application.
-- **app** (`src/app`): the Qt 6 Widgets application.
+- **app** (`src/app`): the Qt 6 Widgets application: main window and docks, map (`MapView`, with the `Basemap` tile layer), reports, data editors, import dialog, and the light theme and icon set drawn in code (`Theme`, `Icons`).
 
 ## Design decisions
 

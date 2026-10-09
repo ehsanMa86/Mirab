@@ -235,10 +235,11 @@ void Model::rebuild()
         const InpSection* s = doc_.find(def.name);
         if (!s)
             continue;
-        const int rows = s->rowCount();
+        const auto allRows = s->allRowTokens();
+        const int rows = static_cast<int>(allRows.size());
         for (int r = 0; r < rows; ++r)
         {
-            const auto tokens = s->rowTokens(r);
+            const auto& tokens = allRows[static_cast<std::size_t>(r)];
             if (tokens.empty())
                 continue;
             switch (def.keyCategory)
@@ -295,7 +296,14 @@ void Model::rebuild()
         }
     }
 
-    std::unordered_map<std::string, std::size_t> nodeIdx, linkIdx, areaIdx, gageIdx;
+    nodeIdx_.clear();
+    linkIdx_.clear();
+    areaIdx_.clear();
+    gageIdx_.clear();
+    auto& nodeIdx = nodeIdx_;
+    auto& linkIdx = linkIdx_;
+    auto& areaIdx = areaIdx_;
+    auto& gageIdx = gageIdx_;
     for (std::size_t i = 0; i < nodes_.size(); ++i)
         nodeIdx.emplace(nodes_[i].id, i);
     for (std::size_t i = 0; i < links_.size(); ++i)
@@ -309,10 +317,11 @@ void Model::rebuild()
         const InpSection* s = doc_.find(section);
         if (!s)
             return;
-        const int rows = s->rowCount();
+        const auto allRows = s->allRowTokens();
+        const int rows = static_cast<int>(allRows.size());
         for (int r = 0; r < rows; ++r)
         {
-            const auto tokens = s->rowTokens(r);
+            const auto& tokens = allRows[static_cast<std::size_t>(r)];
             if (tokens.size() < 3)
                 continue;
             const auto x = text::toDouble(tokens[1]);
@@ -351,62 +360,38 @@ void Model::rebuild()
 
 const NodeItem* Model::findNode(std::string_view id) const
 {
-    for (const auto& n : nodes_)
-    {
-        if (n.id == id)
-            return &n;
-    }
-    return nullptr;
+    const auto it = nodeIdx_.find(std::string(id));
+    return it == nodeIdx_.end() ? nullptr : &nodes_[it->second];
 }
 
 const LinkItem* Model::findLink(std::string_view id) const
 {
-    for (const auto& l : links_)
-    {
-        if (l.id == id)
-            return &l;
-    }
-    return nullptr;
+    const auto it = linkIdx_.find(std::string(id));
+    return it == linkIdx_.end() ? nullptr : &links_[it->second];
 }
 
 const AreaItem* Model::findArea(std::string_view id) const
 {
-    for (const auto& a : areas_)
-    {
-        if (a.id == id)
-            return &a;
-    }
-    return nullptr;
+    const auto it = areaIdx_.find(std::string(id));
+    return it == areaIdx_.end() ? nullptr : &areas_[it->second];
 }
 
 const GageItem* Model::findGage(std::string_view id) const
 {
-    for (const auto& g : gages_)
-    {
-        if (g.id == id)
-            return &g;
-    }
-    return nullptr;
+    const auto it = gageIdx_.find(std::string(id));
+    return it == gageIdx_.end() ? nullptr : &gages_[it->second];
 }
 
 int Model::nodeIndex(std::string_view id) const
 {
-    for (std::size_t i = 0; i < nodes_.size(); ++i)
-    {
-        if (nodes_[i].id == id)
-            return static_cast<int>(i);
-    }
-    return -1;
+    const auto it = nodeIdx_.find(std::string(id));
+    return it == nodeIdx_.end() ? -1 : static_cast<int>(it->second);
 }
 
 int Model::linkIndex(std::string_view id) const
 {
-    for (std::size_t i = 0; i < links_.size(); ++i)
-    {
-        if (links_[i].id == id)
-            return static_cast<int>(i);
-    }
-    return -1;
+    const auto it = linkIdx_.find(std::string(id));
+    return it == linkIdx_.end() ? -1 : static_cast<int>(it->second);
 }
 
 Bounds Model::bounds() const
@@ -552,10 +537,11 @@ std::vector<ElementRow> Model::rowsFor(Category category, std::string_view id) c
         const InpSection* s = doc_.find(def.name);
         if (!s)
             continue;
-        const int rows = s->rowCount();
+        const auto allRows = s->allRowTokens();
+        const int rows = static_cast<int>(allRows.size());
         for (int r = 0; r < rows; ++r)
         {
-            auto tokens = s->rowTokens(r);
+            auto tokens = allRows[static_cast<std::size_t>(r)];
             if (!tokens.empty() && tokens[0] == id)
                 out.push_back(ElementRow{def.name, r, &def, std::move(tokens)});
         }
@@ -846,10 +832,11 @@ namespace
 bool movePointRow(InpDocument& doc, const char* section, std::string_view id, Point pos)
 {
     InpSection& s = doc.ensure(section);
-    const int rows = s.rowCount();
+    const auto allRows = s.allRowTokens();
+    const int rows = static_cast<int>(allRows.size());
     for (int r = 0; r < rows; ++r)
     {
-        auto tokens = s.rowTokens(r);
+        auto tokens = allRows[static_cast<std::size_t>(r)];
         if (!tokens.empty() && tokens[0] == id)
         {
             s.setRowTokens(r, {tokens[0], text::formatDouble(pos.x), text::formatDouble(pos.y)});
@@ -884,9 +871,10 @@ bool Model::setVertices(std::string_view linkId, const std::vector<Point>& verti
     if (!findLink(linkId))
         return false;
     InpSection& s = doc_.ensure("VERTICES");
-    for (int r = s.rowCount() - 1; r >= 0; --r)
+    const auto allRows = s.allRowTokens();
+    for (int r = static_cast<int>(allRows.size()) - 1; r >= 0; --r)
     {
-        auto tokens = s.rowTokens(r);
+        auto tokens = allRows[static_cast<std::size_t>(r)];
         if (!tokens.empty() && tokens[0] == linkId)
             s.removeRow(r);
     }
@@ -947,18 +935,20 @@ void Model::removeKeyedRows(Category category, std::string_view id)
             continue;
         if (def.name == "TAGS")
         {
-            for (int r = s->rowCount() - 1; r >= 0; --r)
+            const auto allRows = s->allRowTokens();
+            for (int r = static_cast<int>(allRows.size()) - 1; r >= 0; --r)
             {
-                if (tagMatches(s->rowTokens(r), category, id))
+                if (tagMatches(allRows[static_cast<std::size_t>(r)], category, id))
                     s->removeRow(r);
             }
             continue;
         }
         if (def.keyCategory != category)
             continue;
-        for (int r = s->rowCount() - 1; r >= 0; --r)
+        const auto allRows = s->allRowTokens();
+        for (int r = static_cast<int>(allRows.size()) - 1; r >= 0; --r)
         {
-            auto tokens = s->rowTokens(r);
+            auto tokens = allRows[static_cast<std::size_t>(r)];
             if (!tokens.empty() && tokens[0] == id)
                 s->removeRow(r);
         }
@@ -1011,10 +1001,11 @@ bool Model::renameElement(Category category, std::string_view oldId, std::string
     for (auto& section : doc_.sections)
     {
         const SectionDef* def = findSectionDef(dialect_, section.name);
-        const int rows = section.rowCount();
+        const auto allRows = section.allRowTokens();
+        const int rows = static_cast<int>(allRows.size());
         for (int r = 0; r < rows; ++r)
         {
-            auto tokens = section.rowTokens(r);
+            auto tokens = allRows[static_cast<std::size_t>(r)];
             bool changed = false;
             if (section.name == "TAGS")
             {

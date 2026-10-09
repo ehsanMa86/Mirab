@@ -40,6 +40,7 @@ struct ProjectSettings
     std::string msxFile;      ///< path relative to the .inp file
     std::string crs;          ///< coordinate reference system, e.g. "EPSG:32614"
     std::string backdropImage; ///< georeferenced image (with world file)
+    std::string basemap;      ///< web basemap shown under the network, e.g. "osm"; empty for none
     double pressureThreshold = 0.0; ///< minimum service pressure for resilience tools
 
     static std::filesystem::path sidecarPath(const std::filesystem::path& inpFile);

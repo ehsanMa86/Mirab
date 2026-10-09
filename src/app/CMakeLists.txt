@@ -21,15 +21,22 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 set(APP_SOURCES
+    Basemap.cpp Basemap.h
     ChartWidget.cpp ChartWidget.h
+    DataEditor.cpp DataEditor.h
     Dialogs.cpp Dialogs.h
     EngineDownloader.cpp EngineDownloader.h
+    Icons.cpp Icons.h
+    ImportDialog.cpp ImportDialog.h
     MainWindow.cpp MainWindow.h
+    MapPage.cpp MapPage.h
     MapView.cpp MapView.h
     Panels.cpp Panels.h
     ProjectDocument.cpp ProjectDocument.h
     PropertyPanel.cpp PropertyPanel.h
+    Reports.cpp Reports.h
     SolverProcess.cpp SolverProcess.h
+    Theme.cpp Theme.h
     include/anahita/app/PluginInterface.h
     main.cpp
     resources/anahita.qrc)

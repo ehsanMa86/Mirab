@@ -3,7 +3,7 @@
  * https://github.com/ehsanMa86/Anahita
  *
  * File:    src/app/MainWindow.cpp
- * Purpose: Main window: menus, engine selection, simulation runs, exports, QGIS bridge and plugins.
+ * Purpose: Main application window: menus, tool bars, map, panels and simulation control.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -24,11 +24,17 @@
  */
 #include "MainWindow.h"
 
+#include "DataEditor.h"
 #include "Dialogs.h"
+#include "Icons.h"
+#include "ImportDialog.h"
+#include "MapPage.h"
 #include "MapView.h"
 #include "Panels.h"
 #include "PropertyPanel.h"
+#include "Reports.h"
 #include "SolverProcess.h"
+#include "Theme.h"
 #include "anahita/AnahitaConfig.h"
 #include "anahita/core/Text.h"
 #include "anahita/engine/Compatibility.h"
@@ -38,6 +44,7 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDesktopServices>
@@ -50,23 +57,24 @@
 #include <QInputDialog>
 #include <QJsonObject>
 #include <QLabel>
+#include <QLibrary>
 #include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QPainter>
 #include <QPluginLoader>
 #include <QProcess>
 #include <QProgressBar>
 #include <QSettings>
 #include <QStandardItemModel>
 #include <QStandardPaths>
-#include <QLibrary>
 #include <QStatusBar>
-#include <QStyle>
+#include <QTabBar>
 #include <QTabWidget>
+#include <QTimer>
 #include <QToolBar>
+#include <QToolButton>
 #include <QUrl>
 
 namespace anahita::app
@@ -77,110 +85,64 @@ using core::Dialect;
 
 namespace
 {
-QIcon shapeIcon(const QString& kind)
-{
-    QPixmap pm(32, 32);
-    pm.fill(Qt::transparent);
-    QPainter p(&pm);
-    p.setRenderHint(QPainter::Antialiasing);
-    const QColor ink(60, 70, 85);
-    const QColor fill(90, 140, 210);
-    p.setPen(QPen(ink, 2));
-    p.setBrush(fill);
-    const QPointF c(16, 16);
-    if (kind == "Junction")
-        p.drawEllipse(c, 7, 7);
-    else if (kind == "Reservoir")
-        p.drawPolygon(QPolygonF({QPointF(5, 10), QPointF(27, 10), QPointF(23, 24), QPointF(9, 24)}));
-    else if (kind == "Tank" || kind == "Storage")
-        p.drawRect(QRectF(9, 6, 14, 20));
-    else if (kind == "Outfall")
-        p.drawPolygon(QPolygonF({QPointF(6, 9), QPointF(26, 9), QPointF(16, 25)}));
-    else if (kind == "Divider")
-        p.drawPolygon(QPolygonF({QPointF(16, 5), QPointF(27, 16), QPointF(16, 27), QPointF(5, 16)}));
-    else if (kind == "Subcatchment")
-    {
-        p.setBrush(QColor(150, 205, 150));
-        p.setPen(QPen(QColor(60, 140, 70), 2));
-        p.drawPolygon(QPolygonF({QPointF(5, 8), QPointF(22, 5), QPointF(27, 22), QPointF(10, 27)}));
-    }
-    else if (kind == "RainGage")
-    {
-        p.setBrush(QColor(170, 205, 245));
-        p.setPen(QPen(QColor(40, 110, 200), 2));
-        p.drawEllipse(QPointF(11, 13), 6, 5);
-        p.drawEllipse(QPointF(18, 10), 7, 6);
-        p.drawEllipse(QPointF(23, 14), 5, 4);
-        p.drawLine(QPointF(12, 21), QPointF(10, 27));
-        p.drawLine(QPointF(18, 21), QPointF(16, 27));
-    }
-    else
-    {
-        p.setPen(QPen(ink, 3, Qt::SolidLine, Qt::RoundCap));
-        p.drawLine(QPointF(4, 26), QPointF(28, 6));
-        if (kind == "Pump")
-        {
-            p.setPen(QPen(ink, 2));
-            p.drawEllipse(c, 6, 6);
-        }
-        else if (kind != "Pipe" && kind != "Conduit")
-        {
-            p.setPen(QPen(ink, 2));
-            p.drawPolygon(QPolygonF({QPointF(10, 11), QPointF(22, 21), QPointF(22, 11), QPointF(10, 21)}));
-        }
-    }
-    return QIcon(pm);
-}
-
-QIcon handIcon(bool pan)
-{
-    QPixmap pm(32, 32);
-    pm.fill(Qt::transparent);
-    QPainter p(&pm);
-    p.setRenderHint(QPainter::Antialiasing);
-    p.setPen(QPen(QColor(60, 70, 85), 2));
-    if (pan)
-    {
-        p.drawLine(16, 4, 16, 28);
-        p.drawLine(4, 16, 28, 16);
-        for (QPointF tip : {QPointF(16, 4), QPointF(16, 28), QPointF(4, 16), QPointF(28, 16)})
-            p.drawEllipse(tip, 2, 2);
-    }
-    else
-    {
-        p.setBrush(Qt::white);
-        p.drawPolygon(QPolygonF({QPointF(9, 4), QPointF(9, 26), QPointF(14, 21), QPointF(18, 29), QPointF(21, 27),
-                                 QPointF(17, 19), QPointF(24, 19)}));
-    }
-    return QIcon(pm);
-}
+const char* kStateKey = "window/state-v3";
+const char* kGeometryKey = "window/geometry-v3";
 } // namespace
 
 MainWindow::MainWindow() : doc_(new ProjectDocument(this))
 {
     setAcceptDrops(true);
     setWindowIcon(QIcon(":/anahita/anahita.png"));
-    map_ = new MapView(doc_, this);
+    setDockNestingEnabled(true);
+    setDocumentMode(true);
+    mapPage_ = new MapPage(doc_, this);
+    map_ = mapPage_->map();
+    start_ = mapPage_->startPage();
     inpEditor_ = new InpEditor(doc_, this);
     msxEditor_ = new MsxEditor(this);
     tabs_ = new QTabWidget(this);
     tabs_->setDocumentMode(true);
-    tabs_->addTab(map_, tr("Map"));
-    tabs_->addTab(inpEditor_, tr("Input file"));
+    tabs_->setTabsClosable(false); // report tabs get their own close buttons
+    tabs_->setMovable(true);
+    tabs_->addTab(mapPage_, icons::get("basemap"), tr("Map"));
+    tabs_->addTab(inpEditor_, icons::get("report"), tr("Input file"));
+    for (int i = 0; i < tabs_->count(); ++i)
+        tabs_->tabBar()->setTabButton(i, QTabBar::RightSide, nullptr);
+    connect(tabs_, &QTabWidget::tabCloseRequested, this, [this](int index) {
+        QWidget* w = tabs_->widget(index);
+        if (w == mapPage_ || w == inpEditor_)
+            return;
+        tabs_->removeTab(index);
+        if (w != msxEditor_)
+            w->deleteLater();
+        else
+        {
+            msxCheck_->setChecked(false);
+        }
+    });
     setCentralWidget(tabs_);
     solver_ = new SolverProcess(this);
 
     createActions();
     createDocks();
     createMenus();
+    createToolBar();
     createStatusBar();
 
     connect(doc_, &ProjectDocument::titleChanged, this, &MainWindow::updateTitle);
     connect(doc_, &ProjectDocument::modelReset, this, [this] {
         rebuildForDialect();
         updateCompatibility();
+        updateStartPage();
+        updateStatusInfo();
+        map_->setCoordinateSystem(QString::fromStdString(doc_->settings().crs));
+        mapPage_->refreshBasemapMenu();
     });
-    connect(doc_, &ProjectDocument::modelChanged, this, &MainWindow::updateCompatibility);
+    connect(doc_, &ProjectDocument::modelChanged, this, [this] {
+        updateCompatibility();
+        updateStatusInfo();
+        updateStartPage();
+    });
     connect(doc_, &ProjectDocument::selectionChanged, this,
             [this] { deleteAct_->setEnabled(!doc_->selection().isEmpty()); });
     connect(map_, &MapView::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
@@ -188,12 +150,62 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
         coords_->setText(QString("X %1   Y %2").arg(w.x(), 0, 'f', 2).arg(w.y(), 0, 'f', 2));
     });
     connect(map_, &MapView::toolFinished, this, [this] { selectAct_->setChecked(true); });
+    connect(map_, &MapView::elementActivated, this, [this] { showDock("propertiesDock"); });
     connect(map_, &MapView::contextMenuForSelection, this, [this](const QPoint& pos) {
         QMenu menu(this);
+        menu.addAction(icons::get("properties"), tr("Properties"), this, [this] { showDock("propertiesDock"); });
+        menu.addAction(icons::get("chart"), tr("Plot over time"), this, [this] { openReport("timeseries"); });
+        menu.addAction(icons::get("zoom-fit"), tr("Zoom to"), this, [this] { map_->zoomTo(doc_->selection()); });
+        menu.addAction(icons::get("table"), tr("Copy ID"), this,
+                       [this] { QApplication::clipboard()->setText(doc_->selection().id); });
+        menu.addSeparator();
         menu.addAction(deleteAct_);
-        menu.addAction(tr("Zoom to fit"), map_, &MapView::fitToWindow);
         menu.exec(pos);
     });
+    connect(map_, &MapView::contextMenuForMap, this, [this](const QPoint& pos, const QPointF& world) {
+        QMenu menu(this);
+        QMenu* add = menu.addMenu(icons::get("new"), tr("Add here"));
+        const Dialect d = doc_->model().dialect();
+        for (const auto& k : core::elementKinds(d, Category::Node))
+        {
+            const QString kind = QString::fromStdString(k);
+            add->addAction(icons::element(kind), kind, this, [this, kind, world] {
+                const auto& m = doc_->model();
+                static const QHash<QString, QString> prefixes = {{"Junction", "J"}, {"Reservoir", "R"}, {"Tank", "T"},
+                                                                 {"Outfall", "O"}, {"Storage", "SU"}, {"Divider", "D"}};
+                const QString id = QString::fromStdString(
+                    m.uniqueId(Category::Node, prefixes.value(kind, kind.left(1)).toStdString()));
+                QString err;
+                if (doc_->edit(tr("Add %1 %2").arg(kind.toLower(), id),
+                               [&](core::Model& mm, std::string* er) {
+                                   return mm.addNode(kind.toStdString(), id.toStdString(), {world.x(), world.y()}, er);
+                               },
+                               &err))
+                    doc_->select({Category::Node, id});
+                else
+                    statusBar()->showMessage(err, 6000);
+            });
+        }
+        menu.addSeparator();
+        menu.addAction(icons::get("zoom-fit"), tr("Zoom to the whole network"), map_, &MapView::fitToWindow);
+        menu.addAction(icons::get("table"), tr("Copy coordinates"), this, [world] {
+            QApplication::clipboard()->setText(QStringLiteral("%1, %2").arg(world.x(), 0, 'f', 3).arg(world.y(), 0, 'f', 3));
+        });
+        menu.addAction(icons::get("globe"), tr("Coordinate system..."), this, &MainWindow::chooseCoordinateSystem);
+        menu.exec(pos);
+    });
+    connect(mapPage_, &MapPage::coordinateSystemRequested, this, &MainWindow::chooseCoordinateSystem);
+    connect(start_, &StartPage::newEpanet, this, [this] { newProject(Dialect::Epanet); });
+    connect(start_, &StartPage::newSwmm, this, [this] { newProject(Dialect::Swmm); });
+    connect(start_, &StartPage::openRequested, this, &MainWindow::openDialog);
+    connect(start_, &StartPage::openFile, this, [this](const QString& f) {
+        if (maybeSave())
+            openFile(f);
+    });
+    connect(browser_, &ProjectBrowser::elementActivated, this, [this] { showDock("propertiesDock"); });
+    connect(browser_, &ProjectBrowser::zoomToRequested, map_, &MapView::zoomTo);
+    connect(browser_, &ProjectBrowser::deleteRequested, this, &MainWindow::deleteSelection);
+    connect(browser_, &ProjectBrowser::dataActivated, this, &MainWindow::openDataEditor);
     connect(inpEditor_, &InpEditor::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
     connect(msxEditor_, &MsxEditor::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
     connect(props_, &PropertyPanel::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
@@ -204,15 +216,11 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
     connect(solver_, &SolverProcess::log, this, &MainWindow::message);
     connect(solver_, &SolverProcess::finished, this, &MainWindow::simulationFinished);
 
-    QSettings s;
-    restoreGeometry(s.value("window/geometry").toByteArray());
-    restoreState(s.value("window/state").toByteArray());
-    if (!s.contains("window/geometry"))
-        resize(1360, 860);
-
+    resize(1440, 900);
     doc_->newProject(Dialect::Epanet, "LPS");
     loadPlugins();
     updateRecentMenu();
+    updateStartPage();
 }
 
 // ---------------------------------------------------------------------------
@@ -221,35 +229,44 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
 void MainWindow::createActions()
 {
     toolGroup_ = new QActionGroup(this);
-    selectAct_ = new QAction(handIcon(false), tr("Select"), this);
+    selectAct_ = new QAction(icons::get("select"), tr("Select"), this);
     selectAct_->setCheckable(true);
     selectAct_->setChecked(true);
     selectAct_->setShortcut(Qt::Key_S);
     selectAct_->setToolTip(tr("Select and move elements (S)"));
-    panAct_ = new QAction(handIcon(true), tr("Pan"), this);
+    panAct_ = new QAction(icons::get("pan"), tr("Pan"), this);
     panAct_->setCheckable(true);
-    panAct_->setToolTip(tr("Pan the map; the middle mouse button also pans"));
+    panAct_->setShortcut(Qt::Key_H);
+    panAct_->setToolTip(tr("Pan the map (H); the middle mouse button also pans"));
+    zoomWindowAct_ = new QAction(icons::get("zoom-window"), tr("Zoom to rectangle"), this);
+    zoomWindowAct_->setCheckable(true);
+    zoomWindowAct_->setShortcut(Qt::Key_Z);
+    zoomWindowAct_->setToolTip(tr("Drag a rectangle to zoom into (Z)"));
     toolGroup_->addAction(selectAct_);
     toolGroup_->addAction(panAct_);
+    toolGroup_->addAction(zoomWindowAct_);
     connect(selectAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::Select); });
     connect(panAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::Pan); });
+    connect(zoomWindowAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::ZoomWindow); });
 
-    runAct_ = new QAction(style()->standardIcon(QStyle::SP_MediaPlay), tr("Run simulation"), this);
+    runAct_ = new QAction(icons::get("run"), tr("Run"), this);
     runAct_->setShortcut(Qt::Key_F5);
+    runAct_->setToolTip(tr("Run the simulation with the selected engine (F5)"));
     connect(runAct_, &QAction::triggered, this, &MainWindow::runSimulation);
-    cancelAct_ = new QAction(style()->standardIcon(QStyle::SP_MediaStop), tr("Stop simulation"), this);
+    cancelAct_ = new QAction(icons::get("stop"), tr("Stop simulation"), this);
     cancelAct_->setEnabled(false);
     connect(cancelAct_, &QAction::triggered, solver_, &SolverProcess::cancel);
-    saveAct_ = new QAction(style()->standardIcon(QStyle::SP_DialogSaveButton), tr("&Save"), this);
+    saveAct_ = new QAction(icons::get("save"), tr("&Save"), this);
     saveAct_->setShortcut(QKeySequence::Save);
+    saveAct_->setToolTip(tr("Save the project (Ctrl+S)"));
     connect(saveAct_, &QAction::triggered, this, &MainWindow::save);
     undoAct_ = doc_->undoStack()->createUndoAction(this, tr("&Undo"));
     undoAct_->setShortcut(QKeySequence::Undo);
-    undoAct_->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
+    undoAct_->setIcon(icons::get("undo"));
     redoAct_ = doc_->undoStack()->createRedoAction(this, tr("&Redo"));
     redoAct_->setShortcut(QKeySequence::Redo);
-    redoAct_->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
-    deleteAct_ = new QAction(style()->standardIcon(QStyle::SP_TrashIcon), tr("&Delete"), this);
+    redoAct_->setIcon(icons::get("redo"));
+    deleteAct_ = new QAction(icons::get("delete"), tr("&Delete"), this);
     deleteAct_->setShortcut(QKeySequence::Delete);
     deleteAct_->setEnabled(false);
     connect(deleteAct_, &QAction::triggered, this, &MainWindow::deleteSelection);
@@ -261,44 +278,114 @@ void MainWindow::createDocks()
         auto* d = new QDockWidget(title, this);
         d->setObjectName(name);
         d->setWidget(w);
+        d->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
         addDockWidget(area, d);
         return d;
     };
     browser_ = new ProjectBrowser(doc_, this);
     props_ = new PropertyPanel(doc_, this);
-    results_ = new ResultsPanel(doc_, map_, this);
+    results_ = new ResultsPanel(doc_, this);
     messages_ = new QListWidget(this);
     messages_->setWordWrap(true);
+    messages_->setIconSize(QSize(16, 16));
+    messages_->setSpacing(2);
+    browser_->setMinimumWidth(260);
+    props_->setMinimumWidth(340);
     auto* dBrowser = dock(tr("Project"), "projectDock", browser_, Qt::LeftDockWidgetArea);
     auto* dProps = dock(tr("Properties"), "propertiesDock", props_, Qt::RightDockWidgetArea);
-    auto* dResults = dock(tr("Results"), "resultsDock", results_, Qt::BottomDockWidgetArea);
+    auto* dResults = dock(tr("Time series"), "resultsDock", results_, Qt::BottomDockWidgetArea);
     auto* dMessages = dock(tr("Messages"), "messagesDock", messages_, Qt::BottomDockWidgetArea);
-    tabifyDockWidget(dResults, dMessages);
-    dResults->raise();
+    tabifyDockWidget(dMessages, dResults);
+    dMessages->raise();
+    setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
+    setCorner(Qt::BottomRightCorner, Qt::RightDockWidgetArea);
     (void)dBrowser;
     (void)dProps;
-    connect(browser_, &ProjectBrowser::elementActivated, this, [dProps] { dProps->raise(); });
-    connect(map_, &MapView::elementActivated, this, [dProps] {
-        dProps->show();
-        dProps->raise();
+}
+
+void MainWindow::showEvent(QShowEvent* e)
+{
+    QMainWindow::showEvent(e);
+    if (layoutRestored_)
+        return;
+    layoutRestored_ = true;
+    // Default proportions (kept for "Reset layout") once the window has its
+    // final size, then the user's last layout when one was saved.
+    QTimer::singleShot(0, this, [this] {
+        resizeDocks({findChild<QDockWidget*>("projectDock"), findChild<QDockWidget*>("propertiesDock")}, {290, 390},
+                    Qt::Horizontal);
+        resizeDocks({findChild<QDockWidget*>("messagesDock")}, {220}, Qt::Vertical);
+        defaultState_ = saveState();
+        QSettings s;
+        if (s.contains(kGeometryKey))
+            restoreGeometry(s.value(kGeometryKey).toByteArray());
+        if (s.contains(kStateKey))
+            restoreState(s.value(kStateKey).toByteArray());
     });
+}
+
+void MainWindow::resetLayout()
+{
+    for (auto* d : findChildren<QDockWidget*>())
+    {
+        d->setFloating(false);
+        d->show();
+    }
+    if (!defaultState_.isEmpty())
+        restoreState(defaultState_);
+    resizeDocks({findChild<QDockWidget*>("projectDock"), findChild<QDockWidget*>("propertiesDock")}, {290, 380},
+                Qt::Horizontal);
+    resizeDocks({findChild<QDockWidget*>("messagesDock")}, {210}, Qt::Vertical);
+}
+
+void MainWindow::showDock(const QString& name)
+{
+    if (auto* d = findChild<QDockWidget*>(name))
+    {
+        d->show();
+        d->raise();
+    }
 }
 
 void MainWindow::createMenus()
 {
     // File
     QMenu* file = menuBar()->addMenu(tr("&File"));
-    file->addAction(tr("New &EPANET project..."), QKeySequence::New, this, [this] { newProject(Dialect::Epanet); });
-    file->addAction(tr("New &SWMM project..."), this, [this] { newProject(Dialect::Swmm); });
-    file->addAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("&Open..."), QKeySequence::Open, this,
-                    &MainWindow::openDialog);
+    file->addAction(icons::element("Junction"), tr("New water network (EPANET)..."), QKeySequence::New, this,
+                    [this] { newProject(Dialect::Epanet); });
+    file->addAction(icons::element("Subcatchment"), tr("New stormwater model (SWMM)..."), this,
+                    [this] { newProject(Dialect::Swmm); });
+    file->addAction(icons::get("open"), tr("&Open..."), QKeySequence::Open, this, &MainWindow::openDialog);
     recentMenu_ = file->addMenu(tr("Open &recent"));
+    QMenu* examples = file->addMenu(tr("Open e&xample"));
+    connect(examples, &QMenu::aboutToShow, this, [this, examples] {
+        examples->clear();
+        const QDir dir(examplesDirectory());
+        for (const QString& sub : dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+        {
+            for (const QString& f : QDir(dir.filePath(sub)).entryList({"*.inp"}, QDir::Files))
+            {
+                const QString path = QDir(dir.filePath(sub)).filePath(f);
+                examples->addAction(icons::element(sub == "swmm" ? "Subcatchment" : "Junction"), f, this, [this, path] {
+                    if (maybeSave())
+                        openFile(path);
+                });
+            }
+        }
+        if (examples->isEmpty())
+            examples->addAction(tr("No examples found"))->setEnabled(false);
+    });
+    file->addSeparator();
     file->addAction(saveAct_);
     file->addAction(tr("Save &as..."), QKeySequence::SaveAs, this, &MainWindow::saveAs);
     file->addSeparator();
-    QMenu* imp = file->addMenu(tr("&Import"));
+    QMenu* imp = file->addMenu(icons::get("import"), tr("&Import"));
+    imp->addAction(icons::get("layers"), tr("Shapefile (SHP)..."), this, [this] { importGisFile("shp"); });
+    imp->addAction(icons::get("layers"), tr("CAD drawing (DXF)..."), this, [this] { importGisFile("dxf"); });
+    imp->addAction(icons::get("table"), tr("Text table (CSV)..."), this, [this] { importGisFile("csv"); });
+    imp->addSeparator();
     imp->addAction(tr("WNTR network (JSON)..."), this, &MainWindow::importWntr);
-    QMenu* exp = file->addMenu(tr("&Export"));
+    QMenu* exp = file->addMenu(icons::get("export"), tr("&Export"));
     exp->addAction(tr("GeoPackage for GIS..."), this, [this] { exportGis(true); });
     exp->addAction(tr("GeoJSON for GIS..."), this, [this] { exportGis(false); });
     exp->addAction(tr("WNTR network (JSON)..."), this, &MainWindow::exportWntr);
@@ -317,7 +404,7 @@ void MainWindow::createMenus()
         if (out.open(QIODevice::WriteOnly | QIODevice::Text))
             out.write(csv.toUtf8());
     });
-    file->addAction(tr("Open in &QGIS"), this, &MainWindow::openInQgis);
+    file->addAction(icons::get("globe"), tr("Open in &QGIS"), this, &MainWindow::openInQgis);
     file->addSeparator();
     file->addAction(tr("E&xit"), QKeySequence::Quit, this, &QWidget::close);
 
@@ -327,53 +414,63 @@ void MainWindow::createMenus()
     edit->addAction(redoAct_);
     edit->addSeparator();
     edit->addAction(deleteAct_);
-    edit->addAction(tr("&Find element..."), QKeySequence::Find, this, &MainWindow::findElement);
+    edit->addAction(icons::get("find"), tr("&Find element..."), QKeySequence::Find, this, &MainWindow::findElement);
+    edit->addSeparator();
+    edit->addAction(icons::get("report"), tr("Edit the input file as text"), this, [this] { tabs_->setCurrentWidget(inpEditor_); });
 
     // View
     QMenu* view = menuBar()->addMenu(tr("&View"));
-    view->addAction(tr("Zoom to &fit"), QKeySequence(Qt::Key_F), map_, &MapView::fitToWindow);
-    view->addAction(tr("Zoom &in"), QKeySequence::ZoomIn, this, [this] { map_->zoomBy(1.5); });
-    view->addAction(tr("Zoom &out"), QKeySequence::ZoomOut, this, [this] { map_->zoomBy(1 / 1.5); });
-    QAction* labels = view->addAction(tr("Show &labels"));
-    labels->setCheckable(true);
-    labels->setChecked(true);
-    connect(labels, &QAction::toggled, map_, &MapView::setShowLabels);
+    view->addAction(icons::get("zoom-fit"), tr("Zoom to &fit"), QKeySequence(Qt::Key_F), map_, &MapView::fitToWindow);
+    view->addAction(icons::get("zoom-in"), tr("Zoom &in"), QKeySequence::ZoomIn, this, [this] { map_->zoomBy(1.5); });
+    view->addAction(icons::get("zoom-out"), tr("Zoom &out"), QKeySequence::ZoomOut, this, [this] { map_->zoomBy(1 / 1.5); });
+    view->addAction(zoomWindowAct_);
     view->addSeparator();
-    view->addAction(tr("&Backdrop image..."), this, &MainWindow::chooseBackdrop);
-    view->addAction(tr("&Clear backdrop"), this, [this] {
+    QMenu* basemaps = view->addMenu(icons::get("basemap"), tr("&Basemap"));
+    connect(basemaps, &QMenu::aboutToShow, this, [this, basemaps] {
+        basemaps->clear();
+        QString why;
+        const bool usable = map_->basemapUsable(&why);
+        auto add = [&](const QString& id, const QString& label) {
+            QAction* a = basemaps->addAction(label, this, [this, id] {
+                map_->setBasemap(id);
+                doc_->settings().basemap = id.toStdString();
+                doc_->markSettingsChanged();
+                mapPage_->refreshBasemapMenu();
+            });
+            a->setCheckable(true);
+            a->setChecked(map_->basemap() == id);
+            a->setEnabled(id.isEmpty() || usable);
+        };
+        add({}, tr("None"));
+        basemaps->addSeparator();
+        for (const auto& [id, label] : MapView::basemapProviders())
+            add(id, label);
+        if (!usable)
+            basemaps->addAction(why)->setEnabled(false);
+    });
+    view->addAction(icons::get("globe"), tr("&Coordinate system..."), this, &MainWindow::chooseCoordinateSystem);
+    view->addAction(tr("Backdrop &image..."), this, &MainWindow::chooseBackdrop);
+    view->addAction(tr("Clear backdrop image"), this, [this] {
         map_->clearBackdrop();
         doc_->settings().backdropImage.clear();
         doc_->markSettingsChanged();
     });
     view->addSeparator();
+    panelsMenu_ = view->addMenu(tr("&Panels"));
     for (auto* d : findChildren<QDockWidget*>())
-        view->addAction(d->toggleViewAction());
+        panelsMenu_->addAction(d->toggleViewAction());
+    view->addAction(tr("&Reset layout"), this, &MainWindow::resetLayout);
 
-    // Add
+    // Add (filled per model type)
     addMenu_ = menuBar()->addMenu(tr("&Add"));
 
-    // Simulation
-    QMenu* sim = menuBar()->addMenu(tr("&Simulation"));
-    sim->addAction(runAct_);
-    sim->addAction(cancelAct_);
-    sim->addSeparator();
-    sim->addAction(tr("Choose &MSX file..."), this, &MainWindow::chooseMsxFile);
-    sim->addAction(tr("&Check compatibility"), this, [this] {
-        updateCompatibility();
-        findChild<QDockWidget*>("messagesDock")->raise();
+    // Project
+    QMenu* project = menuBar()->addMenu(tr("&Project"));
+    project->addAction(icons::get("options"), tr("Simulation &options"), this, [this] {
+        doc_->select({});
+        showDock("propertiesDock");
     });
-    sim->addSeparator();
-    sim->addAction(tr("Open &report"), this, &MainWindow::openReport);
-    sim->addAction(tr("&Load results..."), this, &MainWindow::loadResultsDialog);
-    sim->addAction(tr("C&lear results"), doc_, &ProjectDocument::clearResults);
-
-    // Analysis
-    QMenu* analysis = menuBar()->addMenu(tr("A&nalysis"));
-    analysis->addAction(tr("&Resilience tools..."), this, &MainWindow::showResilience);
-
-    // Tools
-    QMenu* tools = menuBar()->addMenu(tr("&Tools"));
-    tools->addAction(tr("Simulation &engines..."), this, [this] {
+    project->addAction(icons::get("engine"), tr("Simulation &engines..."), this, [this] {
         EnginesDialog dlg(registry_, this);
         connect(&dlg, &EnginesDialog::enginesChanged, this, [this] {
             rebuildEngineChoices();
@@ -381,55 +478,136 @@ void MainWindow::createMenus()
         });
         dlg.exec();
     });
+    project->addAction(tr("Choose &MSX file..."), this, &MainWindow::chooseMsxFile);
+    project->addAction(icons::get("globe"), tr("&Coordinate system..."), this, &MainWindow::chooseCoordinateSystem);
+    project->addAction(tr("C&heck compatibility"), this, [this] {
+        updateCompatibility();
+        showDock("messagesDock");
+    });
+
+    // Simulation
+    QMenu* sim = menuBar()->addMenu(tr("&Simulation"));
+    sim->addAction(runAct_);
+    sim->addAction(cancelAct_);
+    sim->addSeparator();
+    sim->addAction(tr("&Load results..."), this, &MainWindow::loadResultsDialog);
+    sim->addAction(tr("C&lear results"), doc_, &ProjectDocument::clearResults);
+
+    // Reports (filled per model type)
+    QMenu* reports = menuBar()->addMenu(tr("&Reports"));
+    connect(reports, &QMenu::aboutToShow, this, [this, reports] {
+        reports->clear();
+        for (const auto& r : availableReports(doc_->model().dialect()))
+        {
+            QAction* a = reports->addAction(icons::get(r.icon), r.title, this, [this, kind = r.kind] { openReport(kind); });
+            a->setStatusTip(r.description);
+        }
+        if (doc_->model().dialect() == Dialect::Epanet)
+        {
+            reports->addSeparator();
+            reports->addAction(icons::get("fireflow"), tr("Fire flow analysis..."), this, [this] { showResilience("fireflow"); });
+        }
+    });
+
+    // Analysis
+    QMenu* analysis = menuBar()->addMenu(tr("A&nalysis"));
+    analysis->addAction(icons::get("variability"), tr("&Resilience tools..."), this, [this] { showResilience(); });
+    analysis->addAction(icons::get("fireflow"), tr("&Fire flow capacity..."), this, [this] { showResilience("fireflow"); });
+    analysis->addAction(tr("Pipe &criticality..."), this, [this] { showResilience("criticality"); });
+    analysis->addAction(tr("Network &topology..."), this, [this] { showResilience("topology"); });
+
+    // Tools
+    QMenu* tools = menuBar()->addMenu(tr("&Tools"));
     pluginMenu_ = tools->addMenu(tr("&Plugins"));
-    tools->addAction(tr("&Settings..."), this, [this] { SettingsDialog(this).exec(); });
+    tools->addAction(icons::get("settings"), tr("&Settings..."), this, [this] { SettingsDialog(this).exec(); });
 
     // Help
     QMenu* help = menuBar()->addMenu(tr("&Help"));
+    help->addAction(icons::get("home"), tr("&Start page"), this, [this] {
+        tabs_->setCurrentWidget(mapPage_);
+        mapPage_->setStartVisible(true);
+    });
     help->addAction(tr("&Documentation"), this, [] {
         QDesktopServices::openUrl(QUrl(QString(ANAHITA_HOMEPAGE) + "/tree/main/docs"));
     });
-    help->addAction(tr("Open &examples folder"), this, [] {
-        const QString base = QCoreApplication::applicationDirPath();
-        for (const char* rel : {"../examples", "examples", "../share/anahita/examples", "../Resources/examples"})
-        {
-            const QDir d(QDir(base).filePath(rel));
-            if (d.exists())
-            {
-                QDesktopServices::openUrl(QUrl::fromLocalFile(d.absolutePath()));
-                return;
-            }
-        }
-    });
+    help->addAction(tr("Open &examples folder"), this,
+                    [this] { QDesktopServices::openUrl(QUrl::fromLocalFile(examplesDirectory())); });
     help->addSeparator();
     help->addAction(tr("&About Anahita"), this, [this] { AboutDialog(this).exec(); });
     help->addAction(tr("About &Qt"), qApp, &QApplication::aboutQt);
+}
 
-    // Tool bars
-    QToolBar* fileBar = addToolBar(tr("File"));
-    fileBar->setObjectName("fileToolBar");
-    fileBar->addAction(style()->standardIcon(QStyle::SP_FileIcon), tr("New EPANET project"), this,
-                       [this] { newProject(Dialect::Epanet); });
-    fileBar->addAction(style()->standardIcon(QStyle::SP_DialogOpenButton), tr("Open"), this, &MainWindow::openDialog);
-    fileBar->addAction(saveAct_);
-    fileBar->addAction(undoAct_);
-    fileBar->addAction(redoAct_);
+void MainWindow::createToolBar()
+{
+    mainBar_ = addToolBar(tr("Main"));
+    mainBar_->setObjectName("mainToolBar");
+    mainBar_->setMovable(false);
+    mainBar_->setIconSize(QSize(20, 20));
 
-    editBar_ = addToolBar(tr("Edit"));
-    editBar_->setObjectName("editToolBar");
+    auto* newButton = new QToolButton(this);
+    newButton->setIcon(icons::get("new"));
+    newButton->setToolTip(tr("New project"));
+    newButton->setPopupMode(QToolButton::InstantPopup);
+    auto* newMenu = new QMenu(newButton);
+    newMenu->addAction(icons::element("Junction"), tr("Water network (EPANET)"), this, [this] { newProject(Dialect::Epanet); });
+    newMenu->addAction(icons::element("Subcatchment"), tr("Stormwater model (SWMM)"), this, [this] { newProject(Dialect::Swmm); });
+    newButton->setMenu(newMenu);
+    mainBar_->addWidget(newButton);
+    QAction* openAct = mainBar_->addAction(icons::get("open"), tr("Open"), this, &MainWindow::openDialog);
+    openAct->setToolTip(tr("Open a project (Ctrl+O)"));
+    mainBar_->addAction(saveAct_);
+    mainBar_->addSeparator();
+    mainBar_->addAction(undoAct_);
+    mainBar_->addAction(redoAct_);
+    mainBar_->addSeparator();
+    mainBar_->addAction(selectAct_);
+    mainBar_->addAction(panAct_);
+    mainBar_->addAction(zoomWindowAct_);
+    mainBar_->addSeparator();
+    // Element tools are inserted here by rebuildForDialect().
+    QAction* elementsAnchor = mainBar_->addSeparator();
+    elementsAnchor->setObjectName("elementsAnchor");
+    mainBar_->addAction(deleteAct_);
+    mainBar_->addAction(icons::get("find"), tr("Find element (Ctrl+F)"), this, &MainWindow::findElement);
+    mainBar_->addSeparator();
+    QToolButton* reportsButton = new QToolButton(this);
+    reportsButton->setIcon(icons::get("chart"));
+    reportsButton->setText(tr("Reports"));
+    reportsButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    reportsButton->setPopupMode(QToolButton::InstantPopup);
+    auto* reportsMenu = new QMenu(reportsButton);
+    connect(reportsMenu, &QMenu::aboutToShow, this, [this, reportsMenu] {
+        reportsMenu->clear();
+        for (const auto& r : availableReports(doc_->model().dialect()))
+            reportsMenu->addAction(icons::get(r.icon), r.title, this, [this, kind = r.kind] { openReport(kind); });
+        if (doc_->model().dialect() == Dialect::Epanet)
+            reportsMenu->addAction(icons::get("fireflow"), tr("Fire flow analysis..."), this, [this] { showResilience("fireflow"); });
+    });
+    reportsButton->setMenu(reportsMenu);
+    mainBar_->addWidget(reportsButton);
 
-    QToolBar* simBar = addToolBar(tr("Simulation"));
-    simBar->setObjectName("simulationToolBar");
-    simBar->addWidget(new QLabel(tr(" Engine "), this));
+    auto* spacer = new QWidget(this);
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    mainBar_->addWidget(spacer);
+
+    auto* engineLabel = new QLabel(tr("Engine"), this);
+    engineLabel->setObjectName("muted");
+    mainBar_->addWidget(engineLabel);
     engineCombo_ = new QComboBox(this);
-    engineCombo_->setMinimumWidth(230);
+    engineCombo_->setMinimumWidth(200);
     engineCombo_->setToolTip(tr("Solver used for the next run"));
-    simBar->addWidget(engineCombo_);
-    msxCheck_ = new QCheckBox(tr("Multi-species (MSX)"), this);
-    msxCheck_->setToolTip(tr("Run EPANET-MSX on top of the selected EPANET engine"));
-    msxAction_ = simBar->addWidget(msxCheck_);
-    simBar->addAction(runAct_);
-    simBar->addAction(cancelAct_);
+    mainBar_->addWidget(engineCombo_);
+    msxCheck_ = new QCheckBox(tr("MSX"), this);
+    msxCheck_->setToolTip(tr("Run EPANET-MSX (multi-species water quality) on top of the selected EPANET engine"));
+    msxAction_ = mainBar_->addWidget(msxCheck_);
+    runButton_ = new QToolButton(this);
+    runButton_->setObjectName("runButton");
+    runButton_->setDefaultAction(runAct_);
+    runButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    runButton_->setIconSize(QSize(16, 16));
+    mainBar_->addWidget(runButton_);
+    mainBar_->addAction(cancelAct_);
+
     connect(engineCombo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [this] {
         doc_->settings().engineId = engineCombo_->currentData().toString().toStdString();
         doc_->markSettingsChanged();
@@ -446,7 +624,7 @@ void MainWindow::createMenus()
             QString err;
             msxEditor_->load(msxPath(), &err);
             if (idx < 0)
-                tabs_->addTab(msxEditor_, tr("MSX file"));
+                decorateTab(tabs_->addTab(msxEditor_, icons::get("report"), tr("MSX file")));
         }
         else if (!on && idx >= 0)
         {
@@ -460,13 +638,54 @@ void MainWindow::createStatusBar()
 {
     progress_ = new QProgressBar(this);
     progress_->setMaximumWidth(320);
+    progress_->setMinimumWidth(220);
     progress_->setVisible(false);
-    coords_ = new QLabel(this);
-    coords_->setMinimumWidth(200);
+    unitsLabel_ = new QLabel(this);
+    countsLabel_ = new QLabel(this);
     engineLabel_ = new QLabel(this);
+    coords_ = new QLabel(this);
+    coords_->setMinimumWidth(190);
     statusBar()->addPermanentWidget(progress_);
+    statusBar()->addPermanentWidget(countsLabel_);
+    statusBar()->addPermanentWidget(unitsLabel_);
     statusBar()->addPermanentWidget(engineLabel_);
     statusBar()->addPermanentWidget(coords_);
+}
+
+void MainWindow::updateStatusInfo()
+{
+    const auto& m = doc_->model();
+    const auto u = m.units();
+    unitsLabel_->setText(tr("Flow %1").arg(QString::fromStdString(u.flow)) +
+                         (m.dialect() == Dialect::Epanet && !u.pressure.empty() ? tr("  ·  Pressure %1").arg(QString::fromStdString(u.pressure)) : QString()));
+    countsLabel_->setText(tr("%1 nodes  ·  %2 links").arg(m.nodes().size()).arg(m.links().size()));
+}
+
+void MainWindow::updateStartPage()
+{
+    const bool empty = doc_->path().isEmpty() && doc_->model().nodes().empty() && doc_->model().links().empty() &&
+                       !doc_->isModified();
+    QStringList examples;
+    const QDir dir(examplesDirectory());
+    for (const QString& sub : dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+        for (const QString& f : QDir(dir.filePath(sub)).entryList({"*.inp"}, QDir::Files))
+            examples << QDir(dir.filePath(sub)).filePath(f);
+    start_->setExamples(examples);
+    start_->setRecent(QSettings().value("files/recent").toStringList());
+    mapPage_->setStartVisible(empty);
+}
+
+QString MainWindow::examplesDirectory() const
+{
+    const QString base = QCoreApplication::applicationDirPath();
+    for (const char* rel : {"../examples", "examples", "../share/anahita/examples", "../Resources/examples", "../../examples",
+                            "../../../examples"})
+    {
+        const QDir d(QDir(base).filePath(rel));
+        if (d.exists() && !d.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty())
+            return d.absolutePath();
+    }
+    return {};
 }
 
 void MainWindow::rebuildForDialect()
@@ -475,39 +694,38 @@ void MainWindow::rebuildForDialect()
     for (QAction* a : addActions_)
     {
         toolGroup_->removeAction(a);
+        mainBar_->removeAction(a);
         a->deleteLater();
     }
     addActions_.clear();
     addMenu_->clear();
-    editBar_->clear();
-    editBar_->addAction(selectAct_);
-    editBar_->addAction(panAct_);
-    editBar_->addSeparator();
+    QAction* anchor = nullptr;
+    for (QAction* a : mainBar_->actions())
+    {
+        if (a->objectName() == "elementsAnchor")
+            anchor = a;
+    }
     auto addTool = [&](const QString& kind, const QString& label, MapView::Tool tool) {
-        auto* a = new QAction(shapeIcon(kind), label, this);
+        auto* a = new QAction(icons::element(kind), label, this);
         a->setCheckable(true);
         a->setToolTip(tr("Add %1").arg(label.toLower()));
         toolGroup_->addAction(a);
         connect(a, &QAction::triggered, this, [this, kind, tool] { map_->setTool(tool, kind); });
         addMenu_->addAction(a);
-        editBar_->addAction(a);
+        mainBar_->insertAction(anchor, a);
         addActions_ << a;
     };
     for (const auto& k : core::elementKinds(d, Category::Node))
         addTool(QString::fromStdString(k), QString::fromStdString(k), MapView::Tool::AddNode);
     addMenu_->addSeparator();
-    editBar_->addSeparator();
     for (const auto& k : core::elementKinds(d, Category::Link))
         addTool(QString::fromStdString(k), QString::fromStdString(k), MapView::Tool::AddLink);
     if (d == Dialect::Swmm)
     {
         addMenu_->addSeparator();
-        editBar_->addSeparator();
         addTool("Subcatchment", tr("Subcatchment"), MapView::Tool::AddArea);
         addTool("RainGage", tr("Rain gage"), MapView::Tool::AddGage);
     }
-    editBar_->addSeparator();
-    editBar_->addAction(deleteAct_);
     selectAct_->setChecked(true);
     map_->setTool(MapView::Tool::Select);
     msxAction_->setVisible(d == Dialect::Epanet);
@@ -527,7 +745,17 @@ void MainWindow::rebuildForDialect()
     if (d == Dialect::Epanet && doc_->settings().useMsx && !msxPath().isEmpty())
     {
         msxEditor_->load(msxPath());
-        tabs_->addTab(msxEditor_, tr("MSX file"));
+        decorateTab(tabs_->addTab(msxEditor_, icons::get("report"), tr("MSX file")));
+    }
+    // Reports of the previous project do not apply to the new one.
+    for (int i = tabs_->count() - 1; i >= 0; --i)
+    {
+        QWidget* w = tabs_->widget(i);
+        if (w->objectName().startsWith("report:") || w->objectName().startsWith("data:"))
+        {
+            tabs_->removeTab(i);
+            w->deleteLater();
+        }
     }
 }
 
@@ -547,7 +775,8 @@ void MainWindow::rebuildEngineChoices()
     {
         std::string why;
         const bool ok = registry_.isAvailable(desc->id, &why);
-        engineCombo_->addItem(QString::fromStdString(desc->name) + (ok ? QString() : tr(" (not installed)")),
+        engineCombo_->addItem(icons::get("engine"),
+                              QString::fromStdString(desc->name) + (ok ? QString() : tr(" (not installed)")),
                               QString::fromStdString(desc->id));
         const int idx = engineCombo_->count() - 1;
         engineCombo_->setItemData(idx, QString::fromStdString(ok ? desc->description : why), Qt::ToolTipRole);
@@ -595,13 +824,26 @@ QString MainWindow::msxPath() const
     return QFileInfo(doc_->path()).dir().filePath(QString::fromStdString(rel));
 }
 
+QString MainWindow::runBase() const
+{
+    return doc_->path().isEmpty() ? QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath("untitled")
+                                  : QFileInfo(doc_->path()).dir().filePath(QFileInfo(doc_->path()).completeBaseName());
+}
+
 void MainWindow::updateCompatibility()
 {
     const auto* desc = currentEngine();
     props_->setEngine(desc);
-    messages_->clear();
+    // Replace the previous compatibility notes; keep the run log.
+    for (int i = messages_->count() - 1; i >= 0; --i)
+    {
+        if (messages_->item(i)->data(Qt::UserRole).toString() == "compat")
+            delete messages_->takeItem(i);
+    }
+    compatibilityPass_ = true;
     if (!desc)
     {
+        compatibilityPass_ = false;
         runAct_->setEnabled(false);
         return;
     }
@@ -614,7 +856,7 @@ void MainWindow::updateCompatibility()
         message("error", tr("%1 is not installed: %2").arg(QString::fromStdString(desc->name), QString::fromStdString(why)));
     if (desc->multiSpecies && msxPath().isEmpty())
     {
-        message("warning", tr("Choose an EPANET-MSX file (Simulation > Choose MSX file) before running."));
+        message("warning", tr("Choose an EPANET-MSX file (Project > Choose MSX file) before running."));
         ok = false;
     }
     for (const auto& i : report.issues)
@@ -626,23 +868,22 @@ void MainWindow::updateCompatibility()
     }
     if (report.issues.empty() && available)
         message("info", tr("The project is compatible with %1.").arg(QString::fromStdString(desc->name)));
+    if (doc_->model().nodes().empty())
+        ok = false;
+    compatibilityPass_ = false;
     runAct_->setEnabled(ok);
 }
 
 void MainWindow::message(const QString& level, const QString& text)
 {
     auto* item = new QListWidgetItem(text, messages_);
+    if (compatibilityPass_)
+        item->setData(Qt::UserRole, "compat");
+    item->setIcon(icons::get(level == "error" ? "error" : level == "warning" ? "warning" : "info"));
     if (level == "error")
     {
-        item->setIcon(style()->standardIcon(QStyle::SP_MessageBoxCritical));
-    }
-    else if (level == "warning")
-    {
-        item->setIcon(style()->standardIcon(QStyle::SP_MessageBoxWarning));
-    }
-    else
-    {
-        item->setIcon(style()->standardIcon(QStyle::SP_MessageBoxInformation));
+        item->setForeground(QColor(170, 40, 40));
+        showDock("messagesDock");
     }
     messages_->scrollToBottom();
 }
@@ -738,7 +979,9 @@ void MainWindow::newProject(Dialect dialect)
     if (dlg.exec() != QDialog::Accepted)
         return;
     doc_->newProject(dialect, dlg.flowUnits());
-    tabs_->setCurrentWidget(map_);
+    tabs_->setCurrentWidget(mapPage_);
+    mapPage_->setStartVisible(false);
+    statusBar()->showMessage(tr("New project. Pick an element on the tool bar and click on the map to place it."), 10000);
 }
 
 void MainWindow::openDialog()
@@ -752,8 +995,17 @@ void MainWindow::openDialog()
         openFile(f);
 }
 
-bool MainWindow::openFile(const QString& path)
+void MainWindow::openExample(const QString& relative)
 {
+    const QString dir = examplesDirectory();
+    if (!dir.isEmpty() && maybeSave())
+        openFile(QDir(dir).filePath(relative));
+}
+
+bool MainWindow::openFile(const QString& file)
+{
+    // Absolute paths: the solver runs in another working folder.
+    const QString path = QFileInfo(file).absoluteFilePath();
     try
     {
         doc_->open(path);
@@ -765,7 +1017,8 @@ bool MainWindow::openFile(const QString& path)
     }
     QSettings().setValue("files/lastDir", QFileInfo(path).absolutePath());
     addRecent(path);
-    tabs_->setCurrentWidget(map_);
+    tabs_->setCurrentWidget(mapPage_);
+    mapPage_->setStartVisible(false);
     // Reload results from a previous run of this project, when present.
     const QString anr = QFileInfo(path).dir().filePath(QFileInfo(path).completeBaseName() + ".anr");
     if (QFileInfo::exists(anr) && QFileInfo(anr).lastModified() >= QFileInfo(path).lastModified())
@@ -814,8 +1067,8 @@ void MainWindow::closeEvent(QCloseEvent* e)
     if (solver_->isRunning())
         solver_->cancel();
     QSettings s;
-    s.setValue("window/geometry", saveGeometry());
-    s.setValue("window/state", saveState());
+    s.setValue(kGeometryKey, saveGeometry());
+    s.setValue(kStateKey, saveState());
     e->accept();
 }
 
@@ -839,6 +1092,14 @@ void MainWindow::dropEvent(QDropEvent* e)
         {
             loadResults(f);
             return;
+        }
+        for (const char* ext : {"shp", "dxf", "csv"})
+        {
+            if (f.endsWith(QString(".") + ext, Qt::CaseInsensitive))
+            {
+                importFile(f);
+                return;
+            }
         }
     }
 }
@@ -886,16 +1147,13 @@ void MainWindow::runSimulation()
         QMessageBox::warning(this, tr("Cannot run"), err);
         return;
     }
-    const QString base = doc_->path().isEmpty()
-                             ? QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath("untitled")
-                             : QFileInfo(doc_->path()).dir().filePath(QFileInfo(doc_->path()).completeBaseName());
+    const QString base = runBase();
     QStringList args = {"run", runInput_, "--engine", QString::fromStdString(desc->id), "--out", base + ".anr",
                         "--report", base + ".rpt"};
     if (desc->multiSpecies)
         args << "--msx" << msxPath();
     messages_->clear();
     message("info", tr("Running %1...").arg(QString::fromStdString(desc->name)));
-    findChild<QDockWidget*>("messagesDock")->raise();
     progress_->setValue(0);
     progress_->setVisible(true);
     runAct_->setEnabled(false);
@@ -918,7 +1176,10 @@ void MainWindow::simulationFinished(bool ok, const QJsonObject& r)
                             .arg(r.value("seconds").toDouble(), 0, 'f', 2)
                             .arg(r.value("periods").toInt()));
         loadResults(r.value("results").toString());
-        findChild<QDockWidget*>("resultsDock")->raise();
+        showDock("resultsDock");
+        statusBar()->showMessage(tr("Simulation finished. Color the map with the bar above it, and open Reports for "
+                                    "tables and charts."),
+                                 10000);
     }
     else if (r.value("cancelled").toBool())
     {
@@ -968,18 +1229,88 @@ void MainWindow::loadResultsDialog()
         loadResults(f);
 }
 
-void MainWindow::openReport()
+void MainWindow::openReport(const QString& kind)
 {
-    const QString base = doc_->path().isEmpty()
-                             ? QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath("untitled")
-                             : QFileInfo(doc_->path()).dir().filePath(QFileInfo(doc_->path()).completeBaseName());
-    const QString rpt = base + ".rpt";
-    if (!QFileInfo::exists(rpt))
+    if (kind == "fireflow")
     {
-        statusBar()->showMessage(tr("Run a simulation first."), 5000);
+        showResilience("fireflow");
         return;
     }
-    QDesktopServices::openUrl(QUrl::fromLocalFile(rpt));
+    const QString name = "report:" + kind;
+    for (int i = 0; i < tabs_->count(); ++i)
+    {
+        if (tabs_->widget(i)->objectName() == name)
+        {
+            tabs_->setCurrentIndex(i);
+            return;
+        }
+    }
+    QWidget* w = createReport(kind, doc_, runBase() + ".rpt", tabs_);
+    if (!w)
+        return;
+    w->setObjectName(name);
+    QString title = kind, icon = "chart";
+    for (const auto& r : availableReports(doc_->model().dialect()))
+    {
+        if (r.kind == kind)
+        {
+            title = r.title;
+            icon = r.icon;
+        }
+    }
+    const int index = tabs_->addTab(w, icons::get(icon), title);
+    decorateTab(index);
+    tabs_->setCurrentIndex(index);
+}
+
+void MainWindow::openDataEditor(const QString& section, const QString& id)
+{
+    const QString name = "data:" + section + ":" + id;
+    for (int i = 0; i < tabs_->count(); ++i)
+    {
+        if (tabs_->widget(i)->objectName() == name)
+        {
+            tabs_->setCurrentIndex(i);
+            return;
+        }
+    }
+    auto* editor = new DataEditor(doc_, section, id, tabs_);
+    editor->setObjectName(name);
+    const QString icon = section == "PATTERNS" ? "pattern" : section == "TIMESERIES" ? "chart" : "curve";
+    const int index = tabs_->addTab(editor, icons::get(icon), id);
+    decorateTab(index);
+    tabs_->setCurrentIndex(index);
+}
+
+void MainWindow::decorateTab(int index)
+{
+    auto* close = new QToolButton(tabs_);
+    close->setIcon(icons::get("close"));
+    close->setIconSize(QSize(12, 12));
+    close->setAutoRaise(true);
+    close->setToolTip(tr("Close"));
+    close->setStyleSheet("QToolButton { padding: 1px; border-radius: 3px; } QToolButton:hover { background: #e3e9f2; }");
+    QWidget* page = tabs_->widget(index);
+    connect(close, &QToolButton::clicked, this, [this, page] {
+        const int i = tabs_->indexOf(page);
+        if (i >= 0)
+            emit tabs_->tabCloseRequested(i);
+    });
+    tabs_->tabBar()->setTabButton(index, QTabBar::RightSide, close);
+}
+
+void MainWindow::importFile(const QString& path)
+{
+    ImportDialog dlg(doc_, path, this);
+    if (dlg.exec() == QDialog::Accepted)
+    {
+        message("info", dlg.summary());
+        for (const QString& n : dlg.notes())
+            message("warning", n);
+        tabs_->setCurrentWidget(mapPage_);
+        mapPage_->setStartVisible(false);
+        map_->fitToWindow();
+    }
 }
 
 void MainWindow::chooseMsxFile()
@@ -1001,8 +1332,34 @@ void MainWindow::chooseMsxFile()
     msxCheck_->blockSignals(false);
     msxEditor_->load(f);
     if (tabs_->indexOf(msxEditor_) < 0)
-        tabs_->addTab(msxEditor_, tr("MSX file"));
+        decorateTab(tabs_->addTab(msxEditor_, icons::get("report"), tr("MSX file")));
     updateCompatibility();
+}
+
+void MainWindow::chooseCoordinateSystem()
+{
+    CoordinateSystemDialog dlg(QString::fromStdString(doc_->settings().crs), doc_->model(), this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    doc_->settings().crs = dlg.crs().toStdString();
+    doc_->markSettingsChanged();
+    map_->setCoordinateSystem(dlg.crs());
+    mapPage_->refreshBasemapMenu();
+    QString why;
+    if (map_->basemapUsable(&why))
+    {
+        if (map_->basemap().isEmpty())
+        {
+            map_->setBasemap("osm");
+            doc_->settings().basemap = "osm";
+            mapPage_->refreshBasemapMenu();
+        }
+        statusBar()->showMessage(tr("Coordinate system set to %1.").arg(map_->coordinateSystemName()), 8000);
+    }
+    else if (!dlg.crs().isEmpty())
+    {
+        message("warning", why);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1040,7 +1397,8 @@ void MainWindow::findElement()
         return;
     }
     doc_->select(s);
-    tabs_->setCurrentWidget(map_);
+    tabs_->setCurrentWidget(mapPage_);
+    map_->zoomTo(s);
 }
 
 void MainWindow::chooseBackdrop()
@@ -1064,6 +1422,17 @@ void MainWindow::chooseBackdrop()
 // ---------------------------------------------------------------------------
 // Interchange and QGIS
 // ---------------------------------------------------------------------------
+void MainWindow::importGisFile(const QString& format)
+{
+    const QString filter = format == "shp" ? tr("Shapefiles (*.shp)") : format == "dxf" ? tr("DXF drawings (*.dxf)") : tr("CSV files (*.csv *.txt)");
+    const QString start = QSettings().value("files/importDir", QDir::homePath()).toString();
+    const QString f = QFileDialog::getOpenFileName(this, tr("Import"), start, filter + ";;" + tr("All files (*)"));
+    if (f.isEmpty())
+        return;
+    QSettings().setValue("files/importDir", QFileInfo(f).absolutePath());
+    importFile(f);
+}
+
 void MainWindow::exportGis(bool geopackage)
 {
     if (geopackage && !interop::geoPackageAvailable())
@@ -1077,18 +1446,7 @@ void MainWindow::exportGis(bool geopackage)
     if (f.isEmpty())
         return;
     if (doc_->settings().crs.empty())
-    {
-        bool ok = false;
-        const QString crs = QInputDialog::getText(this, tr("Coordinate system"),
-                                                  tr("Coordinate reference system of the map coordinates (for example EPSG:32614). "
-                                                     "Leave empty if unknown."),
-                                                  QLineEdit::Normal, {}, &ok);
-        if (ok && !crs.trimmed().isEmpty())
-        {
-            doc_->settings().crs = crs.trimmed().toUpper().toStdString();
-            doc_->markSettingsChanged();
-        }
-    }
+        chooseCoordinateSystem();
     interop::GisOptions g;
     g.crs = doc_->settings().crs;
     g.results = doc_->results();
@@ -1202,15 +1560,14 @@ void MainWindow::exportMapImage()
         statusBar()->showMessage(tr("Saved %1").arg(f), 5000);
 }
 
-void MainWindow::showResilience()
+void MainWindow::showResilience(const QString& page)
 {
-    if (doc_->model().dialect() != Dialect::Epanet)
+    if (doc_->model().dialect() != Dialect::Epanet && page != "topology")
     {
         QMessageBox::information(this, tr("Resilience"),
                                  tr("The resilience tools apply to water distribution (EPANET) models. "
                                     "Network topology is available for both model types from this dialog."));
     }
-    QString err;
     const QString tmpDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     const QString input = QDir(tmpDir).filePath("anahita-resilience-" + QString::number(QCoreApplication::applicationPid()) + ".inp");
     QFile f(input);
@@ -1219,6 +1576,8 @@ void MainWindow::showResilience()
     f.close();
     QString engineId = engineCombo_->currentData().toString();
     ResilienceDialog dlg(doc_, engineId, input, this);
+    if (!page.isEmpty())
+        dlg.selectAnalysis(page);
     dlg.exec();
     QFile::remove(input);
 }

@@ -3,7 +3,7 @@
  * https://github.com/ehsanMa86/Anahita
  *
  * File:    src/app/ChartWidget.h
- * Purpose: Lightweight time-series chart drawn with QPainter.
+ * Purpose: Plot widget for time series, profiles, frequency and variability charts.
  *
  * Copyright (C) 2026 Ehsan Madadi
  *
@@ -30,6 +30,9 @@
 #include <QVector>
 #include <QWidget>
 
+#include <optional>
+#include <utility>
+
 namespace anahita::app
 {
 
@@ -39,24 +42,59 @@ class ChartWidget : public QWidget
 public:
     struct Series
     {
+        enum class Style
+        {
+            Line,   ///< polyline through the points
+            Step,   ///< step function (pattern multipliers)
+            Area,   ///< line filled down to the bottom of the plot (ground profile)
+            Band,   ///< filled band between points (lower) and upper
+            Bars,   ///< vertical bars at each x
+            Points  ///< markers only
+        };
         QString name;
-        QVector<QPointF> points; ///< x in seconds, y in any unit
+        QVector<QPointF> points; ///< x in seconds when the x axis is time
+        QVector<QPointF> upper;  ///< upper edge for Band
+        QColor color;            ///< automatic when invalid
+        Style style = Style::Line;
+        double width = 2.0;
+        bool dashed = false;
+        bool inLegend = true;
     };
 
     explicit ChartWidget(QWidget* parent = nullptr);
     void setSeries(const QVector<Series>& series, const QString& yLabel, const QString& title = {});
+    /// Time axis (seconds shown as hours or days) or a plain numeric axis.
+    void setXAxis(const QString& label, bool time);
+    /// Labels drawn at given x positions (profile plots: node IDs).
+    void setXAnnotations(const QVector<std::pair<double, QString>>& labels);
+    void setYRange(std::optional<double> min, std::optional<double> max);
     void setMarker(double x);
-    void clear();
-    QSize sizeHint() const override { return {480, 240}; }
+    void clear(const QString& placeholder = {});
+    /// The plotted data as CSV text (one column per series).
+    QString toCsv() const;
+    QSize sizeHint() const override { return {520, 260}; }
 
 protected:
     void paintEvent(QPaintEvent*) override;
+    void mouseMoveEvent(QMouseEvent*) override;
+    void leaveEvent(QEvent*) override;
+    void contextMenuEvent(QContextMenuEvent*) override;
 
 private:
+    QColor colorOf(int index) const;
+
     QVector<Series> series_;
     QString yLabel_;
     QString title_;
+    QString xLabel_;
+    bool timeAxis_ = true;
+    QVector<std::pair<double, QString>> annotations_;
+    std::optional<double> yMin_, yMax_;
     double marker_ = -1.0;
+    QString placeholder_;
+    QPointF hover_{-1, -1};
+    QRectF plot_;
+    double xmin_ = 0, xmax_ = 1, ymin_ = 0, ymax_ = 1;
 };
 
 } // namespace anahita::app

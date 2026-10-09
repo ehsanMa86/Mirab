@@ -91,6 +91,17 @@ std::vector<std::string> InpSection::rowTokens(int row) const
     return splitInpLine(lines[static_cast<std::size_t>(li)]).tokens;
 }
 
+std::vector<std::vector<std::string>> InpSection::allRowTokens() const
+{
+    std::vector<std::vector<std::string>> rows;
+    for (const auto& l : lines)
+    {
+        if (isDataLine(l))
+            rows.push_back(splitInpLine(l).tokens);
+    }
+    return rows;
+}
+
 std::string InpSection::rowComment(int row) const
 {
     const int li = lineIndexOfRow(row);

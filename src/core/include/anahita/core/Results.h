@@ -28,6 +28,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace anahita::core
@@ -66,6 +67,11 @@ public:
     void resizePeriods(int periods);
     /// Adds variables after the existing ones, keeping stored values.
     void appendVariables(const std::vector<Variable>& more);
+
+private:
+    // Lookup table for elementIndex(), rebuilt when the ID list changes size.
+    mutable std::unordered_map<std::string, int> index_;
+    mutable std::size_t indexed_ = static_cast<std::size_t>(-1);
 };
 
 class ResultSet

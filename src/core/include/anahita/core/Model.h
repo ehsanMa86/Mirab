@@ -31,6 +31,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace anahita::core
@@ -194,6 +195,8 @@ private:
     std::vector<LinkItem> links_;
     std::vector<AreaItem> areas_;
     std::vector<GageItem> gages_;
+    // ID lookup tables, rebuilt with the element lists.
+    std::unordered_map<std::string, std::size_t> nodeIdx_, linkIdx_, areaIdx_, gageIdx_;
 };
 
 /// Days since 1970-01-01 for a civil date (proleptic Gregorian).

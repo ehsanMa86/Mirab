@@ -24,6 +24,7 @@
  */
 #include "EngineDownloader.h"
 #include "MainWindow.h"
+#include "Theme.h"
 
 #include "anahita/AnahitaConfig.h"
 
@@ -43,6 +44,7 @@ int main(int argc, char* argv[])
     QApplication::setOrganizationDomain("anahita.app");
     QApplication::setApplicationVersion(ANAHITA_VERSION_STRING);
     QApplication::setWindowIcon(QIcon(":/anahita/anahita.png"));
+    anahita::app::theme::apply(app);
 
     QCommandLineParser parser;
     parser.setApplicationDescription("Unified modeling environment for water distribution and stormwater systems");
@@ -57,8 +59,21 @@ int main(int argc, char* argv[])
         "Download and install an engine without opening a window, then quit. <source> is \"swmm5plus\" "
         "(the published release for this computer), a manifest URL or a local manifest file.",
         "source");
+    const QCommandLineOption reportOpt("report", "With --screenshot: open a report tab (tables, timeseries, profile, "
+                                                 "frequency, variability, systemflow, energy, status) first.",
+                                       "kind");
+    const QCommandLineOption delayOpt("delay", "With --screenshot: milliseconds to wait before the picture (default 700).",
+                                      "ms");
     parser.addOption(screenshot);
     parser.addOption(runFirst);
+    const QCommandLineOption importOpt("import", "Open the import dialog for a shapefile, DXF drawing or CSV table.", "file");
+    parser.addOption(reportOpt);
+    const QCommandLineOption dataOpt("show-data", "Open the editor of a pattern, curve or time series, given as SECTION:ID "
+                                                  "(for example PATTERNS:PAT1).",
+                                     "section:id");
+    parser.addOption(importOpt);
+    parser.addOption(dataOpt);
+    parser.addOption(delayOpt);
     parser.addOption(selectOpt);
     parser.addOption(installEngine);
     parser.process(app);
@@ -99,12 +114,28 @@ int main(int argc, char* argv[])
         window.openFile(files.first());
     if (parser.isSet(selectOpt))
         window.selectElement(parser.value(selectOpt));
+    if (parser.isSet(dataOpt))
+    {
+        const QString v = parser.value(dataOpt);
+        window.openDataEditor(v.section(':', 0, 0).toUpper(), v.section(':', 1));
+    }
+    if (parser.isSet(importOpt))
+    {
+        const QString f = QFileInfo(parser.value(importOpt)).absoluteFilePath();
+        QTimer::singleShot(200, &window, [&window, f] { window.importFile(f); });
+    }
     if (parser.isSet(screenshot))
     {
         const QString target = parser.value(screenshot);
-        auto shoot = [&window, target] {
-            QTimer::singleShot(700, &window, [&window, target] {
-                window.grab().save(target);
+        const QString report = parser.value(reportOpt);
+        const int delay = parser.isSet(delayOpt) ? parser.value(delayOpt).toInt() : 700;
+        auto shoot = [&window, target, report, delay] {
+            if (!report.isEmpty())
+                window.openReport(report);
+            QTimer::singleShot(delay, &window, [&window, target] {
+                // A dialog in front (for example the import dialog) is what the picture shows.
+                QWidget* modal = QApplication::activeModalWidget();
+                (modal ? modal : static_cast<QWidget*>(&window))->grab().save(target);
                 QApplication::quit();
             });
         };
@@ -117,7 +148,7 @@ int main(int argc, char* argv[])
         {
             shoot();
         }
-        QTimer::singleShot(60000, &app, &QApplication::quit); // safety net
+        QTimer::singleShot(60000 + delay, &app, &QApplication::quit); // safety net
     }
     return app.exec();
 }

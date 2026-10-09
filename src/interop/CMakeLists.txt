@@ -20,7 +20,8 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_library(anahita_interop STATIC src/Gis.cpp src/Wntr.cpp)
+add_library(anahita_interop STATIC src/Gis.cpp src/Wntr.cpp
+    src/Shapefile.cpp src/Dxf.cpp src/CsvImport.cpp src/ImportModel.cpp)
 add_library(Anahita::interop ALIAS anahita_interop)
 target_include_directories(anahita_interop PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(anahita_interop PUBLIC Anahita::core PRIVATE Anahita::warnings)
