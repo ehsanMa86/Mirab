@@ -61,3 +61,12 @@ SWMM5+ is written in modern Fortran and uses coarrays. It is built separately by
 - the EPA SWMM 5.1 library that SWMM5+ uses for input parsing and hydrology.
 
 Copy both into any engine folder above. Anahita checks the interface version (`s5p_api_version`) before using it. The C interface is documented in the swmm5plus-capi repository.
+
+Status: SWMM5+ upstream is developed with Intel Fortran. swmm5plus-capi builds it with Intel ifx or GNU gfortran on Linux (macOS expected to work the same way) and replaces the Intel-only extensions with standard Fortran. Windows is experimental because SWMM5+ calls `cp`, `rm` and `mkdir` through the shell. Check the swmm5plus-capi README for the current state of each compiler.
+
+SWMM5+ also has modeling rules of its own, which Anahita applies or reports:
+
+- only `INERTIAL_DAMPING NONE` is supported; Anahita sets it for the run,
+- routing is always dynamic wave; other routing options are ignored,
+- pollutants and LID controls are not modeled,
+- a subcatchment must drain to a storage node or to a junction next to a conduit; SWMM5+ stops with a configuration error otherwise.
