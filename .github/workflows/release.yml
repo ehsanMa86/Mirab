@@ -113,7 +113,7 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
-          export LD_LIBRARY_PATH="$QT_ROOT_DIR/lib:$LD_LIBRARY_PATH"
+          export LD_LIBRARY_PATH="$QT_ROOT_DIR/lib:$PWD/AppDir/usr/lib:$LD_LIBRARY_PATH"
           VERSION=$(grep -m1 -oP '^\s+VERSION \K[0-9.]+' CMakeLists.txt)
           export LINUXDEPLOY_OUTPUT_VERSION="$VERSION"
           ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage \

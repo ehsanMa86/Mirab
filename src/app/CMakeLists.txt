@@ -23,6 +23,7 @@
 set(APP_SOURCES
     ChartWidget.cpp ChartWidget.h
     Dialogs.cpp Dialogs.h
+    EngineDownloader.cpp EngineDownloader.h
     MainWindow.cpp MainWindow.h
     MapView.cpp MapView.h
     Panels.cpp Panels.h
@@ -47,7 +48,7 @@ endif()
 qt_add_executable(Anahita WIN32 MACOSX_BUNDLE ${APP_SOURCES})
 target_include_directories(Anahita PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(Anahita PRIVATE
-    Qt6::Widgets Anahita::engine Anahita::resilience Anahita::interop Anahita::warnings)
+    Qt6::Widgets Qt6::Network Anahita::engine Anahita::resilience Anahita::interop Anahita::warnings)
 
 if(APPLE)
     configure_file("${PROJECT_SOURCE_DIR}/packaging/macos/Info.plist.in"

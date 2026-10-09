@@ -25,6 +25,7 @@
 #include "TestFramework.h"
 
 #include "anahita/core/Features.h"
+#include "anahita/core/Hash.h"
 #include "anahita/core/Json.h"
 #include "anahita/core/Model.h"
 #include "anahita/core/ProjectSettings.h"
@@ -239,4 +240,14 @@ TEST_CASE("settings: sidecar file round trip")
     CHECK_EQ(back.engineId, s.engineId);
     CHECK(back.useMsx);
     CHECK_EQ(back.crs, s.crs);
+}
+
+TEST_CASE("hash: SHA-256 test vectors")
+{
+    CHECK_EQ(core::sha256Hex(""), std::string("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"));
+    CHECK_EQ(core::sha256Hex("abc"), std::string("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"));
+    CHECK_EQ(core::sha256Hex("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"),
+             std::string("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"));
+    const std::string million(1000000, 'a');
+    CHECK_EQ(core::sha256Hex(million), std::string("cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"));
 }

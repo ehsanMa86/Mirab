@@ -22,6 +22,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_library(anahita_core STATIC
     src/Features.cpp
+    src/Hash.cpp
     src/InpDocument.cpp
     src/Json.cpp
     src/Model.cpp

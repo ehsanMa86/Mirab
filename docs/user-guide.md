@@ -26,6 +26,8 @@ Anahita writes standard EPANET and SWMM input files, so models stay usable in an
 
 The engine box on the simulation toolbar lists the engines for the model type. Engines that are not installed are disabled; *Tools > Simulation engines* explains why.
 
+SWMM5+ is an optional engine. On Linux and macOS, open *Tools > Simulation engines* and click *Install SWMM5+*: Anahita downloads it, checks every file and adds it to the engine box. Without internet access, download the files for your computer from the swmm5plus-capi release page and use *Install from file...*. See [engines.md](engines.md#installing-swmm5) for details.
+
 - For EPANET models, tick *Multi-species (MSX)* to run EPANET-MSX on top of the selected EPANET engine and choose the `.msx` file.
 - The *Messages* panel always shows how the project fits the selected engine:
   - **information**: the project is fully supported,

@@ -60,7 +60,29 @@ SWMM5+ is written in modern Fortran and uses coarrays. It is built separately by
 - `swmm5plus_capi` (or `libswmm5plus_capi`), the SWMM5+ solver with the C interface,
 - the EPA SWMM 5.1 library that SWMM5+ uses for input parsing and hydrology.
 
-Copy both into any engine folder above. Anahita checks the interface version (`s5p_api_version`) before using it. The C interface is documented in the swmm5plus-capi repository.
+### Installing SWMM5+
+
+Prebuilt SWMM5+ libraries for Linux (x86_64) and macOS (Apple silicon and Intel) are published with each [swmm5plus-capi release](https://github.com/ehsanMa86/swmm5plus-capi/releases). Each platform has a manifest, `swmm5plus-capi-<platform>.json`, that lists the files with their sizes and SHA-256 checksums.
+
+- **From the application:** *Tools > Simulation engines > Install SWMM5+*. Anahita downloads the manifest for this computer and every file it lists, checks each checksum, installs the files into the per-user engine folder, and then loads the engine once in the solver process to confirm that it works. The same button reads *Update SWMM5+* once it is installed, and *Remove SWMM5+* deletes the installed files.
+- **Offline:** download the manifest and the files of one platform from the release page into one folder, then choose the manifest with *Install from file...*, or run:
+
+  ```
+  anahita-cli engines install swmm5plus-capi-linux-x86_64.json
+  anahita-cli engines verify swmm5plus
+  ```
+
+- **Without a window** (scripts and managed installations): `anahita --install-engine swmm5plus`, or pass a manifest URL or file instead of `swmm5plus`.
+
+Nothing is installed unless every file matches its checksum. A package for another platform, or one with a C interface version other than 1, is refused. The files are placed in the per-user folder (item 5 above); `anahita-cli engines where` prints it, and `--target DIR` installs elsewhere, for example into a shared folder listed in `ANAHITA_ENGINE_PATH`.
+
+To use a different download location, such as a mirror on an internal network, set the `ANAHITA_SWMM5PLUS_MANIFEST_URL` environment variable to the manifest URL.
+
+`anahita-cli` commands accept `swmm5plus` (or `swmm5+`) as a short name for `swmm5plus-1.0`.
+
+### Building SWMM5+ yourself
+
+Build swmm5plus-capi as described in its README and copy both libraries, with the Fortran runtime if it is not installed system-wide, into any engine folder above. Anahita checks the interface version (`s5p_api_version`) before using it. The C interface is documented in the swmm5plus-capi repository.
 
 Status: SWMM5+ upstream is developed with Intel Fortran. swmm5plus-capi builds it with Intel ifx or GNU gfortran on Linux (macOS expected to work the same way) and replaces the Intel-only extensions with standard Fortran. Windows is experimental because SWMM5+ calls `cp`, `rm` and `mkdir` through the shell. Check the swmm5plus-capi README for the current state of each compiler.
 

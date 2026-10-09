@@ -22,14 +22,18 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
+#include "EngineDownloader.h"
 #include "MainWindow.h"
 
 #include "anahita/AnahitaConfig.h"
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QFileInfo>
 #include <QIcon>
 #include <QTimer>
+
+#include <cstdio>
 
 int main(int argc, char* argv[])
 {
@@ -48,10 +52,45 @@ int main(int argc, char* argv[])
     const QCommandLineOption screenshot("screenshot", "Save a picture of the window to <png> and quit.", "png");
     const QCommandLineOption runFirst("run", "With --screenshot: run the simulation before the picture is taken.");
     const QCommandLineOption selectOpt("select", "Select an element by ID after opening.", "id");
+    const QCommandLineOption installEngine(
+        "install-engine",
+        "Download and install an engine without opening a window, then quit. <source> is \"swmm5plus\" "
+        "(the published release for this computer), a manifest URL or a local manifest file.",
+        "source");
     parser.addOption(screenshot);
     parser.addOption(runFirst);
     parser.addOption(selectOpt);
+    parser.addOption(installEngine);
     parser.process(app);
+
+    if (parser.isSet(installEngine))
+    {
+        const QString source = parser.value(installEngine);
+        anahita::app::EngineDownloader downloader;
+        int status = 1;
+        QObject::connect(&downloader, &anahita::app::EngineDownloader::progress, &app,
+                         [last = QString()](qint64, qint64, const QString& stage) mutable {
+                             if (stage != last)
+                                 std::fprintf(stderr, "%s\n", qPrintable(stage));
+                             last = stage;
+                         });
+        QObject::connect(&downloader, &anahita::app::EngineDownloader::finished, &app,
+                         [&status](bool ok, const QString& message) {
+                             std::fprintf(ok ? stdout : stderr, "%s\n", qPrintable(message));
+                             status = ok ? 0 : 1;
+                             QCoreApplication::quit();
+                         });
+        QTimer::singleShot(0, &app, [&] {
+            if (source.compare("swmm5plus", Qt::CaseInsensitive) == 0 || source == "swmm5+")
+                downloader.start(anahita::app::EngineDownloader::swmm5PlusManifestUrl());
+            else if (QFileInfo::exists(source))
+                downloader.installLocal(QFileInfo(source).absoluteFilePath());
+            else
+                downloader.start(QUrl::fromUserInput(source));
+        });
+        app.exec();
+        return status;
+    }
 
     anahita::app::MainWindow window;
     window.show();

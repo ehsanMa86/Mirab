@@ -373,7 +373,14 @@ void MainWindow::createMenus()
 
     // Tools
     QMenu* tools = menuBar()->addMenu(tr("&Tools"));
-    tools->addAction(tr("Simulation &engines..."), this, [this] { EnginesDialog(registry_, this).exec(); });
+    tools->addAction(tr("Simulation &engines..."), this, [this] {
+        EnginesDialog dlg(registry_, this);
+        connect(&dlg, &EnginesDialog::enginesChanged, this, [this] {
+            rebuildEngineChoices();
+            updateCompatibility();
+        });
+        dlg.exec();
+    });
     pluginMenu_ = tools->addMenu(tr("&Plugins"));
     tools->addAction(tr("&Settings..."), this, [this] { SettingsDialog(this).exec(); });
 
@@ -384,7 +391,7 @@ void MainWindow::createMenus()
     });
     help->addAction(tr("Open &examples folder"), this, [] {
         const QString base = QCoreApplication::applicationDirPath();
-        for (const QString& rel : {"../examples", "examples", "../share/anahita/examples", "../Resources/examples"})
+        for (const char* rel : {"../examples", "examples", "../share/anahita/examples", "../Resources/examples"})
         {
             const QDir d(QDir(base).filePath(rel));
             if (d.exists())

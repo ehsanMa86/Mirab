@@ -23,6 +23,7 @@
 add_library(anahita_engine STATIC
     src/Compatibility.cpp
     src/DynamicLibrary.cpp
+    src/EngineInstall.cpp
     src/EngineRegistry.cpp
     src/EpanetEngine.cpp
     src/EpanetToolkit.cpp

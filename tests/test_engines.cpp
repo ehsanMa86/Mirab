@@ -26,7 +26,9 @@
 
 #include "anahita/core/Model.h"
 #include "anahita/core/Text.h"
+#include "anahita/core/Hash.h"
 #include "anahita/engine/Compatibility.h"
+#include "anahita/engine/EngineInstall.h"
 #include "anahita/engine/EngineRegistry.h"
 #include "anahita/interop/Interop.h"
 #include "anahita/resilience/Resilience.h"
@@ -262,4 +264,70 @@ TEST_CASE("engines: SWMM5+ manifest adapts SWMM 5.2 models")
     // EPA SWMM 5.2 keeps the option as written.
     const auto* swmm = registry().descriptor("swmm-5.2-epa");
     CHECK(engine::checkCompatibility(model, *swmm).issues.empty());
+}
+
+TEST_CASE("engines: packages install only when every checksum matches")
+{
+    const auto src = scratch("pkg-src");
+    const auto dst = scratch("pkg-dst");
+    fs::remove_all(src);
+    fs::remove_all(dst);
+    fs::create_directories(src);
+    std::ofstream(src / "asset-a.bin", std::ios::binary) << "first library";
+    std::ofstream(src / "asset-b.bin", std::ios::binary) << "second library";
+    auto manifestText = [&](const std::string& platform, const std::string& shaB, const std::string& nameB) {
+        return std::string("{\"format\":\"anahita-engine/1\",\"engine\":\"swmm5plus-1.0\",\"name\":\"SWMM5+\",") +
+               "\"version\":\"1.0.3\",\"packageVersion\":\"0.1.0\",\"apiVersion\":1,\"platform\":\"" + platform +
+               "\",\"files\":[{\"name\":\"a.so\",\"asset\":\"asset-a.bin\",\"size\":13,\"sha256\":\"" +
+               core::sha256Hex("first library") + "\"},{\"name\":\"" + nameB +
+               "\",\"asset\":\"asset-b.bin\",\"size\":14,\"sha256\":\"" + shaB + "\"}]}";
+    };
+    const std::string goodB = core::sha256Hex("second library");
+
+    // Correct package installs both files and a record, and uninstalls cleanly.
+    const auto good = engine::EngineManifest::parse(manifestText(engine::platformId(), goodB, "b.so"));
+    engine::installFromManifest(good, src, dst);
+    CHECK(fs::exists(dst / "a.so"));
+    CHECK(fs::exists(dst / "b.so"));
+    CHECK(fs::exists(dst / "swmm5plus-1.0.installed.json"));
+    CHECK(engine::uninstallEngine("swmm5plus-1.0", dst));
+    CHECK(!fs::exists(dst / "a.so"));
+
+    // A tampered file aborts before anything is copied.
+    const auto bad = engine::EngineManifest::parse(manifestText(engine::platformId(), std::string(64, 'f'), "b.so"));
+    bool threw = false;
+    try
+    {
+        engine::installFromManifest(bad, src, dst);
+    }
+    catch (const std::exception&)
+    {
+        threw = true;
+    }
+    CHECK(threw);
+    CHECK(!fs::exists(dst / "a.so"));
+
+    // Packages for another platform are refused.
+    threw = false;
+    try
+    {
+        engine::installFromManifest(engine::EngineManifest::parse(manifestText("plan9-mips", goodB, "b.so")), src, dst);
+    }
+    catch (const std::exception&)
+    {
+        threw = true;
+    }
+    CHECK(threw);
+
+    // File names that try to leave the engine folder are rejected.
+    threw = false;
+    try
+    {
+        engine::EngineManifest::parse(manifestText(engine::platformId(), goodB, "../evil.so"));
+    }
+    catch (const std::exception&)
+    {
+        threw = true;
+    }
+    CHECK(threw);
 }

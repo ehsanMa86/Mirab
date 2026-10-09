@@ -30,6 +30,7 @@
 #include "anahita/core/Results.h"
 #include "anahita/core/Text.h"
 #include "anahita/engine/Compatibility.h"
+#include "anahita/engine/EngineInstall.h"
 #include "anahita/engine/EngineRegistry.h"
 #include "anahita/engine/EpanetToolkit.h"
 #include "anahita/interop/Interop.h"
@@ -99,7 +100,7 @@ struct Args
 };
 
 const std::vector<std::string> kValueOptions = {
-    "engine", "msx", "out", "report", "workdir", "table", "variable", "element", "results",
+    "target", "engine", "msx", "out", "report", "workdir", "table", "variable", "element", "results",
     "period", "crs", "required-pressure", "threshold", "links", "nodes", "flow", "residual",
     "time", "max-flow", "minimum-pressure"};
 
@@ -253,11 +254,19 @@ core::Model loadModel(const Args& a)
     return core::Model::fromFile(pathArg(a.positional[0]));
 }
 
+/// Accepts short names for engines whose identifiers are long.
+std::string canonicalEngineId(std::string id)
+{
+    if (id == "swmm5plus" || id == "swmm5+")
+        id = "swmm5plus-1.0";
+    return id;
+}
+
 std::string engineFor(const Args& a, const core::Model& model, const fs::path& inp,
                       const engine::EngineRegistry& registry, bool* useMsx = nullptr)
 {
     const auto settings = core::ProjectSettings::loadFor(inp);
-    std::string id = a.opt("engine", settings.engineId);
+    std::string id = canonicalEngineId(a.opt("engine", settings.engineId));
     if (id.empty())
         id = engine::EngineRegistry::defaultEngineId(model.dialect());
     const bool msx = a.has("msx") || (settings.useMsx && !settings.msxFile.empty());
@@ -300,8 +309,66 @@ int cmdVersion()
     return 0;
 }
 
+std::string resolveEngineId(const engine::EngineRegistry& registry, std::string id)
+{
+    id = canonicalEngineId(id);
+    if (!registry.descriptor(id))
+        throw std::runtime_error("unknown engine " + id + " (see anahita-cli engines)");
+    return id;
+}
+
+int cmdEnginesManage(const Args& a)
+{
+    const std::string action = a.positional[0];
+    engine::EngineRegistry registry;
+    const fs::path target = a.has("target") ? pathArg(a.opt("target")) : engine::userEngineDirectory();
+    if (action == "install")
+    {
+        if (a.positional.size() < 2)
+            throw std::runtime_error("usage: anahita-cli engines install <manifest.json> [--target DIR]");
+        const fs::path manifestFile = pathArg(a.positional[1]);
+        const auto manifest = engine::EngineManifest::load(manifestFile);
+        resolveEngineId(registry, manifest.engine);
+        engine::installFromManifest(manifest, manifestFile.parent_path(), target);
+        std::cout << "Installed " << manifest.name << " " << manifest.version << " (package "
+                  << manifest.packageVersion << ") into " << target.u8string() << "\n";
+        return 0;
+    }
+    if (action == "uninstall")
+    {
+        if (a.positional.size() < 2)
+            throw std::runtime_error("usage: anahita-cli engines uninstall <engine> [--target DIR]");
+        const std::string id = resolveEngineId(registry, a.positional[1]);
+        if (!engine::uninstallEngine(id, target))
+            throw std::runtime_error(id + " was not installed in " + target.u8string());
+        std::cout << "Removed " << id << " from " << target.u8string() << "\n";
+        return 0;
+    }
+    if (action == "verify")
+    {
+        if (a.positional.size() < 2)
+            throw std::runtime_error("usage: anahita-cli engines verify <engine>");
+        const std::string id = resolveEngineId(registry, a.positional[1]);
+        std::string error;
+        auto eng = registry.create(id, &error);
+        if (!eng)
+            throw std::runtime_error(error);
+        std::cout << eng->descriptor().name << " loads correctly: version " << eng->engineVersion() << " from "
+                  << eng->libraryPath().u8string() << "\n";
+        return 0;
+    }
+    if (action == "where")
+    {
+        std::cout << engine::userEngineDirectory().u8string() << "\n";
+        return 0;
+    }
+    throw std::runtime_error("unknown engines command " + action + " (install, uninstall, verify, where)");
+}
+
 int cmdEngines(const Args& a)
 {
+    if (!a.positional.empty())
+        return cmdEnginesManage(a);
     engine::EngineRegistry registry;
     Value list = Value::array();
     for (const auto& d : registry.descriptors())
@@ -885,6 +952,10 @@ void usage()
 Usage:
   anahita-cli version
   anahita-cli engines [--json]
+  anahita-cli engines install <manifest.json> [--target DIR]
+  anahita-cli engines uninstall <engine> [--target DIR]
+  anahita-cli engines verify <engine>
+  anahita-cli engines where
   anahita-cli info <model.inp>
   anahita-cli check <model.inp> [--engine ID] [--msx file.msx] [--json]
   anahita-cli run <model.inp> [--engine ID] [--msx file.msx] [--out results.anr]

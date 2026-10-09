@@ -33,7 +33,7 @@ if(TARGET anahita_engines)
     add_dependencies(anahita-tests anahita_engines)
 endif()
 
-foreach(group IN ITEMS text json inp model features results settings)
+foreach(group IN ITEMS text json inp model features results settings hash)
     add_test(NAME ${group} COMMAND anahita-tests "${group}:")
 endforeach()
 if(ANAHITA_BUILD_ENGINES)

@@ -67,7 +67,7 @@ configure_file(cmake/AnahitaConfig.h.in
     "${PROJECT_BINARY_DIR}/generated/anahita/AnahitaConfig.h" @ONLY)
 
 if(ANAHITA_BUILD_GUI)
-    find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets)
+    find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network)
     qt_standard_project_setup()
 endif()
 

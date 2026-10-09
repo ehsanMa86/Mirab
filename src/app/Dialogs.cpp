@@ -25,9 +25,11 @@
 #include "Dialogs.h"
 
 #include "ChartWidget.h"
+#include "EngineDownloader.h"
 #include "SolverProcess.h"
 #include "anahita/AnahitaConfig.h"
 #include "anahita/core/Text.h"
+#include "anahita/engine/EngineInstall.h"
 #include "anahita/resilience/Resilience.h"
 
 #include <QApplication>
@@ -90,58 +92,140 @@ QString NewProjectDialog::flowUnits() const
 }
 
 // ---------------------------------------------------------------------------
-EnginesDialog::EnginesDialog(const engine::EngineRegistry& registry, QWidget* parent) : QDialog(parent)
+EnginesDialog::EnginesDialog(const engine::EngineRegistry& registry, QWidget* parent)
+    : QDialog(parent), registry_(registry)
 {
     setWindowTitle(tr("Simulation engines"));
-    resize(900, 420);
+    resize(920, 480);
     auto* layout = new QVBoxLayout(this);
-    auto* table = new QTableWidget(this);
+    table_ = new QTableWidget(this);
     const QStringList headers = {tr("Engine"), tr("Status"), tr("Provider"), tr("License"), tr("Limitations"), tr("Source")};
-    table->setColumnCount(headers.size());
-    table->setHorizontalHeaderLabels(headers);
-    table->verticalHeader()->hide();
-    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table->setWordWrap(true);
-    for (const auto& d : registry.descriptors())
+    table_->setColumnCount(headers.size());
+    table_->setHorizontalHeaderLabels(headers);
+    table_->verticalHeader()->hide();
+    table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table_->setWordWrap(true);
+    layout->addWidget(table_);
+
+    auto* row = new QHBoxLayout;
+    install_ = new QPushButton(tr("Install SWMM5+"), this);
+    install_->setToolTip(tr("Download SWMM5+ from the swmm5plus-capi releases, check every file's SHA-256 sum "
+                            "and install it for your user account."));
+    installFile_ = new QPushButton(tr("Install from file..."), this);
+    installFile_->setToolTip(tr("Install an engine package downloaded earlier (choose its .json manifest)."));
+    remove_ = new QPushButton(tr("Remove SWMM5+"), this);
+    progress_ = new QProgressBar(this);
+    progress_->setVisible(false);
+    row->addWidget(install_);
+    row->addWidget(installFile_);
+    row->addWidget(remove_);
+    row->addWidget(progress_, 1);
+    layout->addLayout(row);
+    status_ = new QLabel(this);
+    status_->setWordWrap(true);
+    status_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    layout->addWidget(status_);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
+    connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    layout->addWidget(buttons);
+
+    downloader_ = new EngineDownloader(this);
+    connect(downloader_, &EngineDownloader::progress, this, [this](qint64 done, qint64 total, const QString& stage) {
+        progress_->setVisible(true);
+        progress_->setRange(0, total > 0 ? 1000 : 0);
+        if (total > 0)
+            progress_->setValue(static_cast<int>(1000.0 * static_cast<double>(done) / static_cast<double>(total)));
+        progress_->setFormat(stage);
+        status_->setText(stage);
+    });
+    connect(downloader_, &EngineDownloader::finished, this, &EnginesDialog::installFinished);
+    connect(install_, &QPushButton::clicked, this, [this] {
+        install_->setEnabled(false);
+        installFile_->setEnabled(false);
+        downloader_->start(EngineDownloader::swmm5PlusManifestUrl());
+    });
+    connect(installFile_, &QPushButton::clicked, this, [this] {
+        const QString f = QFileDialog::getOpenFileName(this, tr("Engine package manifest"), QDir::homePath(),
+                                                       tr("Engine manifest (*.json)"));
+        if (f.isEmpty())
+            return;
+        install_->setEnabled(false);
+        installFile_->setEnabled(false);
+        downloader_->installLocal(f);
+    });
+    connect(remove_, &QPushButton::clicked, this, [this] {
+        if (QMessageBox::question(this, tr("Remove SWMM5+"), tr("Remove SWMM5+ from your engine folder?")) !=
+            QMessageBox::Yes)
+            return;
+        if (engine::uninstallEngine("swmm5plus-1.0", engine::userEngineDirectory()))
+            status_->setText(tr("SWMM5+ was removed."));
+        else
+            status_->setText(tr("SWMM5+ was not installed by Anahita, so it was left in place."));
+        populate();
+        emit enginesChanged();
+    });
+    populate();
+}
+
+void EnginesDialog::installFinished(bool ok, const QString& message)
+{
+    progress_->setVisible(false);
+    status_->setText(ok ? tr("Installed. %1").arg(message) : message);
+    populate();
+    if (ok)
+        emit enginesChanged();
+}
+
+void EnginesDialog::populate()
+{
+    table_->setRowCount(0);
+    for (const auto& d : registry_.descriptors())
     {
-        const int r = table->rowCount();
-        table->insertRow(r);
+        const int r = table_->rowCount();
+        table_->insertRow(r);
         std::string why;
-        const bool ok = registry.isAvailable(d.id, &why);
+        const bool ok = registry_.isAvailable(d.id, &why);
         QStringList limits;
         for (const auto& [f, s] : d.support)
             limits << QString::fromUtf8(core::featureName(f)) + ": " +
                           (s == engine::Support::Ignored ? tr("ignored") : tr("not supported"));
         auto* name = new QTableWidgetItem(QString::fromStdString(d.name));
         name->setToolTip(QString::fromStdString(d.description));
-        table->setItem(r, 0, name);
+        table_->setItem(r, 0, name);
         auto* status = new QTableWidgetItem(ok ? tr("Installed") : (d.optional ? tr("Optional, not installed") : tr("Missing")));
-        status->setToolTip(QString::fromStdString(ok ? registry.locate(d)->u8string() : why));
+        status->setToolTip(QString::fromStdString(ok ? registry_.locate(d)->u8string() : why));
         status->setForeground(ok ? QColor(30, 140, 60) : QColor(190, 90, 30));
-        table->setItem(r, 1, status);
-        table->setItem(r, 2, new QTableWidgetItem(QString::fromStdString(d.provider)));
-        table->setItem(r, 3, new QTableWidgetItem(QString::fromStdString(d.license)));
-        table->setItem(r, 4, new QTableWidgetItem(limits.isEmpty() ? tr("none") : limits.join("\n")));
-        table->setItem(r, 5, new QTableWidgetItem(QString::fromStdString(d.upstreamUrl)));
+        table_->setItem(r, 1, status);
+        table_->setItem(r, 2, new QTableWidgetItem(QString::fromStdString(d.provider)));
+        table_->setItem(r, 3, new QTableWidgetItem(QString::fromStdString(d.license)));
+        table_->setItem(r, 4, new QTableWidgetItem(limits.isEmpty() ? tr("none") : limits.join(QChar('\n'))));
+        table_->setItem(r, 5, new QTableWidgetItem(QString::fromStdString(d.upstreamUrl)));
     }
-    table->resizeColumnsToContents();
-    table->resizeRowsToContents();
-    table->horizontalHeader()->setStretchLastSection(true);
-    layout->addWidget(table);
-    QStringList dirs;
-    for (const auto& d : registry.searchDirectories())
-        dirs << QString::fromStdString(d.u8string()).toHtmlEscaped();
-    auto* info = new QLabel(tr("Engine folders searched, in order:<br><small>%1</small><br>"
-                               "SWMM5+ is distributed separately through the swmm5plus-capi project; "
-                               "copy its libraries into one of these folders to enable it.")
-                                .arg(dirs.join("<br>")),
-                            this);
-    info->setWordWrap(true);
-    info->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    layout->addWidget(info);
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
-    connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    layout->addWidget(buttons);
+    table_->resizeColumnsToContents();
+    table_->resizeRowsToContents();
+    table_->horizontalHeader()->setStretchLastSection(true);
+
+    const bool windows = engine::platformId().rfind("windows", 0) == 0;
+    const bool installed = registry_.isAvailable("swmm5plus-1.0");
+    const bool busy = downloader_ && downloader_->isRunning();
+    install_->setEnabled(!windows && !busy);
+    installFile_->setEnabled(!windows && !busy);
+    install_->setText(installed ? tr("Update SWMM5+") : tr("Install SWMM5+"));
+    remove_->setEnabled(installed && !busy);
+    if (windows)
+    {
+        const QString why = tr("SWMM5+ is not available for Windows yet: it runs shell commands (cp, rm, mkdir) "
+                               "that Windows does not provide.");
+        install_->setToolTip(why);
+        installFile_->setToolTip(why);
+        if (status_->text().isEmpty())
+            status_->setText(why);
+    }
+    else if (status_->text().isEmpty())
+    {
+        status_->setText(tr("Optional engines are installed for your user account in %1.")
+                             .arg(QString::fromStdString(engine::userEngineDirectory().u8string())));
+    }
 }
 
 // ---------------------------------------------------------------------------

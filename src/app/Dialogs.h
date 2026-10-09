@@ -57,11 +57,30 @@ private:
     QComboBox* units_;
 };
 
+class EngineDownloader;
+
 class EnginesDialog : public QDialog
 {
     Q_OBJECT
 public:
     explicit EnginesDialog(const engine::EngineRegistry& registry, QWidget* parent = nullptr);
+
+signals:
+    /// Emitted after an engine was installed or removed.
+    void enginesChanged();
+
+private:
+    void populate();
+    void installFinished(bool ok, const QString& message);
+
+    const engine::EngineRegistry& registry_;
+    QTableWidget* table_ = nullptr;
+    QLabel* status_ = nullptr;
+    QProgressBar* progress_ = nullptr;
+    QPushButton* install_ = nullptr;
+    QPushButton* installFile_ = nullptr;
+    QPushButton* remove_ = nullptr;
+    EngineDownloader* downloader_ = nullptr;
 };
 
 class ResilienceDialog : public QDialog

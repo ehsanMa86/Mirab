@@ -27,6 +27,7 @@
 #include "Adapters.h"
 #include "anahita/AnahitaConfig.h"
 #include "anahita/core/Text.h"
+#include "anahita/engine/EngineInstall.h"
 
 #include <cstdlib>
 
@@ -181,18 +182,7 @@ std::vector<std::filesystem::path> EngineRegistry::defaultSearchDirectories()
         }
     }
     dirs.push_back(exe);
-#if defined(_WIN32)
-    if (const char* local = std::getenv("LOCALAPPDATA"))
-        dirs.push_back(std::filesystem::u8path(local) / "Anahita" / "engines");
-#elif defined(__APPLE__)
-    if (const char* home = std::getenv("HOME"))
-        dirs.push_back(std::filesystem::u8path(home) / "Library" / "Application Support" / "Anahita" / "engines");
-#else
-    if (const char* xdg = std::getenv("XDG_DATA_HOME"))
-        dirs.push_back(std::filesystem::u8path(xdg) / "anahita" / "engines");
-    else if (const char* home = std::getenv("HOME"))
-        dirs.push_back(std::filesystem::u8path(home) / ".local" / "share" / "anahita" / "engines");
-#endif
+    dirs.push_back(userEngineDirectory());
     return dirs;
 }
 
