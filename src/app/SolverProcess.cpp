@@ -65,7 +65,14 @@ QString SolverProcess::cliPath()
 #if defined(Q_OS_WIN)
     return QDir(dir).filePath("mirab-cli.exe");
 #else
-    return QDir(dir).filePath("mirab-cli");
+    const QString beside = QDir(dir).filePath("mirab-cli");
+#if defined(Q_OS_MACOS)
+    // In the build tree the bundle is bin/Mirab.app/Contents/MacOS and mirab-cli is in bin.
+    const QString build = QDir(dir).filePath("../../../mirab-cli");
+    if (!QFileInfo::exists(beside) && QFileInfo::exists(build))
+        return QDir::cleanPath(build);
+#endif
+    return beside;
 #endif
 }
 

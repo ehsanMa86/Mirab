@@ -118,6 +118,7 @@ int main(int argc, char* argv[])
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, automationSettings.path());
     }
 
+    bool runFailed = false;
     mirab::app::MainWindow window;
     window.show();
     const QStringList files = parser.positionalArguments();
@@ -152,7 +153,10 @@ int main(int argc, char* argv[])
         };
         if (parser.isSet(runFirst))
         {
-            QObject::connect(&window, &mirab::app::MainWindow::simulationCompleted, &window, shoot);
+            QObject::connect(&window, &mirab::app::MainWindow::simulationCompleted, &window, [shoot, &runFailed](bool ok) {
+                runFailed = !ok;
+                shoot();
+            });
             QTimer::singleShot(500, &window, [&window] { window.runSimulation(); });
         }
         else
@@ -161,5 +165,7 @@ int main(int argc, char* argv[])
         }
         QTimer::singleShot(60000 + delay, &app, &QApplication::quit); // safety net
     }
-    return app.exec();
+    const int code = app.exec();
+    // A failed --run still saves the picture, but tests must see the failure.
+    return runFailed ? 1 : code;
 }
