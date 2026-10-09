@@ -38,6 +38,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -222,9 +223,11 @@ private:
 };
 
 std::atomic<bool> g_cancel{false};
+std::atomic<bool> g_stdinWatcher{false};
 
 void watchStdinForCancel()
 {
+    g_stdinWatcher = true;
     std::thread([] {
         std::string line;
         while (std::getline(std::cin, line))
@@ -929,9 +932,7 @@ std::vector<std::string> utf8Arguments(int argc, char** argv)
     return out;
 }
 
-} // namespace
-
-int main(int argc, char** argv)
+int runMain(int argc, char** argv)
 {
 #if defined(_WIN32)
     SetConsoleOutputCP(CP_UTF8);
@@ -992,4 +993,23 @@ int main(int argc, char** argv)
         }
         return 1;
     }
+}
+
+} // namespace
+
+int main(int argc, char** argv)
+{
+    const int rc = runMain(argc, argv);
+    if (g_stdinWatcher)
+    {
+        // The cancel watcher may be blocked reading standard input. On glibc,
+        // normal exit would wait for that stream's lock forever, so flush the
+        // output streams and end the process directly.
+        std::cout.flush();
+        std::cerr.flush();
+        std::fflush(stdout);
+        std::fflush(stderr);
+        std::_Exit(rc);
+    }
+    return rc;
 }

@@ -31,7 +31,7 @@ if(WIN32)
 elseif(APPLE)
     set(ANAHITA_PLUGIN_DIR "Anahita.app/Contents/PlugIns/anahita")
 else()
-    set(ANAHITA_PLUGIN_DIR "${CMAKE_INSTALL_LIBDIR}/anahita/plugins")
+    set(ANAHITA_PLUGIN_DIR "lib/anahita/plugins")
 endif()
 install(TARGETS anahita_network_statistics
     LIBRARY DESTINATION "${ANAHITA_PLUGIN_DIR}"

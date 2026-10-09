@@ -107,7 +107,8 @@ jobs:
       - run: cmake --build --preset release --target package
       - name: AppImage
         run: |
-          DESTDIR="$PWD/AppDir" cmake --install build/release
+          # Qt's deploy step ignores DESTDIR, so install with an explicit prefix.
+          cmake --install build/release --prefix "$PWD/AppDir/usr"
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy*.AppImage

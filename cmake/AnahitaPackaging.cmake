@@ -54,6 +54,15 @@ endif()
 
 # --- Linux desktop integration -----------------------------------------------
 if(UNIX AND NOT APPLE AND ANAHITA_BUILD_GUI)
+    # Qt 6.5+ needs libxcb-cursor for X11, which minimal distributions lack.
+    # Ship it next to the Qt libraries (their RUNPATH is $ORIGIN).
+    find_library(ANAHITA_XCB_CURSOR NAMES libxcb-cursor.so.0 xcb-cursor)
+    if(ANAHITA_XCB_CURSOR)
+        get_filename_component(_xcb_real "${ANAHITA_XCB_CURSOR}" REALPATH)
+        install(FILES "${_xcb_real}" DESTINATION "${CMAKE_INSTALL_LIBDIR}" RENAME libxcb-cursor.so.0)
+    else()
+        message(STATUS "libxcb-cursor not found; Linux packages will rely on the system copy")
+    endif()
     install(FILES packaging/linux/io.github.ehsanma86.Anahita.desktop
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
     install(FILES packaging/linux/io.github.ehsanma86.Anahita.metainfo.xml
