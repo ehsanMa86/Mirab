@@ -58,6 +58,8 @@ struct S5pApi
     int (*version)(char*, int) = nullptr;
     int (*open)(const char*, const char*, const char*, const char*) = nullptr;
     int (*setProgress)(ProgressFn, void*) = nullptr;
+    int (*setQuiet)(int) = nullptr; ///< optional
+
     int (*initialize)() = nullptr;
     int (*run)() = nullptr;
     int (*finalize)() = nullptr;
@@ -142,6 +144,7 @@ public:
         ok &= lib_.bind(api_.getValue, "s5p_get_value", &missing);
         ok &= lib_.bind(api_.getTimes, "s5p_get_times", &missing);
         ok &= lib_.bind(api_.lastError, "s5p_last_error", &missing);
+        lib_.bind(api_.setQuiet, "s5p_set_quiet"); // optional: newer interface builds
         if (!ok)
         {
             if (error)
@@ -194,6 +197,9 @@ public:
         cb.report(0.0, "Initializing SWMM5+");
         if (int code = api_.open(inp.c_str(), od.c_str(), nullptr, libDir.c_str()))
             return failure(out, code);
+        // SWMM5+ writes to standard output, which carries the solver protocol.
+        if (api_.setQuiet)
+            api_.setQuiet(1);
         if (int code = api_.initialize())
         {
             api_.close();
