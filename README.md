@@ -31,7 +31,7 @@ Anahita runs on Windows, macOS and Linux. It needs no Python, no QGIS and no oth
 
 Installers for Windows (`.exe` and `.zip`), macOS (`.dmg`) and Linux (`.AppImage` and `.tar.gz`) are attached to each [release](https://github.com/ehsanMa86/Anahita/releases). Example models are installed with the application and are also in [`examples/`](examples).
 
-SWMM5+ is an optional engine for Linux and macOS, published separately by [swmm5plus-capi](https://github.com/ehsanMa86/swmm5plus-capi). Install it from *Tools > Simulation engines > Install SWMM5+*, or with `anahita-cli engines install <manifest.json>` for offline use. See [docs/engines.md](docs/engines.md#installing-swmm5).
+SWMM5+ is an optional engine for Windows, macOS and Linux, published separately by [swmm5plus-capi](https://github.com/ehsanMa86/swmm5plus-capi). Install it from *Tools > Simulation engines > Install SWMM5+*, with `anahita --install-engine swmm5plus` in a deployment script, or with `anahita-cli engines install <manifest.json>` for offline use. See [docs/engines.md](docs/engines.md#installing-swmm5).
 
 ## Command line
 

@@ -205,23 +205,13 @@ void EnginesDialog::populate()
     table_->resizeRowsToContents();
     table_->horizontalHeader()->setStretchLastSection(true);
 
-    const bool windows = engine::platformId().rfind("windows", 0) == 0;
     const bool installed = registry_.isAvailable("swmm5plus-1.0");
     const bool busy = downloader_ && downloader_->isRunning();
-    install_->setEnabled(!windows && !busy);
-    installFile_->setEnabled(!windows && !busy);
+    install_->setEnabled(!busy);
+    installFile_->setEnabled(!busy);
     install_->setText(installed ? tr("Update SWMM5+") : tr("Install SWMM5+"));
     remove_->setEnabled(installed && !busy);
-    if (windows)
-    {
-        const QString why = tr("SWMM5+ is not available for Windows yet: it runs shell commands (cp, rm, mkdir) "
-                               "that Windows does not provide.");
-        install_->setToolTip(why);
-        installFile_->setToolTip(why);
-        if (status_->text().isEmpty())
-            status_->setText(why);
-    }
-    else if (status_->text().isEmpty())
+    if (status_->text().isEmpty())
     {
         status_->setText(tr("Optional engines are installed for your user account in %1.")
                              .arg(QString::fromStdString(engine::userEngineDirectory().u8string())));
