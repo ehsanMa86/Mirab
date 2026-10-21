@@ -27,13 +27,16 @@
 #include "mirab/core/Features.h"
 #include "mirab/core/Hash.h"
 #include "mirab/core/Json.h"
+#include "mirab/core/LiveResults.h"
 #include "mirab/core/Model.h"
 #include "mirab/core/ProjectSettings.h"
 #include "mirab/core/Results.h"
 #include "mirab/core/Text.h"
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 
 using namespace mirab;
 namespace fs = std::filesystem;
@@ -225,6 +228,115 @@ TEST_CASE("results: .anr files round trip")
     CHECK_NEAR(back.table("node")->value(2, 2, 0), 7.0, 1e-6);
     CHECK_EQ(back.table("node")->variables[2].name, std::string("Extra"));
     CHECK_NEAR(back.times[2], 1200.0, 1e-9);
+}
+
+TEST_CASE("results: base64 matches RFC 4648")
+{
+    const char* plain[] = {"", "f", "fo", "foo", "foob", "fooba", "foobar"};
+    const char* coded[] = {"", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==", "Zm9vYmE=", "Zm9vYmFy"};
+    for (int i = 0; i < 7; ++i)
+    {
+        const std::string p = plain[i];
+        CHECK_EQ(core::live::base64Encode(p.data(), p.size()), std::string(coded[i]));
+        std::vector<unsigned char> back;
+        CHECK(core::live::base64Decode(coded[i], back));
+        CHECK_EQ(std::string(back.begin(), back.end()), p);
+    }
+    std::vector<unsigned char> out;
+    CHECK(!core::live::base64Decode("Zm9", out));
+    CHECK(!core::live::base64Decode("Zm9v!A==", out));
+    CHECK(!core::live::base64Decode("Z=9v", out));
+}
+
+TEST_CASE("results: live layout and frames rebuild the result set")
+{
+    core::ResultSet r;
+    r.engineId = "test";
+    r.engineName = "Test engine";
+    r.flowUnits = "LPS";
+    r.unitSystem = "SI";
+    r.reportStep = 600;
+    r.defineTable("node", {"A", "B", "C"}, {{"Pressure", "m"}, {"Head", "m"}});
+    r.defineTable("link", {"P1", "P2"}, {{"Flow", "LPS"}});
+    r.defineTable("system", {"System"}, {});
+    for (int p = 0; p < 4; ++p)
+    {
+        r.addPeriod(p * 600.0);
+        for (int e = 0; e < 3; ++e)
+        {
+            r.table("node")->set(p, 0, e, static_cast<float>(p * 10 + e) + 0.25f);
+            r.table("node")->set(p, 1, e, -static_cast<float>(e) / 3.0f);
+        }
+        r.table("link")->set(p, 0, 1, p == 2 ? std::numeric_limits<float>::quiet_NaN() : 1e-7f * p);
+    }
+
+    json::Value event = core::live::layoutPayload(r, 7);
+    event.set("event", "layout");
+    int layout = 0;
+    core::ResultSet live = core::live::parseLayout(json::Value::parse(event.dump()), &layout);
+    CHECK_EQ(layout, 7);
+    CHECK(core::live::sameLayout(live, r));
+    CHECK_EQ(live.periodCount(), 0);
+    CHECK_EQ(live.engineName, r.engineName);
+    CHECK_EQ(core::live::frameSize(live), static_cast<std::size_t>(8));
+
+    for (int p = 0; p < 4; ++p)
+    {
+        const std::string line = core::live::frameLine(r, p, 7, p, p * 600.0);
+        CHECK(line.rfind("{\"event\":\"frame\"", 0) == 0);
+        const auto frame = core::live::parseFrameLine(line);
+        CHECK_EQ(frame.layout, 7);
+        CHECK_EQ(frame.period, p);
+        CHECK_EQ(core::live::appendFrame(live, frame), p);
+        // The general JSON reader understands the same line.
+        CHECK_EQ(json::Value::parse(line).get("period").asNumber(), static_cast<double>(p));
+    }
+    CHECK_EQ(live.periodCount(), 4);
+    CHECK_NEAR(live.times[3], 1800.0, 1e-9);
+    for (const auto& t : r.tables)
+    {
+        const auto* lt = live.table(t.kind);
+        CHECK(lt != nullptr);
+        CHECK_EQ(lt->data.size(), t.data.size());
+        for (std::size_t i = 0; i < t.data.size(); ++i)
+            CHECK(lt->data[i] == t.data[i] || (std::isnan(lt->data[i]) && std::isnan(t.data[i])));
+    }
+
+    // A frame for another layout does not fit.
+    core::live::Frame wrong;
+    wrong.values.resize(5);
+    CHECK_EQ(core::live::appendFrame(live, wrong), -1);
+    CHECK_EQ(live.periodCount(), 4);
+    // A frame repeating the latest time replaces that period.
+    core::live::Frame again = core::live::parseFrameLine(core::live::frameLine(r, 0, 7, 3, 1800.0));
+    CHECK_EQ(core::live::appendFrame(live, again), 3);
+    CHECK_EQ(live.periodCount(), 4);
+    CHECK_NEAR(live.table("node")->value(3, 0, 2), 2.25, 1e-6);
+    core::ResultSet other = r;
+    other.table("link")->variables[0].unit = "GPM";
+    CHECK(!core::live::sameLayout(other, r));
+    bool threw = false;
+    try
+    {
+        core::live::parseFrameLine("{\"event\":\"frame\",\"layout\":1,\"period\":0,\"time\":0,\"data\":\"#\"}");
+    }
+    catch (const std::exception&)
+    {
+        threw = true;
+    }
+    CHECK(threw);
+}
+
+TEST_CASE("model: report start offsets")
+{
+    auto swmm = core::Model::fromFile(example("swmm/mirab-urban.inp"));
+    CHECK_NEAR(swmm.reportStartSeconds(), 0.0, 1e-9);
+    swmm.setOption("REPORT_START_TIME", "01:30:00");
+    CHECK_NEAR(swmm.reportStartSeconds(), 5400.0, 1e-9);
+    swmm.setOption("REPORT_START_DATE", "01/02/2026");
+    CHECK_NEAR(swmm.reportStartSeconds(), 86400.0 + 5400.0, 1e-9);
+    const auto epanet = core::Model::fromFile(example("epanet/mirab-demo.inp"));
+    CHECK_NEAR(epanet.reportStartSeconds(), 0.0, 1e-9);
 }
 
 TEST_CASE("settings: sidecar file round trip")

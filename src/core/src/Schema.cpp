@@ -210,6 +210,295 @@ std::vector<SectionDef> buildEpanet()
     return v;
 }
 
+ColumnDef ref(std::string name, std::string kind, bool optional = false, std::string help = {},
+              std::vector<std::string> keywords = {})
+{
+    ColumnDef c = col(std::move(name), CT::ObjectRef, {}, optional, std::move(help));
+    c.object = std::move(kind);
+    c.choices = std::move(keywords);
+    return c;
+}
+
+ColumnDef blankAsEmpty(ColumnDef c)
+{
+    c.blank = "\"\"";
+    return c;
+}
+
+SectionDef objectSect(std::string name, std::string kind, std::vector<ColumnDef> cols,
+                      std::string description)
+{
+    SectionDef s = sect(std::move(name), Category::None, {}, std::move(cols), std::move(description));
+    s.objectKind = std::move(kind);
+    return s;
+}
+
+/// Water quality, groundwater, RDII, snow, streets and inlets (SWMM 5.2 input format).
+void appendSwmmData(std::vector<SectionDef>& v)
+{
+    v.push_back(objectSect(
+        "POLLUTANTS", "Pollutant",
+        {col("Name", CT::Id), choice("Units", {"MG/L", "UG/L", "#/L"}, false, "concentration units"),
+         col("Crain", CT::Number, {}, false, "concentration in rainfall"),
+         col("Cgw", CT::Number, {}, false, "concentration in groundwater"),
+         col("Crdii", CT::Number, {}, false, "concentration in RDII inflow"),
+         col("Kdecay", CT::Number, "decay", false, "first-order decay coefficient"),
+         choice("SnowOnly", {"NO", "YES"}, true, "buildup occurs only when there is snow"),
+         ref("CoPollutant", "Pollutant", true, "pollutant whose runoff concentration adds to this one"),
+         col("CoFraction", CT::Number, {}, true, "fraction of the co-pollutant concentration"),
+         col("Cdwf", CT::Number, {}, true, "concentration in dry weather flow"),
+         col("Cinit", CT::Number, {}, true, "initial concentration throughout the system")},
+        "Pollutants"));
+    v.push_back(objectSect(
+        "LANDUSES", "Landuse",
+        {col("Name", CT::Id),
+         col("SweepInterval", CT::Number, "days", true, "days between street sweeping"),
+         col("Availability", CT::Number, {}, true, "fraction of buildup available for sweeping"),
+         col("LastSweep", CT::Number, "days", true, "days since last swept at the start")},
+        "Land uses"));
+    {
+        auto s = sect("BUILDUP", Category::None, {},
+                      {ref("Landuse", "Landuse"), ref("Pollutant", "Pollutant"),
+                       choice("Function", {"NONE", "POW", "EXP", "SAT", "EXT"}, false,
+                              "buildup function: power, exponential, saturation or external time series"),
+                       col("C1", CT::Number, {}, false, "maximum buildup (mass per unit of area or curb length)"),
+                       col("C2", CT::Number, {}, false, "rate constant (or scaling factor for EXT)"),
+                       col("C3", CT::Text, {}, false, "power or half-saturation constant (time series for EXT)"),
+                       choice("PerUnit", {"AREA", "CURB"}, false, "buildup is per unit of area or of curb length")},
+                      "Pollutant buildup");
+        s.multiRowPerKey = true;
+        v.push_back(s);
+    }
+    {
+        auto s = sect("WASHOFF", Category::None, {},
+                      {ref("Landuse", "Landuse"), ref("Pollutant", "Pollutant"),
+                       choice("Function", {"NONE", "EXP", "RC", "EMC"}, false,
+                              "washoff function: exponential, rating curve or event mean concentration"),
+                       col("C1", CT::Number, {}, false, "washoff coefficient or event mean concentration"),
+                       col("C2", CT::Number, {}, false, "washoff exponent"),
+                       col("SweepRemoval", CT::Number, "percent", false, "street sweeping removal efficiency"),
+                       col("BmpRemoval", CT::Number, "percent", false, "BMP removal efficiency")},
+                      "Pollutant washoff");
+        s.multiRowPerKey = true;
+        v.push_back(s);
+    }
+    {
+        auto s = sect("COVERAGES", Category::Area, {},
+                      {col("Subcatchment", CT::AreaRef), ref("Landuse", "Landuse"),
+                       col("Percent", CT::Number, "percent", false, "percent of the subcatchment area")},
+                      "Land use coverage");
+        s.multiRowPerKey = true;
+        s.repeatFrom = 1;
+        v.push_back(s);
+    }
+    {
+        auto s = sect("LOADINGS", Category::Area, {},
+                      {col("Subcatchment", CT::AreaRef), ref("Pollutant", "Pollutant"),
+                       col("InitBuildup", CT::Number, "loading", false, "initial buildup")},
+                      "Initial pollutant buildup");
+        s.multiRowPerKey = true;
+        s.repeatFrom = 1;
+        v.push_back(s);
+    }
+    {
+        auto s = sect("INFLOWS", Category::Node, {},
+                      {col("Node", CT::NodeRef),
+                       ref("Constituent", "Pollutant", false, "FLOW or a pollutant", {"FLOW"}),
+                       blankAsEmpty(col("TimeSeries", CT::SeriesRef, {}, true,
+                                        "time series of the inflow (blank for a constant baseline)")),
+                       choice("Type", {"FLOW", "CONCEN", "MASS"}, true,
+                              "FLOW for flow, CONCEN or MASS for a pollutant"),
+                       col("Mfactor", CT::Number, {}, true, "factor that converts mass inflow to mass/s (1.0 for flow)"),
+                       col("Sfactor", CT::Number, {}, true, "scaling factor of the time series values"),
+                       col("Baseline", CT::Number, {}, true, "constant baseline value"),
+                       blankAsEmpty(col("Pattern", CT::PatternRef, {}, true, "time pattern of the baseline"))},
+                      "External inflow");
+        s.multiRowPerKey = true;
+        v.push_back(s);
+    }
+    {
+        auto s = sect("DWF", Category::Node, {},
+                      {col("Node", CT::NodeRef),
+                       ref("Constituent", "Pollutant", false, "FLOW or a pollutant", {"FLOW"}),
+                       col("Baseline", CT::Number, {}, false, "average dry weather flow or concentration"),
+                       blankAsEmpty(col("MonthlyPattern", CT::PatternRef, {}, true)),
+                       blankAsEmpty(col("DailyPattern", CT::PatternRef, {}, true)),
+                       blankAsEmpty(col("HourlyPattern", CT::PatternRef, {}, true)),
+                       blankAsEmpty(col("WeekendPattern", CT::PatternRef, {}, true))},
+                      "Dry weather inflow");
+        s.multiRowPerKey = true;
+        v.push_back(s);
+    }
+    v.push_back(sect("RDII", Category::Node, {},
+                     {col("Node", CT::NodeRef),
+                      ref("UnitHydrograph", "Hydrograph", false, "unit hydrograph group"),
+                      col("SewerArea", CT::Number, "area", false, "area of the sewershed that contributes RDII")},
+                     "Rainfall-dependent infiltration/inflow"));
+    {
+        auto s = sect("TREATMENT", Category::Node, {},
+                      {col("Node", CT::NodeRef), ref("Pollutant", "Pollutant"),
+                       col("Expression", CT::Text, {}, false,
+                           "R = removal or C = concentration, e.g. R = 0.75 * R_TSS")},
+                      "Treatment");
+        s.multiRowPerKey = true;
+        s.variadic = true;
+        v.push_back(s);
+    }
+    v.push_back(objectSect(
+        "AQUIFERS", "Aquifer",
+        {col("Name", CT::Id), col("Porosity", CT::Number, {}, false, "volume of voids / total soil volume"),
+         col("WiltingPoint", CT::Number, {}, false, "soil moisture content at wilting point"),
+         col("FieldCapacity", CT::Number, {}, false, "soil moisture content at field capacity"),
+         col("Ksat", CT::Number, "rate", false, "saturated hydraulic conductivity"),
+         col("Kslope", CT::Number, {}, false, "slope of the conductivity versus moisture content curve"),
+         col("Tslope", CT::Number, {}, false, "slope of the soil tension versus moisture content curve"),
+         col("ETupper", CT::Number, {}, false, "fraction of evaporation available in the upper zone"),
+         col("ETlower", CT::Number, "depth", false, "depth into the lower zone over which evaporation can occur"),
+         col("Seepage", CT::Number, "rate", false, "seepage rate to deep groundwater"),
+         col("Ebottom", CT::Number, "elevation", false, "elevation of the bottom of the aquifer"),
+         col("WaterTable", CT::Number, "elevation", false, "initial water table elevation"),
+         col("UnsatMoisture", CT::Number, {}, false, "initial moisture content of the unsaturated zone"),
+         col("ETpattern", CT::PatternRef, {}, true, "monthly pattern of upper zone evaporation")},
+        "Aquifers"));
+    v.push_back(sect("GROUNDWATER", Category::Area, {},
+                     {col("Subcatchment", CT::AreaRef), ref("Aquifer", "Aquifer"),
+                      col("Node", CT::NodeRef, {}, false, "node that receives groundwater flow"),
+                      col("SurfaceElev", CT::Number, "elevation", false, "ground surface elevation"),
+                      col("A1", CT::Number, {}, false, "groundwater flow coefficient"),
+                      col("B1", CT::Number, {}, false, "groundwater flow exponent"),
+                      col("A2", CT::Number, {}, false, "surface water flow coefficient"),
+                      col("B2", CT::Number, {}, false, "surface water flow exponent"),
+                      col("A3", CT::Number, {}, false, "surface-groundwater interaction coefficient"),
+                      col("SurfaceDepth", CT::Number, "depth", false, "fixed depth of surface water at the node"),
+                      col("ThresholdElev", CT::Number, "elevation", true,
+                          "groundwater elevation that must be reached before flow occurs (* for the node invert)"),
+                      col("BottomElev", CT::Number, "elevation", true, "aquifer bottom elevation (overrides the aquifer)"),
+                      col("InitialElev", CT::Number, "elevation", true, "initial water table elevation (overrides the aquifer)"),
+                      col("InitialMoisture", CT::Number, {}, true, "initial upper zone moisture (overrides the aquifer)")},
+                     "Groundwater"));
+    {
+        auto s = sect("GWF", Category::Area, {},
+                      {col("Subcatchment", CT::AreaRef),
+                       choice("Flow", {"LATERAL", "DEEP"}, false, "lateral flow to the node or deep percolation"),
+                       col("Expression", CT::Text, {}, false, "flow per unit area as a math expression")},
+                      "Groundwater flow expression");
+        s.multiRowPerKey = true;
+        s.variadic = true;
+        v.push_back(s);
+    }
+    {
+        auto s = objectSect("SNOWPACKS", "Snowpack",
+                            {col("Name", CT::Id),
+                             choice("Surface", {"PLOWABLE", "IMPERVIOUS", "PERVIOUS", "REMOVAL"}),
+                             col("Parameters", CT::Text)},
+                            "Snow packs");
+        s.multiRowPerKey = true;
+        s.variadic = true;
+        s.variantColumn = 1;
+        auto melt = [](const char* last, const char* lastHelp) {
+            return std::vector<ColumnDef>{
+                col("Cmin", CT::Number, "meltrate", false, "minimum melt coefficient (December 21)"),
+                col("Cmax", CT::Number, "meltrate", false, "maximum melt coefficient (June 21)"),
+                col("Tbase", CT::Number, "temperature", false, "snow melt base temperature"),
+                col("FWF", CT::Number, {}, false, "free water capacity (fraction of snow depth)"),
+                col("SD0", CT::Number, "smalldepth", false, "initial snow depth (water equivalent)"),
+                col("FW0", CT::Number, "smalldepth", false, "initial free water in the pack"),
+                col(last, CT::Number, {}, false, lastHelp)};
+        };
+        s.variants = {
+            {"PLOWABLE", melt("SNN0", "fraction of impervious area that can be plowed"), false},
+            {"IMPERVIOUS", melt("SD100", "snow depth above which there is 100% cover"), false},
+            {"PERVIOUS", melt("SD100", "snow depth above which there is 100% cover"), false},
+            {"REMOVAL",
+             {col("Dplow", CT::Number, "smalldepth", false, "depth at which snow removal begins"),
+              col("Fout", CT::Number, {}, false, "fraction moved out of the watershed"),
+              col("Fimp", CT::Number, {}, false, "fraction moved to the impervious area"),
+              col("Fperv", CT::Number, {}, false, "fraction moved to the pervious area"),
+              col("Fimelt", CT::Number, {}, false, "fraction converted into immediate melt"),
+              col("Fsub", CT::Number, {}, true, "fraction moved to another subcatchment"),
+              col("Nsub", CT::AreaRef, {}, true, "subcatchment that receives that snow")},
+             false}};
+        v.push_back(s);
+    }
+    {
+        auto s = freeSect("HYDROGRAPHS", "Unit hydrographs");
+        s.objectKind = "Hydrograph";
+        v.push_back(s);
+    }
+    {
+        auto s = freeSect("TRANSECTS", "Transects");
+        s.objectKind = "Transect";
+        v.push_back(s);
+    }
+    v.push_back(objectSect(
+        "STREETS", "Street",
+        {col("Name", CT::Id), col("Tcrown", CT::Number, "length", false, "distance from curb to street crown"),
+         col("Hcurb", CT::Number, "length", false, "curb height"),
+         col("Sx", CT::Number, "percent", false, "street cross slope"),
+         col("nRoad", CT::Number, {}, false, "Manning's n of the road surface"),
+         col("a", CT::Number, "smalldepth", true, "gutter depression height"),
+         col("W", CT::Number, "length", true, "depressed section width"),
+         choice("Sides", {"1", "2"}, true, "1 for a single-sided street, 2 for two sides"),
+         col("Tback", CT::Number, "length", true, "street backing width"),
+         col("Sback", CT::Number, "percent", true, "street backing slope"),
+         col("nBack", CT::Number, {}, true, "Manning's n of the street backing")},
+        "Streets"));
+    {
+        auto s = objectSect("INLETS", "Inlet",
+                            {col("Name", CT::Id),
+                             choice("Type", {"GRATE", "CURB", "SLOTTED", "DROP_GRATE", "DROP_CURB", "CUSTOM"}),
+                             col("Parameters", CT::Text)},
+                            "Street inlets");
+        s.multiRowPerKey = true;
+        s.variadic = true;
+        s.variantColumn = 1;
+        const std::vector<std::string> grates = {"P_BAR-50",    "P_BAR-50x100", "P_BAR-30",
+                                                 "CURVED_VANE", "TILT_BAR-45",  "TILT_BAR-30",
+                                                 "RETICULINE",  "GENERIC"};
+        const std::vector<ColumnDef> grate = {
+            col("Length", CT::Number, "length", false, "length of the grate"),
+            col("Width", CT::Number, "length", false, "width of the grate"),
+            choice("GrateType", grates),
+            col("OpenArea", CT::Number, {}, true, "fraction of the grate area that is open (GENERIC grates)"),
+            col("SplashVelocity", CT::Number, "velocity", true, "splash over velocity (GENERIC grates)")};
+        const std::vector<ColumnDef> curb = {col("Length", CT::Number, "length", false, "length of the curb opening"),
+                                             col("Height", CT::Number, "length", false, "height of the curb opening")};
+        auto curbThroat = curb;
+        curbThroat.push_back(choice("Throat", {"HORIZONTAL", "INCLINED", "VERTICAL"}, true, "throat angle"));
+        s.variants = {
+            {"GRATE", grate, false},
+            {"CURB", curbThroat, false},
+            {"SLOTTED",
+             {col("Length", CT::Number, "length", false, "length of the slot"),
+              col("Width", CT::Number, "length", false, "width of the slot")},
+             false},
+            {"DROP_GRATE", grate, false},
+            {"DROP_CURB", curb, false},
+            {"CUSTOM", {col("Curve", CT::CurveRef, {}, false, "diversion or rating curve of captured flow")}, false}};
+        v.push_back(s);
+    }
+    v.push_back(sect("INLET_USAGE", Category::Link, {},
+                     {col("Conduit", CT::LinkRef), ref("Inlet", "Inlet"),
+                      col("Node", CT::NodeRef, {}, false, "node that receives the captured flow"),
+                      col("Number", CT::Number, {}, true, "number of inlets on each side of the street"),
+                      col("PctClogged", CT::Number, "percent", true, "degree to which the inlet is clogged"),
+                      col("Qmax", CT::Number, "flow", true, "largest flow the inlet can capture (0 for no limit)"),
+                      col("aLocal", CT::Number, "smalldepth", true, "height of the local gutter depression"),
+                      col("wLocal", CT::Number, "length", true, "width of the local gutter depression"),
+                      choice("Placement", {"AUTOMATIC", "ON_GRADE", "ON_SAG"}, true)},
+                     "Street inlet"));
+    {
+        auto s = freeSect("LID_CONTROLS", "LID controls");
+        s.objectKind = "LID";
+        v.push_back(s);
+    }
+    {
+        auto s = freeSect("CONTROLS", "Control rules");
+        s.objectKind = "Rule";
+        v.push_back(s);
+    }
+}
+
 std::vector<SectionDef> buildSwmm()
 {
     std::vector<SectionDef> v;
@@ -232,14 +521,14 @@ std::vector<SectionDef> buildSwmm()
                        col("Outlet", CT::NodeOrAreaRef), col("Area", CT::Number, "area"),
                        col("PctImperv", CT::Number), col("Width", CT::Number, "length"),
                        col("PctSlope", CT::Number), col("CurbLen", CT::Number, "length", true),
-                       col("SnowPack", CT::Text, {}, true)},
+                       ref("SnowPack", "Snowpack", true, "snow pack of the subcatchment")},
                       "Subcatchments");
         v.push_back(s);
     }
     v.push_back(sect("SUBAREAS", Category::Area, {},
                      {col("Subcatchment", CT::AreaRef), col("N-Imperv", CT::Number),
-                      col("N-Perv", CT::Number), col("S-Imperv", CT::Number, "depth"),
-                      col("S-Perv", CT::Number, "depth"), col("PctZero", CT::Number),
+                      col("N-Perv", CT::Number), col("S-Imperv", CT::Number, "smalldepth"),
+                      col("S-Perv", CT::Number, "smalldepth"), col("PctZero", CT::Number),
                       choice("RouteTo", {"OUTLET", "IMPERVIOUS", "PERVIOUS"}),
                       col("PctRouted", CT::Number, {}, true)},
                      "Subcatchment subareas"));
@@ -256,7 +545,7 @@ std::vector<SectionDef> buildSwmm()
                      {col("Name", CT::Id), col("Elevation", CT::Number, "elevation"),
                       col("MaxDepth", CT::Number, "depth"), col("InitDepth", CT::Number, "depth", true),
                       col("SurDepth", CT::Number, "depth", true),
-                      col("Aponded", CT::Number, "area", true)},
+                      col("Aponded", CT::Number, "surfacearea", true)},
                      "Junction nodes"));
     {
         auto s = sect("OUTFALLS", Category::Node, "Outfall",
@@ -339,6 +628,15 @@ std::vector<SectionDef> buildSwmm()
                        col("Barrels", CT::Number, {}, true), col("Culvert", CT::Number, {}, true)},
                       "Link cross sections");
         s.variadic = true;
+        s.variantColumn = 1;
+        s.variants = {
+            {"IRREGULAR", {ref("Transect", "Transect", false, "transect of the channel")}, false},
+            {"STREET", {ref("Street", "Street", false, "street cross section")}, false},
+            {"CUSTOM",
+             {col("Geom1", CT::Number, "depth", false, "full height"),
+              col("Curve", CT::CurveRef, {}, false, "shape curve"),
+              col("Barrels", CT::Number, {}, true)},
+             false}};
         v.push_back(s);
     }
     v.push_back(sect("LOSSES", Category::Link, {},
@@ -346,12 +644,25 @@ std::vector<SectionDef> buildSwmm()
                       col("Kavg", CT::Number), choice("FlapGate", {"NO", "YES"}, true),
                       col("Seepage", CT::Number, {}, true)},
                      "Conduit losses"));
-    for (const char* n : {"TRANSECTS", "STREETS", "INLETS", "INLET_USAGE", "CONTROLS",
-                          "POLLUTANTS", "LANDUSES", "COVERAGES", "LOADINGS", "BUILDUP", "WASHOFF",
-                          "TREATMENT", "INFLOWS", "DWF", "RDII", "HYDROGRAPHS", "LID_CONTROLS",
-                          "LID_USAGE", "AQUIFERS", "GROUNDWATER", "GWF", "SNOWPACKS",
-                          "TEMPERATURE", "ADJUSTMENTS", "EVENTS", "FILES", "PROFILES", "REPORT",
-                          "TAGS", "MAP", "LABELS", "BACKDROP"})
+    appendSwmmData(v);
+    {
+        auto s = sect("LID_USAGE", Category::Area, {},
+                      {col("Subcatchment", CT::AreaRef), ref("LID", "LID", false, "LID control"),
+                       col("Number", CT::Number, {}, false, "number of replicate units"),
+                       col("Area", CT::Number, "surfacearea", false, "area of each unit"),
+                       col("Width", CT::Number, "length", false, "outflow edge width of each unit"),
+                       col("InitSat", CT::Number, "percent", false, "initial saturation"),
+                       col("FromImp", CT::Number, "percent", false, "percent of impervious area treated"),
+                       choice("ToPerv", {"0", "1"}, true, "1 sends outflow to the pervious area"),
+                       col("RptFile", CT::Text, {}, true, "detailed report file (\"*\" for none)"),
+                       col("DrainTo", CT::NodeOrAreaRef, {}, true, "node or subcatchment receiving drain flow"),
+                       col("FromPerv", CT::Number, "percent", true, "percent of pervious area treated")},
+                      "LID units in subcatchments");
+        s.multiRowPerKey = true;
+        v.push_back(s);
+    }
+    for (const char* n : {"TEMPERATURE", "ADJUSTMENTS", "EVENTS", "FILES", "PROFILES",
+                          "REPORT", "TAGS", "MAP", "LABELS", "BACKDROP"})
         v.push_back(freeSect(n, {}));
     {
         auto s = sect("CURVES", Category::None, {},
@@ -432,6 +743,80 @@ const SectionDef* findSectionDef(Dialect dialect, std::string_view name)
     for (const auto& s : sectionDefs(dialect))
     {
         if (s.name == n)
+            return &s;
+    }
+    return nullptr;
+}
+
+const ColumnDef* RowLayout::column(std::size_t index) const
+{
+    if (columns.empty())
+        return nullptr;
+    if (index < columns.size())
+        return &columns[index];
+    if (repeatFrom >= 0 && static_cast<std::size_t>(repeatFrom) < columns.size())
+    {
+        const std::size_t period = columns.size() - static_cast<std::size_t>(repeatFrom);
+        return &columns[static_cast<std::size_t>(repeatFrom) + (index - static_cast<std::size_t>(repeatFrom)) % period];
+    }
+    return variadic ? &columns.back() : nullptr;
+}
+
+std::string RowLayout::columnName(std::size_t index) const
+{
+    const ColumnDef* c = column(index);
+    if (!c)
+        return "Value " + std::to_string(index + 1);
+    if (repeatFrom >= 0 && index >= columns.size())
+    {
+        const std::size_t period = columns.size() - static_cast<std::size_t>(repeatFrom);
+        return c->name + " " + std::to_string((index - static_cast<std::size_t>(repeatFrom)) / period + 1);
+    }
+    return c->name;
+}
+
+const SectionVariant* SectionDef::variant(std::string_view key) const
+{
+    for (const auto& v : variants)
+    {
+        if (text::iequals(v.key, key))
+            return &v;
+    }
+    return nullptr;
+}
+
+RowLayout SectionDef::layout(const std::vector<std::string>& tokens) const
+{
+    RowLayout l;
+    l.columns = columns;
+    l.variadic = variadic;
+    l.repeatFrom = repeatFrom;
+    if (variantColumn >= 0 && tokens.size() > static_cast<std::size_t>(variantColumn))
+    {
+        if (const SectionVariant* v = variant(tokens[static_cast<std::size_t>(variantColumn)]))
+        {
+            l.columns.resize(static_cast<std::size_t>(variantColumn) + 1);
+            l.columns.insert(l.columns.end(), v->columns.begin(), v->columns.end());
+            l.variadic = v->variadic;
+            l.repeatFrom = -1;
+        }
+    }
+    return l;
+}
+
+std::vector<std::string> objectKinds(Dialect dialect)
+{
+    if (dialect != Dialect::Swmm)
+        return {};
+    return {"Pollutant", "Landuse",  "Aquifer", "Snowpack", "Hydrograph",
+            "Transect",  "Street",   "Inlet",   "LID",      "Rule"};
+}
+
+const SectionDef* sectionForObject(Dialect dialect, std::string_view kind)
+{
+    for (const auto& s : sectionDefs(dialect))
+    {
+        if (!s.objectKind.empty() && text::iequals(s.objectKind, kind))
             return &s;
     }
     return nullptr;

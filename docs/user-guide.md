@@ -9,7 +9,7 @@
 - **Map tab.** A bar above the map chooses the results that color nodes, links and subcatchments. It also holds the time controls (step, play, slider), the basemap and the label, flow-arrow and legend switches. Zoom buttons float at the top right of the map; a scale bar and the legend sit on the map itself.
 - **Input file tab.** The `.inp` text exactly as the engines read it. Edit it and press *Apply changes*; the change can be undone as one step.
 - **Report, pattern and curve tabs.** They open next to the map and close with the cross on the tab.
-- **Project panel** (left). It shows a summary of the model and a search box. Below them is a tree with the simulation options, every element by type, and the patterns, curves and time series. Double-click an element to zoom to it, or a pattern or curve to edit it. Right-click for more.
+- **Project panel** (left). It shows a summary of the model and a search box. Below them is a tree with the simulation options, every element by type, the patterns, curves and time series and, for SWMM models, the named objects (pollutants, land uses, aquifers, ...). Double-click an element to zoom to it, a pattern, curve or object to edit it, or *Simulation options* to open the options dialog. Right-click for more.
 - **Properties panel** (right). It shows the selected element, or the simulation options when nothing is selected. Click a value to edit it, and type in the filter box to find a property quickly.
 - **Messages and Time series** (bottom). The Messages tab shows compatibility notes and the run log. The Time series tab plots the selected element over time.
 
@@ -26,7 +26,7 @@ Panels can be resized, moved, closed and floated. *View > Panels* shows a closed
    You can also right-click an empty spot of the map and choose *Add here*.
 3. Press `Esc` or right-click to return to the selection tool. Drag nodes to move them. `Delete` removes the selection and any links attached to a removed node.
 4. Edit values in *Properties*. Renaming the ID updates every reference to it, including controls and rules.
-5. *Add data* attaches extra rows to the selected element, such as demand categories, emitters, FAVAD leakage, water quality sources, losses or cross sections.
+5. *Add data* attaches extra rows to the selected element, such as demand categories, emitters, FAVAD leakage, water quality sources, losses or cross sections, and for SWMM external and dry weather inflows, RDII, treatment, groundwater, land use coverage, initial buildup and street inlets. Right-click a row of attached data to remove it.
 
 Mirab writes standard EPANET and SWMM input files, so models stay usable in any other tool.
 
@@ -52,7 +52,7 @@ Import several layers in a row, for example junctions, then pipes, then tanks. E
 
 ## Basemaps and coordinate systems
 
-The *Basemap* button on the map bar shows a web map under the network. The choices are OpenStreetMap, CARTO Light, Esri streets, satellite imagery, topographic and light-gray maps, and OpenTopoMap. Tiles are cached on disk, so places you have visited load quickly and work offline. The attribution of the map provider is shown at the bottom right.
+The *Basemap* button on the map bar shows a web map under the network. The choices are OpenStreetMap, Esri streets, satellite imagery, topographic and light-gray maps, and OpenTopoMap. Tiles are cached on disk, so places you have visited load quickly and work offline. The attribution of the map provider is shown at the bottom right.
 
 Basemaps need to know where the coordinates are on Earth. Use *View > Coordinate system* (or the basemap menu) to choose the coordinate reference system of the node coordinates:
 
@@ -63,6 +63,74 @@ Basemaps need to know where the coordinates are on Earth. Use *View > Coordinate
 Coordinates that are plain longitude and latitude are recognised automatically. Datum shifts are not applied, so data on older datums such as NAD27 can appear tens of metres away from the basemap. The coordinate system is also written into GeoPackage and GeoJSON exports.
 
 The example `examples/epanet/mirab-demo-longbeach.inp` is placed in downtown Long Beach, California, in NAD83 / California zone 5 State Plane coordinates (US survey feet, EPSG:2229). It uses US customary units and opens with an OpenStreetMap basemap.
+
+## Rasters and map services
+
+![Elevation model with hillshade under the Long Beach example](images/map-raster.jpg)
+
+### Raster layers
+
+*View > Raster layers* (also in the basemap menu) adds elevation models and georeferenced images under the network. Mirab reads them itself, with no GDAL or other software:
+
+- **GeoTIFF** (`.tif`, `.tiff`), including BigTIFF, in strips or tiles, uncompressed or compressed with Deflate, LZW or PackBits (with or without a predictor), with 8 to 64-bit integer or floating-point values. Files saved with JPEG, LZMA, ZSTD or WebP compression are not read; save them again with Deflate or LZW.
+- **ESRI ASCII grids** (`.asc`).
+- The coordinate system comes from the GeoTIFF keys (EPSG codes and the common user-defined projections) or from a `.prj` file next to the raster. A world file (`.tfw`, `.wld`) places a TIFF that carries no georeferencing.
+- The NoData value of the file (`GDAL_NODATA`) leaves holes transparent.
+
+Large files are not loaded whole: Mirab reads only the parts it draws and keeps a small cache. Files with internal overviews draw faster when zoomed out.
+
+Each layer has a style and an opacity:
+
+| Style | Use |
+|---|---|
+| Hillshade | Shading of the relief over the basemap; flat ground stays clear. Raise *Hillshade exaggeration* for flat towns. |
+| Colour ramp | Low ground green, high ground brown. |
+| Colour ramp with hillshade | Both together. |
+| Image | 8-bit grey, RGB, RGBA or palette images (aerial photos, scanned plans). |
+
+Layers are reprojected to the project's coordinate system as they are drawn, and are drawn in list order (later layers cover earlier ones). *Elevation units* tells Mirab the units of the values when the file does not declare them: metres are assumed, or feet when the horizontal units of the raster are feet.
+
+With an elevation layer, the status bar shows the ground elevation under the cursor in project units, and the profile plot adds the ground line along the path.
+
+A GeoTIFF chosen with *View > Backdrop image* becomes a raster layer. Other images keep working as before with a world file.
+
+### Elevations from a DEM
+
+*Tools > Elevations from DEM* sets node elevations from a digital elevation model.
+
+![Elevations from DEM](images/elevations-dialog.png)
+
+1. Choose the DEM: an elevation layer of the project, or any file with *Browse*. A file from *Browse* can be added to the map at the same time.
+2. Check *Elevation units*. Values are converted to the project's units (metres or feet).
+3. Choose the nodes: all, only those with a zero value, or only the selected node.
+4. Choose the values:
+   - **EPANET:** junction and tank elevations, and optionally the total head of reservoirs.
+   - **SWMM:** the ground is the rim of junctions and storage units. Either the invert is set to the ground minus the maximum depth, or the maximum depth is set to the ground minus the invert. Outfalls and dividers are left unchanged.
+5. The table previews the current value, the ground and the new value of every node. Nodes outside the DEM or on NoData are listed and left unchanged.
+6. *Apply* changes the input file as one step that *Edit > Undo* reverses.
+
+The node coordinates are reprojected to the coordinate system of the DEM when both are known. Elevations are interpolated between the four nearest cells.
+
+The same is available from the command line:
+
+```
+mirab-cli elevations model.inp --dem terrain.tif                  # preview
+mirab-cli elevations model.inp --dem terrain.tif --out model.inp  # write
+mirab-cli elevations model.inp --dem terrain.tif --mode missing --reservoirs --dem-units ft --out model.inp
+mirab-cli elevations sewer.inp --dem terrain.asc --swmm depth --out sewer.inp
+```
+
+`--mode` is `all`, `missing` or `selected` (with `--nodes ID,ID`), `--swmm` is `invert` or `depth`, `--dem-units` is `auto`, `m`, `ft` or `usft`, and `--crs` overrides the project's coordinate system. `--json` prints the table as JSON.
+
+### Map services
+
+Besides the built-in basemaps, *Add map service* in the basemap menu uses any of:
+
+- **Tile address templates (XYZ)** such as `https://tiles.example.org/{z}/{x}/{y}.png`, with `{s}` for subdomains and `{-y}` for TMS row order. The tiles must be in Web Mercator.
+- **OGC WMS** (1.1.1 and 1.3.0). Enter the service address and press *Load layers*: Mirab reads the capabilities and lists the layers, styles, formats and coordinate systems. Maps are requested in Web Mercator when the server offers it, otherwise in the project's coordinate system.
+- **OGC WMTS** (1.0.0), with tile matrix sets in Web Mercator, the project's coordinate system or longitude/latitude.
+
+Tiles go through the same disk cache as the built-in basemaps. Added services are kept in the application settings; a project that uses one also stores its definition, so it shows the same basemap on another computer. *View > Basemap > Remove* deletes the current service from the list. Problems such as an unreachable server are shown in red at the bottom of the map.
 
 ## Choosing an engine
 
@@ -77,11 +145,17 @@ SWMM5+ is an optional engine. Open *Project > Simulation engines* and click *Ins
   - **Error:** the engine cannot run the project, and the Run button is disabled.
 - **Greyed-out data:** data the selected engine does not model is greyed out in *Properties*. For example, the `[LEAKAGE]` rows of a pipe are greyed out under EPA EPANET 2.2, and PCV is not offered as a valve type.
 
-The choice of engine, the MSX file, the coordinate system, the basemap and the backdrop are saved next to the model in `<model>.inp.mirab.json`.
+The choice of engine, the MSX file, the coordinate system, the basemap (with the definition of a custom map service), the raster layers and the backdrop are saved next to the model in `<model>.inp.mirab.json`.
 
 ## Running and viewing results
 
-Press `F5` or *Run*. The engine runs in a separate process; you can keep working and press Stop at any time. When it finishes:
+Press `F5` or *Run*. The engine runs in a separate process, so you can keep working.
+
+- **Live results:** the map, the legend, the time controls and the Time series panel fill in while the simulation runs. The time slider covers the periods computed so far and follows the latest one until you move it; the map bar shows how far the run has got. Several times a second the newest period arrives; the complete results replace these when the run ends. Values an engine cannot report during the run (for SWMM 5.2: link volumes, groundwater, snow and pollutants) show as *n/a* until then.
+- **Pause:** `F6` or *Pause* holds the engine between two time steps; the status bar shows *Paused at* the simulation time reached. Press it again to resume.
+- **Stop:** *Stop* ends the run. The periods computed so far stay on the map, marked *Partial results (cancelled at ...)*. Partial results are not saved; the `.anr` file of the last complete run is kept.
+
+When the run finishes:
 
 - **Map colors:** the map colors nodes, links and subcatchments by the results chosen on the map bar, with a legend and flow-direction arrows.
 - **Time controls:** the time controls step through the reporting periods or animate them.
@@ -100,7 +174,7 @@ The *Reports* menu and tool bar button open report tabs. Each report follows new
 |---|---|
 | Network tables | Properties and results of every node, link or subcatchment at the current time. Sort by any column and filter with expressions such as `Pressure < 20` or `Diameter >= 300`. Selecting a row selects the element on the map. |
 | Time series | One result for several elements on one chart. |
-| Profile plot | Ground or invert elevation and the hydraulic grade along the shortest path between two nodes, with the minimum-maximum range over the simulation. |
+| Profile plot | Ground or invert elevation and the hydraulic grade along the shortest path between two nodes, with the minimum-maximum range over the simulation. With an elevation layer, the ground from the DEM is drawn along the path; SWMM profiles also show node rims and conduit crowns. |
 | Frequency plot | The distribution of a result over all elements at one time, with minimum, median, mean and maximum. |
 | Variability plot | The minimum, 10th-90th percentile band, median, mean and maximum of a result over all elements (or one type) at every time. |
 | System flow | EPANET: water supplied by reservoirs, consumed by demands and stored in tanks. SWMM: runoff, outfall discharge and flooding. |
@@ -117,6 +191,47 @@ Double-click a pattern, curve or time series in the *Project* panel to edit it i
 
 ![Pattern editor](images/pattern-editor.jpg)
 
+## Stormwater data (SWMM)
+
+Everything in a SWMM 5.2 input file can be edited without the text view.
+
+- **Named objects.** The *Project* panel lists pollutants, land uses, aquifers, snow packs, unit hydrographs, transects, streets, inlets, LID controls and control rules, with their counts. Right-click a group to add an object, or an object to rename or delete it. Renaming updates every reference (a renamed pollutant changes its inflows, dry weather flows, buildup, washoff, initial loadings and treatment expressions). Deleting removes the data that cannot exist without the object, such as the inflows of a deleted pollutant or the buildup of a deleted land use, and clears optional references such as a co-pollutant. Undo restores everything.
+- **Object editor.** Double-click an object to edit it in a tab. Each value has its own field with its units, and a tooltip with the SWMM name and meaning; choices and references to other objects, time series, patterns and curves are drop-down lists. A land use shows its buildup and washoff functions for every pollutant in tables. Snow packs show one box per surface (plowable, impervious, pervious, removal) and inlets one box per part, so a combination inlet has a grate and a curb opening. *Apply* writes the changes as one undoable step. Unit hydrographs, transects, LID controls and control rules have their own editors, described below.
+- **Element data.** In *Properties*, the data attached to a node, link or subcatchment appears under its own heading: external inflows ([INFLOWS]), dry weather inflows ([DWF]), RDII, treatment, groundwater and its flow expressions, land use coverage, initial buildup and inlet usage. Each value has a name and units; references offer the existing objects.
+- **Checks.** *Project > Check compatibility* (also run when a project opens or the engine changes) reports references to objects that do not exist (an inflow of an unknown pollutant, a coverage of an unknown land use, a groundwater outlet that is not a node) in *Messages*.
+- **Engine support.** Data the selected engine does not simulate is greyed out with the reason, for example pollutants, LID controls, streets and inlets with SWMM5+. The data stays in the input file.
+
+The example `examples/swmm/mirab-quality.inp` uses pollutants, land uses, buildup and washoff, external and dry weather inflows, treatment, groundwater and RDII.
+
+## Simulation options
+
+*Project > Simulation options* (or a double-click on *Simulation options* in the *Project* panel) opens a dialog with one page per topic:
+
+- **SWMM:** general settings (flow units, infiltration model, routing method, link offsets, ponding, steady periods, and which process models run), analysis and reporting dates, time steps, dynamic wave settings, interface files ([FILES]: hotstart, rainfall, runoff, RDII, inflows and outflows), reporting ([REPORT]), evaporation (constant, monthly, time series, temperature or climate file, with a soil recovery pattern), temperature, wind speed and snowmelt ([TEMPERATURE]), and monthly adjustments ([ADJUSTMENTS]).
+- **EPANET:** hydraulics and demands, water quality and reactions, times, energy and reporting.
+
+Dates and times use calendar and clock fields; choices use drop-down lists. Only the values you change are written, as one undoable step, and options the dialog does not show are kept. The *Properties* panel still lists the options as plain rows when nothing is selected.
+
+## LID controls, transects, unit hydrographs and control rules
+
+These SWMM sections have their own editors. They open in a tab like the pattern editor, with *Revert* and *Apply* in the header and a list of problems at the bottom that updates while you type. *Apply* is disabled while there are errors, except for control rules, which can be applied unfinished. Renaming an object also updates the rows that use it ([LID_USAGE], irregular [XSECTIONS], [RDII]). Lines and comments of other objects in the section are kept as they are.
+
+**LID controls** ([LID_CONTROLS]). Choose the type (bio-retention cell, rain garden, green roof, infiltration trench, permeable pavement, rain barrel, rooftop disconnection or vegetative swale); only the layers that type uses are shown: surface, pavement, soil, storage, drain, drainage mat and pollutant removals. Each value shows its unit, and a description appears below the form when you click it. The drawing on the right is a cross-section of the layers (heights are indicative, not to scale) with the drain at its offset height, and it changes as you type. The checks follow SWMM: for example the field capacity must be below the porosity, the wilting point below the field capacity, and a drain's open level above its closed level.
+
+![LID control editor](images/lid-control-editor.jpg)
+
+**LID usage** ([LID_USAGE]). Right-click a subcatchment on the map or in the *Project* panel and choose *LID usage...*. The dialog lists the LID units of the subcatchment: control, number of units, area and width of each unit, initial saturation, the percentages of the impervious and pervious areas treated, whether the outflow goes to the pervious area, the drain outlet and an optional report file. Below the table, the total LID area is compared with the subcatchment area; above 100 % the line turns red, because SWMM stops with an error.
+
+**Transects** ([TRANSECTS]). Enter the stations and elevations from left to right looking downstream (Ctrl+V pastes two columns from a spreadsheet), the Manning's n of the left overbank, channel and right overbank, the bank stations and the modifiers (stations factor, elevation offset, meander factor). The chart shows the section with the modifiers applied, the banks as dashed lines and a water surface whose depth you set with the slider; the line below the chart gives the flow area, top width, wetted perimeter and hydraulic radius at that depth. Several transects can share the section; when a transect takes its n values from the one above it, Mirab keeps that working when you change the one above.
+
+**Unit hydrographs** ([HYDROGRAPHS]). Choose the rain gage, then a month on the left (*All months* or January to December) and enter R, T and K of the short, medium and long-term responses, with the optional initial abstraction depth, recovery rate and initial value. Months with their own values are shown in blue; the others use the *All months* values. The chart shows the three triangular hydrographs of the month and their total.
+
+**Control rules** (SWMM [CONTROLS], EPANET [RULES] and simple [CONTROLS]). Open them from *Project > Control rules*. The list on the left has one entry per rule, plus *Variables and notes* for the lines before the first rule (SWMM `VARIABLE` and `EXPRESSION` definitions go there). The selected rule is shown with syntax colors; lines with errors are underlined, and each problem names the rule and line. Rules are checked as SWMM 5.2 checks them: clause order (IF, AND, OR, THEN, ELSE, PRIORITY), object types and their attributes, relational operators, values (status words, times, dates, months), settings by number, `CURVE`, `TIMESERIES` or `PID`, named variables and expressions, and whether every node, link, gage, curve and time series exists and has the right type. *New rule* inserts a template (pump on and off by wet-well depth, orifice by time of day, weir by flow, control curve, PID controller, named variable); *Rule builder* composes a rule from lists of the model's objects.
+
+![Control rule editor](images/control-rules.jpg)
+
+`mirab-cli info model.inp` prints the same checks, with the line number in the file for rule problems.
+
 ## Resilience tools
 
 *Analysis* offers five analyses for EPANET models: the Todini index, water service availability, network topology, pipe criticality and fire-flow capacity. See [resilience.md](resilience.md) for the methods. Selecting a row in the result table highlights the element on the map.
@@ -125,7 +240,7 @@ Double-click a pattern, curve or time series in the *Project* panel to edit it i
 
 - *File > Export > GeoPackage* writes one layer per element type (junctions, pipes, conduits, subcatchments, ...) with every input value and, when results are loaded, the values of the current period.
 - *File > Open in QGIS* writes `<model>.gpkg` and starts QGIS with it. QGIS is never loaded inside Mirab, so a QGIS installation problem cannot affect it. Set the QGIS program in *Tools > Settings* if it is not found.
-- *View > Backdrop image* shows a PNG, JPEG or TIFF behind the network. With a world file (`.pgw`, `.jgw`, `.tfw` or `.wld`) the image is georeferenced; without one it is stretched over the network.
+- *View > Backdrop image* shows a PNG, JPEG or TIFF behind the network. With a world file (`.pgw`, `.jgw`, `.tfw` or `.wld`) the image is georeferenced; without one it is stretched over the network. A georeferenced GeoTIFF becomes a raster layer (see [Rasters and map services](#rasters-and-map-services)).
 
 ## WNTR
 
@@ -136,6 +251,7 @@ Double-click a pattern, curve or time series in the *Project* panel to edit it i
 | Key | Action |
 |---|---|
 | `F5` | Run simulation |
+| `F6` | Pause or resume the simulation |
 | `F` | Zoom to fit |
 | `+`, `-`, arrow keys | Zoom and pan the map |
 | `S` | Selection tool |
@@ -153,9 +269,11 @@ Double-click a pattern, curve or time series in the *Project* panel to edit it i
 | Option | Effect |
 |---|---|
 | `--import FILE` | Opens the import dialog for a shapefile, DXF drawing or CSV table. |
-| `--show-data SECTION:ID` | Opens the editor of a pattern, curve or time series, for example `PATTERNS:PAT1`. |
+| `--show-data SECTION:ID` | Opens the editor of a pattern, curve, time series, named object, LID control, transect or unit hydrograph group, for example `PATTERNS:PAT1`, `POLLUTANTS:TSS` or `LID_CONTROLS:Cell1`; `CONTROLS:` or `RULES:` opens the control rules and `LID_USAGE:S1` the LID usage of subcatchment S1. |
+| `--options-dialog PAGE` | Opens the simulation options dialog at a page: `general`, `dates`, `steps`, `dynwave`, `files`, `report`, `evaporation`, `climate`, `adjustments` (SWMM) or `hydraulics`, `quality`, `times`, `energy`, `report` (EPANET). |
 | `--select ID` | Selects an element. |
+| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers` or `map-service`. |
 | `--install-engine swmm5plus` | Installs SWMM5+ without opening a window (also a manifest URL or file). |
-| `--screenshot FILE.png` | Saves a picture of the window and quits; with `--run` (run first), `--report KIND` (open a report: tables, timeseries, profile, frequency, variability, systemflow, energy, status) and `--delay MS`. |
+| `--screenshot FILE.png` | Saves a picture of the window and quits; with `--run` (run first), `--report KIND` (open a report: tables, timeseries, profile, frequency, variability, systemflow, energy, status) and `--delay MS`. With `--run`, `--run-for MS` takes the picture while the simulation runs, and `--pause-after MS` or `--stop-after MS` pause or stop it first. |
 
 Every analysis is also available without a window through `mirab-cli`; run `mirab-cli` without arguments for its commands.

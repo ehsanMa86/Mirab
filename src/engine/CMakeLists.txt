@@ -23,6 +23,7 @@
 add_library(mirab_engine STATIC
     src/Compatibility.cpp
     src/DynamicLibrary.cpp
+    src/Engine.cpp
     src/EngineInstall.cpp
     src/EngineRegistry.cpp
     src/EpanetEngine.cpp

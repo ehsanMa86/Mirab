@@ -1,0 +1,160 @@
+; Mirab - Unified Water Infrastructure Modeling Environment
+; https://github.com/ehsanMa86/Mirab
+;
+; File:    tests/data/swmm-objects.inp
+; Purpose: SWMM 5.2 test model with LID controls and usage, transects, unit hydrographs and control rules.
+;
+; Copyright (C) 2026 Ehsan Madadi
+;
+; This program is free software: you can redistribute it and/or modify it
+; under the terms of the GNU General Public License as published by the Free
+; Software Foundation, either version 3 of the License, or (at your option)
+; any later version.
+;
+; This program is distributed in the hope that it will be useful, but WITHOUT
+; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+; FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+; more details.
+;
+; You should have received a copy of the GNU General Public License along
+; with this program. If not, see <https://www.gnu.org/licenses/>.
+;
+; SPDX-License-Identifier: GPL-3.0-or-later
+[TITLE]
+LID, transect, RDII and control rule test model
+
+[OPTIONS]
+FLOW_UNITS           CFS
+INFILTRATION         HORTON
+FLOW_ROUTING         DYNWAVE
+
+[RAINGAGES]
+;;Name  Format    Interval SCF Source
+RG1     INTENSITY 0:15     1.0 TIMESERIES Storm1
+
+[SUBCATCHMENTS]
+;;Name  Gage  Outlet  Area  %Imperv  Width  %Slope  CurbLen
+S1      RG1   J1      4     50       400    0.5     0
+S2      RG1   J2      0.5   40       500    0.5     0
+
+[JUNCTIONS]
+J1  100  10  0  0  0
+J2  98   10  0  0  0
+
+[OUTFALLS]
+Out1  90  FREE  NO
+
+[STORAGE]
+WW1  95  12  0  FUNCTIONAL  1000  0  0  0  0
+
+[CONDUITS]
+C1  J1  J2   400  0.015  0  0  0  0
+C2  J2  WW1  400  0.015  0  0  0  0
+
+[PUMPS]
+P1  WW1  Out1  Pump1  OFF  0  0
+
+[ORIFICES]
+OR1  J2  Out1  SIDE  0  0.65  NO  0
+
+[WEIRS]
+W1  J1  Out1  TRANSVERSE  0  3.33  NO  0  0  YES
+
+[XSECTIONS]
+C1  IRREGULAR  Main  0  0  0  1
+C2  CIRCULAR   2     0  0  0  1
+
+[POLLUTANTS]
+TSS  MG/L  0  0  0  0  0  0  0
+
+[LID_CONTROLS]
+;;Name  Type/Layer  Parameters
+BioCell  BC
+BioCell  SURFACE  6  0.1  0  0  0     ;ponding
+BioCell  SOIL     18  0.5  0.2  0.1  0.5  10  3.5
+BioCell  STORAGE  12  0.75  0.5  0
+BioCell  DRAIN    0.5  0.5  6  6
+BioCell  REMOVALS TSS 80
+;green roof
+Roof1  GR
+Roof1  SURFACE  0  0  0.1  1  0
+Roof1  SOIL     3  0.5  0.2  0.1  0.5  10  3.5
+Roof1  DRAINMAT 3  0.5  0.1
+
+[LID_USAGE]
+;;Subcatch  LID  Number  Area  Width  InitSat  FromImp  ToPerv  RptFile  DrainTo  FromPerv
+S1  BioCell  4  500  10  0  20  0      ;east side
+S1  Roof1    1  2000 20  0  30  1  *  J2  10
+S2  BioCell  2  300  10  0  15  0
+
+[TRANSECTS]
+;Main channel
+NC 0.05     0.05     0.03
+X1 Main             6        20       80       0.0      0.0      0.0      0.0      0.0
+GR 10       0        6        20       2        40       2        60       6        80
+GR 10       100
+;Same roughness as Main
+X1 Side             4        5        15       0.0      0.0      1.2      2        0.5
+GR 4        0        1        5        1        15       4        20
+
+[HYDROGRAPHS]
+;;Name  Month/Gage  Response  R  T  K  Dmax  Drecov  Dinit
+UH1  RG1
+UH1  ALL  SHORT   0.02  1  2
+UH1  ALL  MEDIUM  0.03  3  3     ;medium term
+UH1  ALL  LONG    0.04  6  4   1  0.1  0
+UH1  JUL  SHORT   0.05  1  2
+UH2  RG1
+UH2  MAR  0.01 1 2 0.02 4 3 0.03 8 4
+
+[CURVES]
+Pump1  PUMP2  0  0  5  10
+Ctl1   CONTROL  0  0  10  1
+
+[TIMESERIES]
+Storm1  0:00  0
+Storm1  1:00  1
+
+[CONTROLS]
+VARIABLE Wet = NODE WW1 DEPTH
+EXPRESSION WetFt = Wet * 3.281
+
+;Start the pump
+RULE PumpOn
+IF NODE WW1 DEPTH > 5
+THEN PUMP P1 STATUS = ON
+PRIORITY 1
+
+RULE PumpOff
+IF Wet < 1
+THEN PUMP P1 STATUS = OFF
+
+RULE Gate
+IF SIMULATION CLOCKTIME >= 08:00
+AND SIMULATION CLOCKTIME < 18:00
+OR GAGE RG1 6HR_PRECIP > 0.5
+THEN ORIFICE OR1 SETTING = CURVE Ctl1
+ELSE ORIFICE OR1 SETTING = PID 0.5 0.1 0
+AND WEIR W1 SETTING = 0.5
+PRIORITY 2
+
+[COORDINATES]
+J1    100   300
+J2    300   300
+WW1   500   300
+Out1  700   300
+
+[POLYGONS]
+S1  50 400
+S1  250 400
+S1  250 500
+S1  50 500
+S2  260 400
+S2  420 400
+S2  420 500
+S2  260 500
+
+[SYMBOLS]
+RG1  150 600
+
+[END]

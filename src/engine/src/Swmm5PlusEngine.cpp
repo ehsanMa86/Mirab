@@ -76,6 +76,7 @@ struct Sampler
     const S5pApi* api = nullptr;
     core::ResultSet* results = nullptr;
     const RunCallbacks* callbacks = nullptr;
+    FramePacer* pacer = nullptr;
     double reportStep = 300.0;
     double nextReport = 0.0;
     int nodes = 0;
@@ -104,6 +105,18 @@ struct Sampler
             api->getValue(S5P_LINK, i, S5P_LINK_VELOCITY, &v);
             lt->set(p, 2, i, static_cast<float>(v));
         }
+        if (pacer->due())
+            pacer->send(frame(p));
+    }
+
+    ResultFrame frame(int p) const
+    {
+        ResultFrame f;
+        f.results = results;
+        f.slot = p;
+        f.period = p;
+        f.time = p >= 0 ? results->times[static_cast<std::size_t>(p)] : 0.0;
+        return f;
     }
 
     static int onProgress(double now, double end, void* user)
@@ -116,7 +129,8 @@ struct Sampler
         }
         if (end > 0)
             self->callbacks->report(0.05 + 0.85 * std::min(1.0, now / end), "Finite-volume routing");
-        return self->callbacks->cancelled() ? 1 : 0;
+        // Blocking here pauses SWMM5+ between two time steps.
+        return self->callbacks->proceed(now) ? 0 : 1;
     }
 };
 
@@ -206,10 +220,12 @@ public:
             return failure(out, code);
         }
 
+        FramePacer pacer(cb);
         Sampler sampler;
         sampler.api = &api_;
         sampler.results = &out.results;
         sampler.callbacks = &cb;
+        sampler.pacer = &pacer;
         double start = 0, end = 0, step = 0;
         api_.getTimes(&start, &end, &step);
         if (step > 0)
@@ -234,6 +250,7 @@ public:
         api_.setProgress(&Sampler::onProgress, &sampler);
         const int runCode = api_.run();
         api_.setProgress(nullptr, nullptr);
+        pacer.finish(sampler.frame(out.results.periodCount() - 1));
         if (runCode && !cb.cancelled())
         {
             failure(out, runCode);

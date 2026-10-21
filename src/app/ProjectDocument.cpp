@@ -27,6 +27,8 @@
 #include <QFileInfo>
 #include <QUndoCommand>
 
+#include <algorithm>
+
 namespace mirab::app
 {
 
@@ -175,10 +177,27 @@ void ProjectDocument::markSettingsChanged()
 
 void ProjectDocument::setResults(std::unique_ptr<core::ResultSet> r)
 {
+    // Coming from live results, stay at the time the map showed.
+    const bool keepTime = live_ || !note_.isEmpty();
+    const double time = keepTime && results_ && period_ < results_->periodCount()
+                            ? results_->times[static_cast<std::size_t>(period_)]
+                            : 0.0;
     results_ = std::move(r);
-    period_ = results_ && results_->periodCount() > 0 ? 0 : 0;
+    period_ = 0;
+    if (keepTime && results_)
+    {
+        const auto& t = results_->times;
+        const auto it = std::lower_bound(t.begin(), t.end(), time - 0.5);
+        period_ = it == t.end() ? std::max(0, results_->periodCount() - 1)
+                                : static_cast<int>(it - t.begin());
+    }
+    const bool stateChanged = live_ || !note_.isEmpty();
+    live_ = false;
+    note_.clear();
     emit resultsChanged();
     emit periodChanged(period_);
+    if (stateChanged)
+        emit liveStateChanged();
 }
 
 void ProjectDocument::clearResults()
@@ -187,18 +206,63 @@ void ProjectDocument::clearResults()
         return;
     results_.reset();
     period_ = 0;
+    const bool stateChanged = live_ || !note_.isEmpty();
+    live_ = false;
+    note_.clear();
     emit resultsChanged();
+    if (stateChanged)
+        emit liveStateChanged();
 }
 
 void ProjectDocument::setPeriod(int p)
 {
     if (!results_)
         return;
-    p = std::max(0, std::min(p, results_->periodCount() - 1));
+    const int last = results_->periodCount() - 1;
+    p = std::max(0, std::min(p, last));
+    if (live_)
+        followLatest_ = p == last;
     if (p == period_)
         return;
     period_ = p;
     emit periodChanged(p);
+}
+
+void ProjectDocument::beginLiveResults(std::shared_ptr<const core::ResultSet> live)
+{
+    if (!live || live->periodCount() == 0)
+        return;
+    results_ = std::move(live);
+    live_ = true;
+    followLatest_ = true;
+    note_.clear();
+    period_ = results_->periodCount() - 1;
+    emit resultsChanged();
+    emit periodChanged(period_);
+    emit liveStateChanged();
+}
+
+void ProjectDocument::liveResultsGrew(const core::ResultSet* live, int firstChanged)
+{
+    // Ignore a run whose results are no longer shown (cleared or replaced).
+    if (!live_ || results_.get() != live)
+        return;
+    const int count = results_->periodCount();
+    emit liveResultsUpdated(std::max(0, std::min(firstChanged, count - 1)));
+    if (followLatest_ && period_ != count - 1)
+    {
+        period_ = count - 1;
+        emit periodChanged(period_);
+    }
+}
+
+void ProjectDocument::endLiveResults(const QString& note)
+{
+    if (!live_)
+        return;
+    live_ = false;
+    note_ = note;
+    emit liveStateChanged();
 }
 
 void ProjectDocument::select(const Selection& s)

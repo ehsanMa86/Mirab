@@ -39,6 +39,7 @@ namespace mirab::app
 {
 
 class Basemap;
+class RasterRenderer;
 
 class MapView : public QWidget
 {
@@ -78,8 +79,17 @@ public:
     static std::vector<std::pair<QString, QString>> basemapProviders();
     static QString basemapLabel(const QString& id);
     void setBasemap(const QString& id);
+    /// Shows a basemap and records it (and a custom service's definition) in the project settings.
+    void chooseBasemap(const QString& id);
     QString basemap() const;
     bool basemapUsable(QString* why = nullptr) const;
+    /// Re-reads the raster layers from the project settings.
+    void reloadRasters();
+    /// Ground elevation (project units) from the project's DEM layer.
+    std::optional<double> groundElevationAt(const QPointF& world) const;
+    /// Problem with the current map service, empty when none.
+    QString basemapError() const;
+
     /// Coordinate system of the model coordinates ("EPSG:32614", WKT, ...).
     void setCoordinateSystem(const QString& crs);
     QString coordinateSystemName() const;
@@ -120,6 +130,8 @@ private:
     void drawLabel(QPainter& p, const QPointF& at, const QString& text);
     QColor colorFor(double value) const;
     void recomputeRanges();
+    /// Widens the legend range with the periods from @p fromPeriod on.
+    void extendRanges(int fromPeriod);
     std::optional<double> resultValue(const char* table, int variable, const std::string& id) const;
     int flowVariable() const;
     void finishArea();
@@ -130,6 +142,7 @@ private:
 
     ProjectDocument* doc_;
     Basemap* basemap_;
+    RasterRenderer* rasters_;
     QString crsText_;
     Tool tool_ = Tool::Select;
     QString kind_;
@@ -157,6 +170,9 @@ private:
     int nodeVarIndex_ = -1, linkVarIndex_ = -1, areaVarIndex_ = -1;
     double rangeMin_ = 0.0, rangeMax_ = 1.0;
     QString legendTitle_;
+    const char* rangeTable_ = nullptr; ///< table and variable the legend follows
+    int rangeVar_ = -1;
+    double rangeLo_ = 0.0, rangeHi_ = 0.0; ///< data extremes found so far
     bool showLabels_ = true;
     bool showArrows_ = true;
     bool showLegend_ = true;

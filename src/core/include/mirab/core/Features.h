@@ -68,4 +68,11 @@ struct FeatureUse
 
 std::vector<FeatureUse> detectFeatures(const Model& model);
 
+/// Feature that the data of a section needs, e.g. [POLLUTANTS] needs SWMM
+/// water quality. @p tokens refines the answer for rows whose meaning depends
+/// on their values (an [INFLOWS] row of a pollutant). Returns false when the
+/// section needs no particular feature.
+bool featureForSection(Dialect dialect, std::string_view section,
+                       const std::vector<std::string>& tokens, Feature& feature);
+
 } // namespace mirab::core

@@ -61,7 +61,8 @@ struct Probe
 } // namespace
 
 bool runEpanetLoop(EpanetSession& s, const std::filesystem::path& inputFile,
-                   core::ResultSet& r, const RunCallbacks& cb, double from, double to)
+                   core::ResultSet& r, const RunCallbacks& cb, FramePacer& pacer, double from,
+                   double to)
 {
     // Information that the toolkit does not expose in 2.2 comes from the file.
     core::Model model;
@@ -198,10 +199,12 @@ bool runEpanetLoop(EpanetSession& s, const std::filesystem::path& inputFile,
                     lt->set(p, static_cast<int>(v), i - 1, static_cast<float>(value));
                 }
             }
+            if (pacer.due())
+                pacer.send(lastFrame(r, 1));
         }
         cb.report(from + (to - from) * (duration > 0 ? static_cast<double>(t) / duration : 1.0),
                   "Simulating hydraulics and water quality");
-        if (cb.cancelled())
+        if (!cb.proceed(static_cast<double>(t)))
         {
             cancelled = true;
             break;
@@ -212,6 +215,17 @@ bool runEpanetLoop(EpanetSession& s, const std::filesystem::path& inputFile,
     s.closeQ();
     s.closeH();
     return !cancelled;
+}
+
+ResultFrame lastFrame(const core::ResultSet& r, int layout)
+{
+    ResultFrame f;
+    f.results = &r;
+    f.slot = r.periodCount() - 1;
+    f.period = f.slot;
+    f.time = f.slot >= 0 ? r.times[static_cast<std::size_t>(f.slot)] : 0.0;
+    f.layout = layout;
+    return f;
 }
 
 namespace
@@ -240,7 +254,9 @@ public:
             EpanetSession s(lib_.api());
             cb.report(0.0, "Reading the network");
             s.open(req.input, req.reportFile);
-            const bool finished = runEpanetLoop(s, req.input, out.results, cb, 0.02, 0.98);
+            FramePacer pacer(cb);
+            const bool finished = runEpanetLoop(s, req.input, out.results, cb, pacer, 0.02, 0.98);
+            pacer.finish(lastFrame(out.results, 1));
             if (finished)
             {
                 cb.report(0.99, "Writing the report");

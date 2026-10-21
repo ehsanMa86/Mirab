@@ -66,15 +66,40 @@ int main(int argc, char* argv[])
                                        "kind");
     const QCommandLineOption delayOpt("delay", "With --screenshot: milliseconds to wait before the picture (default 700).",
                                       "ms");
+    const QCommandLineOption runFor("run-for", "With --run: take the picture <ms> after the simulation starts, while it "
+                                               "is still running.",
+                                    "ms");
+    const QCommandLineOption pauseAfter("pause-after", "With --run: pause the simulation <ms> after it starts; the "
+                                                       "picture follows.",
+                                        "ms");
+    const QCommandLineOption stopAfter("stop-after", "With --run: stop the simulation <ms> after it starts; the picture "
+                                                     "follows.",
+                                       "ms");
     parser.addOption(screenshot);
     parser.addOption(runFirst);
+    parser.addOption(runFor);
+    parser.addOption(pauseAfter);
+    parser.addOption(stopAfter);
     const QCommandLineOption importOpt("import", "Open the import dialog for a shapefile, DXF drawing or CSV table.", "file");
     parser.addOption(reportOpt);
-    const QCommandLineOption dataOpt("show-data", "Open the editor of a pattern, curve or time series, given as SECTION:ID "
-                                                  "(for example PATTERNS:PAT1).",
+    const QCommandLineOption dataOpt("show-data",
+                                     "Open the editor of a pattern, curve, time series, named object (for example "
+                                     "POLLUTANTS:TSS), LID control, transect, unit hydrograph group or the control "
+                                     "rules, given as SECTION:ID (for example PATTERNS:PAT1, LID_CONTROLS:Cell1, "
+                                     "CONTROLS: or RULES:), or the LID usage dialog of a subcatchment (LID_USAGE:S1).",
                                      "section:id");
+    const QCommandLineOption optionsOpt("options-dialog", "Open the simulation options dialog at a page (general, dates, "
+                                                          "steps, dynwave, files, report, evaporation, climate, "
+                                                          "adjustments for SWMM; hydraulics, quality, times, energy, "
+                                                          "reactions, report for EPANET).",
+                                        "page");
+    const QCommandLineOption toolOpt("open-tool", "Open a tool dialog after the file: elevations (from a DEM), "
+                                                  "raster-layers or map-service.",
+                                     "name");
+    parser.addOption(toolOpt);
     parser.addOption(importOpt);
     parser.addOption(dataOpt);
+    parser.addOption(optionsOpt);
     parser.addOption(delayOpt);
     parser.addOption(selectOpt);
     parser.addOption(installEngine);
@@ -131,6 +156,16 @@ int main(int argc, char* argv[])
         const QString v = parser.value(dataOpt);
         window.openDataEditor(v.section(':', 0, 0).toUpper(), v.section(':', 1));
     }
+    if (parser.isSet(optionsOpt))
+    {
+        const QString page = parser.value(optionsOpt);
+        QTimer::singleShot(200, &window, [&window, page] { window.showSimulationOptions(page); });
+    }
+    if (parser.isSet(toolOpt))
+    {
+        const QString tool = parser.value(toolOpt);
+        QTimer::singleShot(200, &window, [&window, tool] { window.openTool(tool); });
+    }
     if (parser.isSet(importOpt))
     {
         const QString f = QFileInfo(parser.value(importOpt)).absoluteFilePath();
@@ -153,11 +188,27 @@ int main(int argc, char* argv[])
         };
         if (parser.isSet(runFirst))
         {
-            QObject::connect(&window, &mirab::app::MainWindow::simulationCompleted, &window, [shoot, &runFailed](bool ok) {
-                runFailed = !ok;
-                shoot();
-            });
+            // Pictures during a run: after a delay, after pausing, or after stopping.
+            const int during = parser.isSet(runFor) ? parser.value(runFor).toInt() : -1;
+            const int pause = parser.isSet(pauseAfter) ? parser.value(pauseAfter).toInt() : -1;
+            const int stop = parser.isSet(stopAfter) ? parser.value(stopAfter).toInt() : -1;
+            QObject::connect(&window, &mirab::app::MainWindow::simulationCompleted, &window,
+                             [shoot, &runFailed, during, pause, stop](bool ok) {
+                                 if (during >= 0 || pause >= 0)
+                                     return; // the picture was planned during the run
+                                 runFailed = !ok && stop < 0;
+                                 shoot();
+                             });
             QTimer::singleShot(500, &window, [&window] { window.runSimulation(); });
+            if (during >= 0)
+                QTimer::singleShot(500 + during, &window, shoot);
+            else if (pause >= 0)
+                QTimer::singleShot(500 + pause, &window, [&window, shoot] {
+                    window.togglePause();
+                    shoot();
+                });
+            else if (stop >= 0)
+                QTimer::singleShot(500 + stop, &window, [&window] { window.stopSimulation(); });
         }
         else
         {

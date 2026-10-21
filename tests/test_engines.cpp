@@ -24,6 +24,8 @@
  */
 #include "TestFramework.h"
 
+#include "mirab/core/Features.h"
+#include "mirab/core/LiveResults.h"
 #include "mirab/core/Model.h"
 #include "mirab/core/Text.h"
 #include "mirab/core/Hash.h"
@@ -34,8 +36,12 @@
 #include "mirab/resilience/Resilience.h"
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <iterator>
 
 using namespace mirab;
 namespace fs = std::filesystem;
@@ -49,7 +55,10 @@ fs::path example(const char* rel)
 
 fs::path scratch(const std::string& name)
 {
-    const auto dir = fs::temp_directory_path() / "mirab-tests";
+    // One folder per process: ctest runs the test groups in parallel.
+    static const std::string tag =
+        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const auto dir = fs::temp_directory_path() / ("mirab-tests-" + tag);
     fs::create_directories(dir);
     return dir / name;
 }
@@ -174,6 +183,24 @@ TEST_CASE("engines: EPA SWMM 5.2 routes the design storm")
     CHECK_NEAR(std::stod(r.metadata.at("flowContinuityErrorPct")), 0.0, 5.0);
 }
 
+TEST_CASE("engines: EPA SWMM 5.2 runs pollutants, dry weather flow, groundwater and RDII")
+{
+    const auto r = run("swmm-5.2-epa", example("swmm/mirab-quality.inp"));
+    CHECK_EQ(r.periodCount(), 144);
+    const auto* nodes = r.table("node");
+    CHECK(nodes && nodes->variableIndex("TSS") >= 0 && nodes->variableIndex("Lead") >= 0);
+    double tss = 0.0;
+    for (int p = 0; p < r.periodCount(); ++p)
+        tss = std::max(tss, value(r, "node", "TSS", "O1", p));
+    CHECK(tss > 1.0);
+    // Dry weather flow reaches J1 before the storm starts.
+    CHECK(value(r, "node", "Lateral Inflow", "J1", 0) > 0.0);
+    double gw = 0.0;
+    for (int p = 0; p < r.periodCount(); ++p)
+        gw = std::max(gw, value(r, "subcatchment", "Groundwater Flow", "S1", p));
+    CHECK(gw > 0.0);
+}
+
 TEST_CASE("resilience: Todini, topology, criticality and fire flow")
 {
     const auto model = core::Model::fromFile(example("epanet/mirab-demo.inp"));
@@ -264,6 +291,325 @@ TEST_CASE("engines: SWMM5+ manifest adapts SWMM 5.2 models")
     // EPA SWMM 5.2 keeps the option as written.
     const auto* swmm = registry().descriptor("swmm-5.2-epa");
     CHECK(engine::checkCompatibility(model, *swmm).issues.empty());
+}
+
+namespace
+{
+/// Values of one period, table by table (the order of a frame event).
+std::vector<float> periodValues(const core::ResultSet& r, int slot)
+{
+    std::vector<float> out;
+    for (const auto& t : r.tables)
+    {
+        const std::size_t block = t.ids.size() * t.variables.size();
+        const auto first = t.data.begin() + static_cast<std::ptrdiff_t>(static_cast<std::size_t>(slot) * block);
+        out.insert(out.end(), first, first + static_cast<std::ptrdiff_t>(block));
+    }
+    return out;
+}
+
+core::ResultSet layoutOf(const core::ResultSet& r)
+{
+    core::ResultSet s;
+    for (const auto& t : r.tables)
+        s.defineTable(t.kind, t.ids, t.variables);
+    return s;
+}
+
+struct Recorded
+{
+    int period = 0;
+    double time = 0.0;
+    int layout = 0;
+    std::vector<float> values;
+    core::ResultSet shape;
+};
+
+struct LiveRun
+{
+    engine::RunOutcome outcome;
+    std::vector<Recorded> frames;
+    std::vector<double> checkpoints;
+};
+
+/// Runs an engine with frame and checkpoint callbacks. @p stop, when set,
+/// requests cancellation.
+LiveRun runLive(const std::string& engineId, const fs::path& inp, double interval, const fs::path& msx = {},
+                const std::function<bool(const LiveRun&)>& stop = {})
+{
+    std::string error;
+    auto e = registry().create(engineId, &error);
+    if (!e)
+        throw std::runtime_error(engineId + ": " + error);
+    const auto model = core::Model::fromFile(inp);
+    const fs::path input = scratch("live-" + engineId + "-" + inp.filename().u8string());
+    std::ofstream(input, std::ios::binary) << engine::prepareInput(model, e->descriptor());
+    engine::RunRequest req;
+    req.input = input;
+    req.msxInput = msx;
+    req.reportFile = scratch("live-" + engineId + ".rpt");
+    req.workDir = scratch("live-" + engineId + "-work");
+    fs::create_directories(req.workDir);
+    LiveRun out;
+    engine::RunCallbacks cb;
+    cb.frameInterval = interval;
+    cb.frame = [&](const engine::ResultFrame& f) {
+        Recorded r;
+        r.period = f.period;
+        r.time = f.time;
+        r.layout = f.layout;
+        r.values = periodValues(*f.results, f.slot);
+        r.shape = layoutOf(*f.results);
+        CHECK_NEAR(f.results->times[static_cast<std::size_t>(f.slot)], f.time, 1e-9);
+        out.frames.push_back(std::move(r));
+    };
+    cb.checkpoint = [&](double seconds) { out.checkpoints.push_back(seconds); };
+    cb.cancelRequested = [&] { return stop && stop(out); };
+    out.outcome = e->run(req, cb);
+    return out;
+}
+
+bool sameValues(const std::vector<float>& a, const std::vector<float>& b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i)
+    {
+        if (!(a[i] == b[i] || (std::isnan(a[i]) && std::isnan(b[i]))))
+            return false;
+    }
+    return true;
+}
+
+/// The urban example with pollutants, land uses, LID controls and
+/// kinematic wave routing.
+std::string urbanWithQuality()
+{
+    std::ifstream in(example("swmm/mirab-urban.inp"), std::ios::binary);
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const std::string routing = "FLOW_ROUTING         DYNWAVE";
+    text.replace(text.find(routing), routing.size(), "FLOW_ROUTING         KINWAVE");
+    text += R"(
+[POLLUTANTS]
+;;Name           Units  Crain  Cgw    Crdii  Kdecay SnowOnly Co-Pollutant Co-Frac Cdwf Cinit
+TSS              MG/L   0      0      0      0      NO       *            0       0    0
+Lead             UG/L   0      0      0      0      NO       TSS          0.2     0    0
+
+[LANDUSES]
+;;Name           Sweeping Fraction Last
+Residential      0        0        0
+
+[COVERAGES]
+S1               Residential      100
+S2               Residential      100
+S3               Residential      100
+
+[LOADINGS]
+S1               TSS              1.0
+
+[BUILDUP]
+Residential      TSS              POW        50     0.5    2      AREA
+Residential      Lead             NONE       0      0      0      AREA
+
+[WASHOFF]
+Residential      TSS              EXP        0.1    1      0      0
+Residential      Lead             EMC        0      0      0      0
+
+[TREATMENT]
+J5               TSS              R = 0.2
+
+[INFLOWS]
+;;Node           Constituent      Time Series      Type     Mfactor  Sfactor  Baseline Pattern
+J1               FLOW             ""               FLOW     1.0      1.0      0.01
+J1               TSS              ""               CONCEN   1.0      1.0      20
+
+[DWF]
+J2               FLOW             0.005
+J2               TSS              15
+
+[LID_CONTROLS]
+RainGarden       RG
+RainGarden       SURFACE          150        0.0        0.1        1.0        5
+RainGarden       SOIL             450        0.5        0.2        0.1        50         10.0       3.5
+RainGarden       STORAGE          0          0.75       0.5        0
+RainGarden       REMOVALS         TSS        50
+
+[LID_USAGE]
+S1               RainGarden       1          500        0          0          25         0
+)";
+    return text;
+}
+} // namespace
+
+TEST_CASE("engines: EPANET frames follow every period and end on the final results")
+{
+    for (const char* id : {"epanet-2.2-epa", "epanet-2.3-owa"})
+    {
+        const auto live = runLive(id, example("epanet/mirab-demo.inp"), 0.0);
+        CHECK(live.outcome.success);
+        const auto& r = live.outcome.results;
+        CHECK_EQ(live.frames.size(), static_cast<std::size_t>(r.periodCount()));
+        for (std::size_t i = 0; i < live.frames.size(); ++i)
+        {
+            const auto& f = live.frames[i];
+            CHECK_EQ(f.period, static_cast<int>(i));
+            CHECK_NEAR(f.time, r.times[i], 1e-9);
+            CHECK(core::live::sameLayout(f.shape, r));
+            CHECK(sameValues(f.values, periodValues(r, f.period)));
+        }
+        CHECK(!live.checkpoints.empty());
+        CHECK(std::is_sorted(live.checkpoints.begin(), live.checkpoints.end()));
+    }
+}
+
+TEST_CASE("engines: frames are paced and the final state is always delivered")
+{
+    const auto live = runLive("epanet-2.3-owa", example("epanet/mirab-demo.inp"), 3600.0);
+    CHECK(live.outcome.success);
+    const auto& r = live.outcome.results;
+    CHECK_EQ(live.frames.size(), static_cast<std::size_t>(2));
+    CHECK_EQ(live.frames.front().period, 0);
+    CHECK_EQ(live.frames.back().period, r.periodCount() - 1);
+    CHECK(sameValues(live.frames.back().values, periodValues(r, r.periodCount() - 1)));
+}
+
+TEST_CASE("engines: a cancelled run delivers its last computed period")
+{
+    const auto afterFrames = [](std::size_t n) { return [n](const LiveRun& r) { return r.frames.size() >= n; }; };
+    // Every period is sent: cancellation after the third frame ends there.
+    const auto a = runLive("epanet-2.3-owa", example("epanet/mirab-demo.inp"), 0.0, {}, afterFrames(3));
+    CHECK(a.outcome.cancelled);
+    CHECK(!a.outcome.success);
+    CHECK_EQ(a.frames.size(), static_cast<std::size_t>(3));
+    CHECK_EQ(a.frames.back().period, a.outcome.results.periodCount() - 1);
+    // Paced frames: the period reached when the run stops is still sent.
+    const auto b = runLive("epanet-2.3-owa", example("epanet/mirab-demo.inp"), 3600.0, {}, [](const LiveRun& r) {
+        return !r.checkpoints.empty() && r.checkpoints.back() >= 6 * 3600.0;
+    });
+    CHECK(b.outcome.cancelled);
+    CHECK_EQ(b.frames.size(), static_cast<std::size_t>(2));
+    CHECK_EQ(b.frames.back().period, b.outcome.results.periodCount() - 1);
+    CHECK_EQ(b.frames.back().period, 6);
+    CHECK(sameValues(b.frames.back().values, periodValues(b.outcome.results, b.frames.back().period)));
+    const auto c = runLive("swmm-5.2-epa", example("swmm/mirab-urban.inp"), 0.0, {}, afterFrames(5));
+    CHECK(c.outcome.cancelled);
+    CHECK_EQ(c.frames.size(), static_cast<std::size_t>(5));
+    CHECK_EQ(c.frames.back().period, 4);
+}
+
+TEST_CASE("engines: EPANET-MSX frames switch to the species layout")
+{
+    const auto live = runLive("epanet-msx-2.0-owa23", example("epanet/mirab-demo.inp"), 0.0,
+                              example("msx/mirab-demo.msx"));
+    CHECK(live.outcome.success);
+    const auto& r = live.outcome.results;
+    const auto n = static_cast<std::size_t>(r.periodCount());
+    CHECK_EQ(live.frames.size(), 2 * n);
+    CHECK_EQ(live.frames.front().layout, 1);
+    CHECK(!core::live::sameLayout(live.frames.front().shape, r));
+    for (std::size_t i = n; i < 2 * n; ++i)
+    {
+        CHECK_EQ(live.frames[i].layout, 2);
+        CHECK_EQ(live.frames[i].period, static_cast<int>(i - n));
+        CHECK(core::live::sameLayout(live.frames[i].shape, r));
+    }
+    CHECK(sameValues(live.frames.back().values, periodValues(r, r.periodCount() - 1)));
+}
+
+TEST_CASE("engines: EPA SWMM 5.2 frames match the binary output")
+{
+    const auto live = runLive("swmm-5.2-epa", example("swmm/mirab-urban.inp"), 0.0);
+    CHECK(live.outcome.success);
+    const auto& r = live.outcome.results;
+    // Every period live, then the last one again from the output file.
+    CHECK_EQ(live.frames.size(), static_cast<std::size_t>(r.periodCount() + 1));
+    const auto* nodes = r.table("node");
+    const auto* links = r.table("link");
+    const int depth = nodes->variableIndex("Depth");
+    const int flow = links->variableIndex("Flow");
+    const int volume = links->variableIndex("Volume");
+    float maxDepth = 0, maxFlow = 0;
+    for (int p = 0; p < r.periodCount(); ++p)
+    {
+        for (int e = 0; e < nodes->elementCount(); ++e)
+            maxDepth = std::max(maxDepth, nodes->value(p, depth, e));
+        for (int e = 0; e < links->elementCount(); ++e)
+            maxFlow = std::max(maxFlow, std::fabs(links->value(p, flow, e)));
+    }
+    for (std::size_t i = 0; i < live.frames.size(); ++i)
+    {
+        const auto& f = live.frames[i];
+        const std::size_t p = std::min(i, r.times.size() - 1);
+        CHECK_EQ(f.period, static_cast<int>(p));
+        CHECK_NEAR(f.time, r.times[p], 1e-6);
+        CHECK(core::live::sameLayout(f.shape, r));
+        if (i + 1 == live.frames.size())
+            break;
+        // The live state is taken at the routing step that reaches the
+        // reporting time; the output file interpolates to it.
+        core::ResultSet one = f.shape;
+        CHECK_EQ(core::live::appendFrame(one, {f.layout, f.period, f.time, f.values}), 0);
+        for (int e = 0; e < nodes->elementCount(); ++e)
+            CHECK_NEAR(one.table("node")->value(0, depth, e), nodes->value(f.period, depth, e), 0.05 * maxDepth);
+        for (int e = 0; e < links->elementCount(); ++e)
+        {
+            CHECK_NEAR(one.table("link")->value(0, flow, e), links->value(f.period, flow, e), 0.05 * maxFlow);
+            CHECK(std::isnan(one.table("link")->value(0, volume, e)));
+        }
+    }
+    CHECK(sameValues(live.frames.back().values, periodValues(r, r.periodCount() - 1)));
+}
+
+TEST_CASE("engines: SWMM5+ input preparation removes every ignored feature")
+{
+    const std::string original = urbanWithQuality();
+    const fs::path withQuality = scratch("urban-quality.inp");
+    std::ofstream(withQuality, std::ios::binary) << original;
+    const auto model = core::Model::fromText(original);
+
+    // EPA SWMM 5.2 runs the full model, and its live layout names the pollutants.
+    const auto full = runLive("swmm-5.2-epa", withQuality, 0.0);
+    CHECK(full.outcome.success);
+    CHECK(full.outcome.results.table("node")->variableIndex("Lead") >= 0);
+    CHECK(core::live::sameLayout(full.frames.front().shape, full.outcome.results));
+
+    const auto* s5p = registry().descriptor("swmm5plus-1.0");
+    std::vector<std::string> notes;
+    const std::string text = engine::prepareInput(model, *s5p, &notes);
+    const auto prepared = core::Model::fromText(text);
+    const auto& doc = prepared.document();
+    for (const char* s : {"POLLUTANTS", "LANDUSES", "COVERAGES", "LOADINGS", "BUILDUP", "WASHOFF", "TREATMENT",
+                          "LID_CONTROLS", "LID_USAGE"})
+        CHECK(!doc.has(s));
+    CHECK_EQ(doc.find("INFLOWS")->rowCount(), 1);
+    CHECK_EQ(doc.find("INFLOWS")->rowTokens(0).at(1), std::string("FLOW"));
+    CHECK_EQ(doc.find("DWF")->rowCount(), 1);
+    CHECK_EQ(text::splitInpLine(prepared.option("FLOW_ROUTING")).tokens.at(0), std::string("DYNWAVE"));
+    CHECK_EQ(text::splitInpLine(prepared.option("INERTIAL_DAMPING")).tokens.at(0), std::string("NONE"));
+    std::string all;
+    for (const auto& n : notes)
+        all += n + "\n";
+    CHECK(all.find("[POLLUTANTS]") != std::string::npos);
+    CHECK(all.find("[INFLOWS]") != std::string::npos);
+    CHECK(all.find("[LID_USAGE]") != std::string::npos);
+    CHECK(all.find("DYNWAVE") != std::string::npos);
+    // Nothing the engine ignores is left for it to see.
+    for (const auto& use : core::detectFeatures(prepared))
+        CHECK(s5p->supportFor(use.feature) != engine::Support::Ignored);
+
+    // The prepared input is still a valid SWMM model.
+    const fs::path stripped = scratch("urban-stripped.inp");
+    std::ofstream(stripped, std::ios::binary) << text;
+    const auto r = run("swmm-5.2-epa", stripped);
+    CHECK_EQ(r.periodCount(), 72);
+    CHECK(r.table("node")->variableIndex("TSS") < 0);
+
+    // When LIDs stay (SWMM 5.2 support), only the pollutant rows go with the pollutants.
+    engine::EngineDescriptor pollutantsOnly = *registry().descriptor("swmm-5.2-epa");
+    pollutantsOnly.support = {{core::Feature::SwmmWaterQuality, engine::Support::Ignored}};
+    const auto partial = core::Model::fromText(engine::prepareInput(model, pollutantsOnly));
+    CHECK(partial.document().has("LID_USAGE"));
+    CHECK_EQ(partial.document().find("LID_CONTROLS")->rowCount(), 4);
 }
 
 TEST_CASE("engines: packages install only when every checksum matches")

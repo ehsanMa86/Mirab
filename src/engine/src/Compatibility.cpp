@@ -65,8 +65,15 @@ std::string consequence(Feature f, Support level, const EngineDescriptor& e)
         return name + " is not supported by " + e.name + "; the option will be skipped";
     case Feature::SwmmStreetsAndInlets:
         return name + " are not supported by " + e.name + "; those sections will be skipped";
+    case Feature::SwmmWaterQuality:
+        return name + " is not modeled by " + e.name +
+               "; pollutants, land uses, buildup, washoff, treatment and pollutant inflows will "
+               "be skipped";
+    case Feature::SwmmLowImpactDevelopment:
+        return name + " are not modeled by " + e.name + "; the LID sections will be skipped";
     case Feature::SwmmNonDynamicRouting:
-        return e.name + " always solves the full dynamic wave equations; the routing option is ignored";
+        return e.name + " always solves the full dynamic wave equations; FLOW_ROUTING will be set "
+                        "to DYNWAVE for the run";
     case Feature::SwmmInertialDamping:
         return e.name + " supports INERTIAL_DAMPING NONE only; it will be set to NONE for the run";
     default:
@@ -104,6 +111,54 @@ CompatibilityReport checkCompatibility(const core::Model& model, const EngineDes
     return report;
 }
 
+namespace
+{
+/// Removes whole sections and returns their names as "[A], [B]".
+std::string removeSections(core::InpDocument& doc, std::initializer_list<const char*> names)
+{
+    std::string removed;
+    for (const char* s : names)
+    {
+        if (doc.remove(s))
+            removed += (removed.empty() ? "[" : ", [") + std::string(s) + "]";
+    }
+    return removed;
+}
+
+/// Removes the rows of @p section whose tokens match @p drop. Returns the number removed.
+template <typename Drop>
+int removeRows(core::InpDocument& doc, const char* section, Drop drop)
+{
+    core::InpSection* s = doc.find(section);
+    if (!s)
+        return 0;
+    int removed = 0;
+    const auto rows = s->allRowTokens();
+    for (int r = static_cast<int>(rows.size()) - 1; r >= 0; --r)
+    {
+        if (drop(rows[static_cast<std::size_t>(r)]))
+        {
+            s->removeRow(r);
+            ++removed;
+        }
+    }
+    return removed;
+}
+
+/// The second column names something other than flow: a pollutant row of
+/// [INFLOWS] or [DWF].
+bool pollutantRow(const std::vector<std::string>& t)
+{
+    return t.size() > 1 && !text::iequals(t[1], "FLOW");
+}
+
+/// A pollutant removal row ("REMOVALS" layer) of [LID_CONTROLS].
+bool lidRemovalRow(const std::vector<std::string>& t)
+{
+    return t.size() > 1 && text::iequals(t[1], "REMOVALS");
+}
+} // namespace
+
 std::string prepareInput(const core::Model& model, const EngineDescriptor& engine,
                          std::vector<std::string>* notes)
 {
@@ -135,11 +190,40 @@ std::string prepareInput(const core::Model& model, const EngineDescriptor& engin
             note("set INERTIAL_DAMPING to NONE");
             break;
         case Feature::SwmmStreetsAndInlets:
-            for (const char* s : {"STREETS", "INLETS", "INLET_USAGE"})
-            {
-                if (doc.remove(s))
-                    note(std::string("removed the [") + s + "] section");
-            }
+        {
+            const std::string removed = removeSections(doc, {"STREETS", "INLETS", "INLET_USAGE"});
+            if (!removed.empty())
+                note("removed streets and inlets: " + removed);
+            break;
+        }
+        case Feature::SwmmWaterQuality:
+        {
+            std::string removed = removeSections(doc, {"POLLUTANTS", "LANDUSES", "COVERAGES",
+                                                       "LOADINGS", "BUILDUP", "WASHOFF",
+                                                       "TREATMENT"});
+            auto add = [&](int n, const std::string& what) {
+                if (n > 0)
+                    removed += (removed.empty() ? "" : ", ") + std::to_string(n) + " " + what;
+            };
+            add(removeRows(doc, "INFLOWS", pollutantRow), "pollutant row(s) of [INFLOWS]");
+            add(removeRows(doc, "DWF", pollutantRow), "pollutant row(s) of [DWF]");
+            // LID removal rows name pollutants; they go even when the LIDs stay.
+            add(removeRows(doc, "LID_CONTROLS", lidRemovalRow),
+                "pollutant removal row(s) of [LID_CONTROLS]");
+            if (!removed.empty())
+                note("removed pollutants: " + removed);
+            break;
+        }
+        case Feature::SwmmLowImpactDevelopment:
+        {
+            const std::string removed = removeSections(doc, {"LID_CONTROLS", "LID_USAGE"});
+            if (!removed.empty())
+                note("removed LID controls: " + removed);
+            break;
+        }
+        case Feature::SwmmNonDynamicRouting:
+            doc.setKeyValue("OPTIONS", "FLOW_ROUTING", "DYNWAVE");
+            note("set FLOW_ROUTING to DYNWAVE");
             break;
         default:
             break;

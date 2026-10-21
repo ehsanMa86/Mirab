@@ -267,11 +267,15 @@ MapPage::MapPage(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(
     slider_->setMinimumWidth(120);
     timeLabel_ = new QLabel(tr("No results"), bar_);
     timeLabel_->setMinimumWidth(130);
+    noteLabel_ = new QLabel(bar_);
+    noteLabel_->setVisible(false);
+    noteLabel_->setStyleSheet(QString("color: %1; font-weight: 600;").arg(theme::kWarning.name()));
     bl->addWidget(stepBack_);
     bl->addWidget(play_);
     bl->addWidget(stepForward_);
     bl->addWidget(slider_, 1);
     bl->addWidget(timeLabel_);
+    bl->addWidget(noteLabel_);
     bl->addSpacing(10);
 
     basemap_ = barButton("basemap", tr("Background map"), bar_);
@@ -361,6 +365,8 @@ MapPage::MapPage(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(
     connect(linkVar_, &QComboBox::currentTextChanged, map_, &MapView::setLinkVariable);
     connect(areaVar_, &QComboBox::currentTextChanged, map_, &MapView::setAreaVariable);
     connect(doc_, &ProjectDocument::resultsChanged, this, &MapPage::resultsChanged);
+    connect(doc_, &ProjectDocument::liveResultsUpdated, this, &MapPage::updateTimeControls);
+    connect(doc_, &ProjectDocument::liveStateChanged, this, &MapPage::updateTimeLabel);
     connect(doc_, &ProjectDocument::modelReset, this, [this] {
         resultsChanged();
         refreshBasemapMenu();
@@ -383,17 +389,16 @@ void MapPage::refreshBasemapMenu()
         a->setChecked(current == id);
         a->setEnabled(id.isEmpty() || usable);
         group->addAction(a);
-        connect(a, &QAction::triggered, this, [this, id] {
-            map_->setBasemap(id);
-            doc_->settings().basemap = id.toStdString();
-            doc_->markSettingsChanged();
-        });
+        connect(a, &QAction::triggered, this, [this, id] { map_->chooseBasemap(id); });
     };
     add({}, tr("None"));
     menu->addSeparator();
     for (const auto& [id, label] : MapView::basemapProviders())
         add(id, label);
     menu->addSeparator();
+    connect(menu->addAction(tr("Add map service...")), &QAction::triggered, this, &MapPage::mapServiceRequested);
+    connect(menu->addAction(icons::get("layers"), tr("Raster layers...")), &QAction::triggered, this,
+            &MapPage::rasterLayersRequested);
     QAction* crs = menu->addAction(icons::get("globe"), tr("Coordinate system..."));
     connect(crs, &QAction::triggered, this, &MapPage::coordinateSystemRequested);
     if (!usable)
@@ -457,11 +462,21 @@ void MapPage::resultsChanged()
     fill(areaVar_, "subcatchment", "Runoff");
     areaVar_->setVisible(swmm);
     areaLabel_->setVisible(swmm);
-    slider_->setRange(0, r ? std::max(0, r->periodCount() - 1) : 0);
-    for (QWidget* w : std::initializer_list<QWidget*>{slider_, play_, stepBack_, stepForward_})
-        w->setEnabled(r != nullptr && r->periodCount() > 1);
     if (!r)
         play_->setChecked(false);
+    updateTimeControls();
+}
+
+void MapPage::updateTimeControls()
+{
+    // Live results grow: the slider covers the periods computed so far.
+    const auto* r = doc_->results();
+    slider_->blockSignals(true);
+    slider_->setRange(0, r ? std::max(0, r->periodCount() - 1) : 0);
+    slider_->setValue(doc_->period());
+    slider_->blockSignals(false);
+    for (QWidget* w : std::initializer_list<QWidget*>{slider_, play_, stepBack_, stepForward_})
+        w->setEnabled(r != nullptr && r->periodCount() > 1);
     updateTimeLabel();
 }
 
@@ -471,12 +486,23 @@ void MapPage::updateTimeLabel()
     if (!r || r->periodCount() == 0)
     {
         timeLabel_->setText(tr("No results yet"));
+        noteLabel_->setVisible(false);
         return;
     }
-    timeLabel_->setText(tr("%1   %2 of %3")
-                            .arg(QString::fromStdString(text::formatDuration(r->times[static_cast<std::size_t>(doc_->period())])))
-                            .arg(doc_->period() + 1)
-                            .arg(r->periodCount()));
+    auto clock = [](double seconds) { return QString::fromStdString(text::formatDuration(seconds)); };
+    const QString now = clock(r->times[static_cast<std::size_t>(doc_->period())]);
+    if (doc_->isLive())
+    {
+        // Live results hold the periods received so far, not every period.
+        const bool latest = doc_->period() == r->periodCount() - 1;
+        noteLabel_->setText(latest ? tr("Live") : tr("Live, computed to %1").arg(clock(r->times.back())));
+        noteLabel_->setVisible(true);
+        timeLabel_->setText(now);
+        return;
+    }
+    noteLabel_->setText(doc_->resultsNote());
+    noteLabel_->setVisible(!noteLabel_->text().isEmpty());
+    timeLabel_->setText(tr("%1   %2 of %3").arg(now).arg(doc_->period() + 1).arg(r->periodCount()));
 }
 
 } // namespace mirab::app

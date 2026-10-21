@@ -24,16 +24,24 @@
  */
 #include "MainWindow.h"
 
+#include "Basemap.h"
 #include "DataEditor.h"
 #include "Dialogs.h"
 #include "Icons.h"
 #include "ImportDialog.h"
 #include "MapPage.h"
+#include "MapServices.h"
 #include "MapView.h"
+#include "ObjectEditor.h"
+#include "OptionsDialog.h"
 #include "Panels.h"
 #include "PropertyPanel.h"
+#include "RasterDialogs.h"
+#include "RasterLayers.h"
 #include "Reports.h"
+#include "SchemaWidgets.h"
 #include "SolverProcess.h"
+#include "SwmmEditors.h"
 #include "Theme.h"
 #include "mirab/MirabConfig.h"
 #include "mirab/core/Text.h"
@@ -131,6 +139,12 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
 
     connect(doc_, &ProjectDocument::titleChanged, this, &MainWindow::updateTitle);
     connect(doc_, &ProjectDocument::modelReset, this, [this] {
+        // A run of the previous project must not deliver results into this one.
+        if (solver_->isRunning())
+        {
+            discardRun_ = true;
+            solver_->cancel();
+        }
         rebuildForDialect();
         updateCompatibility();
         updateStartPage();
@@ -147,7 +161,12 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
             [this] { deleteAct_->setEnabled(!doc_->selection().isEmpty()); });
     connect(map_, &MapView::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
     connect(map_, &MapView::cursorMoved, this, [this](const QPointF& w) {
-        coords_->setText(QString("X %1   Y %2").arg(w.x(), 0, 'f', 2).arg(w.y(), 0, 'f', 2));
+        QString text = QString("X %1   Y %2").arg(w.x(), 0, 'f', 2).arg(w.y(), 0, 'f', 2);
+        if (const auto z = map_->groundElevationAt(w))
+            text += tr("   Ground %1 %2")
+                        .arg(*z, 0, 'f', 2)
+                        .arg(QString::fromStdString(doc_->model().units().label("elevation")));
+        coords_->setText(text);
     });
     connect(map_, &MapView::toolFinished, this, [this] { selectAct_->setChecked(true); });
     connect(map_, &MapView::elementActivated, this, [this] { showDock("propertiesDock"); });
@@ -156,6 +175,9 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
         menu.addAction(icons::get("properties"), tr("Properties"), this, [this] { showDock("propertiesDock"); });
         menu.addAction(icons::get("chart"), tr("Plot over time"), this, [this] { openReport("timeseries"); });
         menu.addAction(icons::get("zoom-fit"), tr("Zoom to"), this, [this] { map_->zoomTo(doc_->selection()); });
+        if (doc_->selection().category == Category::Area)
+            menu.addAction(icons::get("layers"), tr("LID usage..."), this,
+                           [this] { openDataEditor("LID_USAGE", doc_->selection().id); });
         menu.addAction(icons::get("table"), tr("Copy ID"), this,
                        [this] { QApplication::clipboard()->setText(doc_->selection().id); });
         menu.addSeparator();
@@ -195,6 +217,8 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
         menu.exec(pos);
     });
     connect(mapPage_, &MapPage::coordinateSystemRequested, this, &MainWindow::chooseCoordinateSystem);
+    connect(mapPage_, &MapPage::mapServiceRequested, this, &MainWindow::addMapService);
+    connect(mapPage_, &MapPage::rasterLayersRequested, this, &MainWindow::showRasterLayers);
     connect(start_, &StartPage::newEpanet, this, [this] { newProject(Dialect::Epanet); });
     connect(start_, &StartPage::newSwmm, this, [this] { newProject(Dialect::Swmm); });
     connect(start_, &StartPage::openRequested, this, &MainWindow::openDialog);
@@ -206,6 +230,20 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
     connect(browser_, &ProjectBrowser::zoomToRequested, map_, &MapView::zoomTo);
     connect(browser_, &ProjectBrowser::deleteRequested, this, &MainWindow::deleteSelection);
     connect(browser_, &ProjectBrowser::dataActivated, this, &MainWindow::openDataEditor);
+    connect(browser_, &ProjectBrowser::optionsActivated, this, [this] { showSimulationOptions(); });
+    connect(browser_, &ProjectBrowser::objectRenamed, this, [this](const QString& section, const QString& from, const QString& to) {
+        // An open editor follows the renamed object.
+        for (int i = 0; i < tabs_->count(); ++i)
+        {
+            auto* editor = qobject_cast<ObjectEditor*>(tabs_->widget(i));
+            if (!editor || editor->objectName() != "data:" + section + ":" + from)
+                continue;
+            editor->setObjectName("data:" + section + ":" + to);
+            editor->setName(to);
+            tabs_->setTabText(i, to);
+        }
+    });
+    connect(browser_, &ProjectBrowser::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
     connect(inpEditor_, &InpEditor::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
     connect(msxEditor_, &MsxEditor::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
     connect(props_, &PropertyPanel::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
@@ -215,6 +253,28 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
     });
     connect(solver_, &SolverProcess::log, this, &MainWindow::message);
     connect(solver_, &SolverProcess::finished, this, &MainWindow::simulationFinished);
+    connect(solver_, &SolverProcess::liveStarted, this, [this] {
+        if (discardRun_)
+            return;
+        doc_->beginLiveResults(solver_->liveResults());
+        // With an element selected, its time series is the most useful view of a run.
+        if (!doc_->selection().isEmpty())
+            showDock("resultsDock");
+    });
+    connect(solver_, &SolverProcess::liveUpdated, this, [this](int firstChanged) {
+        if (!discardRun_)
+            doc_->liveResultsGrew(solver_->liveResults().get(), firstChanged);
+    });
+    connect(solver_, &SolverProcess::paused, this, [this](double seconds) {
+        const QString at = QString::fromStdString(text::formatDuration(seconds));
+        runState_->setText(tr("Paused at %1").arg(at));
+        runState_->setVisible(true);
+        updatePauseAction();
+    });
+    connect(solver_, &SolverProcess::resumed, this, [this] {
+        runState_->setVisible(false);
+        updatePauseAction();
+    });
 
     resize(1440, 900);
     doc_->newProject(Dialect::Epanet, "LPS");
@@ -255,7 +315,12 @@ void MainWindow::createActions()
     connect(runAct_, &QAction::triggered, this, &MainWindow::runSimulation);
     cancelAct_ = new QAction(icons::get("stop"), tr("Stop simulation"), this);
     cancelAct_->setEnabled(false);
-    connect(cancelAct_, &QAction::triggered, solver_, &SolverProcess::cancel);
+    cancelAct_->setToolTip(tr("Stop the simulation; the results computed so far stay on the map"));
+    connect(cancelAct_, &QAction::triggered, this, &MainWindow::stopSimulation);
+    pauseAct_ = new QAction(icons::get("pause"), tr("Pause simulation"), this);
+    pauseAct_->setEnabled(false);
+    pauseAct_->setShortcut(Qt::Key_F6);
+    connect(pauseAct_, &QAction::triggered, this, &MainWindow::togglePause);
     saveAct_ = new QAction(icons::get("save"), tr("&Save"), this);
     saveAct_->setShortcut(QKeySequence::Save);
     saveAct_->setToolTip(tr("Save the project (Ctrl+S)"));
@@ -432,9 +497,7 @@ void MainWindow::createMenus()
         const bool usable = map_->basemapUsable(&why);
         auto add = [&](const QString& id, const QString& label) {
             QAction* a = basemaps->addAction(label, this, [this, id] {
-                map_->setBasemap(id);
-                doc_->settings().basemap = id.toStdString();
-                doc_->markSettingsChanged();
+                map_->chooseBasemap(id);
                 mapPage_->refreshBasemapMenu();
             });
             a->setCheckable(true);
@@ -447,8 +510,19 @@ void MainWindow::createMenus()
             add(id, label);
         if (!usable)
             basemaps->addAction(why)->setEnabled(false);
+        basemaps->addSeparator();
+        basemaps->addAction(tr("Add map service..."), this, &MainWindow::addMapService);
+        if (const auto* current = Basemap::find(map_->basemap()); current && current->custom)
+        {
+            basemaps->addAction(tr("Remove \"%1\"").arg(current->label), this, [this, id = current->id] {
+                Basemap::removeService(id);
+                map_->chooseBasemap({});
+                mapPage_->refreshBasemapMenu();
+            });
+        }
     });
     view->addAction(icons::get("globe"), tr("&Coordinate system..."), this, &MainWindow::chooseCoordinateSystem);
+    view->addAction(icons::get("layers"), tr("&Raster layers..."), this, &MainWindow::showRasterLayers);
     view->addAction(tr("Backdrop &image..."), this, &MainWindow::chooseBackdrop);
     view->addAction(tr("Clear backdrop image"), this, [this] {
         map_->clearBackdrop();
@@ -466,10 +540,7 @@ void MainWindow::createMenus()
 
     // Project
     QMenu* project = menuBar()->addMenu(tr("&Project"));
-    project->addAction(icons::get("options"), tr("Simulation &options"), this, [this] {
-        doc_->select({});
-        showDock("propertiesDock");
-    });
+    project->addAction(icons::get("options"), tr("Simulation &options..."), this, [this] { showSimulationOptions(); });
     project->addAction(icons::get("engine"), tr("Simulation &engines..."), this, [this] {
         EnginesDialog dlg(registry_, this);
         connect(&dlg, &EnginesDialog::enginesChanged, this, [this] {
@@ -477,6 +548,9 @@ void MainWindow::createMenus()
             updateCompatibility();
         });
         dlg.exec();
+    });
+    project->addAction(icons::get("controls"), tr("Control &rules..."), this, [this] {
+        openDataEditor(doc_->model().dialect() == Dialect::Swmm ? "CONTROLS" : "RULES", {});
     });
     project->addAction(tr("Choose &MSX file..."), this, &MainWindow::chooseMsxFile);
     project->addAction(icons::get("globe"), tr("&Coordinate system..."), this, &MainWindow::chooseCoordinateSystem);
@@ -488,6 +562,7 @@ void MainWindow::createMenus()
     // Simulation
     QMenu* sim = menuBar()->addMenu(tr("&Simulation"));
     sim->addAction(runAct_);
+    sim->addAction(pauseAct_);
     sim->addAction(cancelAct_);
     sim->addSeparator();
     sim->addAction(tr("&Load results..."), this, &MainWindow::loadResultsDialog);
@@ -518,6 +593,8 @@ void MainWindow::createMenus()
 
     // Tools
     QMenu* tools = menuBar()->addMenu(tr("&Tools"));
+    tools->addAction(icons::get("profile"), tr("&Elevations from DEM..."), this, &MainWindow::elevationsFromDem);
+    tools->addSeparator();
     pluginMenu_ = tools->addMenu(tr("&Plugins"));
     tools->addAction(icons::get("settings"), tr("&Settings..."), this, [this] { SettingsDialog(this).exec(); });
 
@@ -606,6 +683,7 @@ void MainWindow::createToolBar()
     runButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     runButton_->setIconSize(QSize(16, 16));
     mainBar_->addWidget(runButton_);
+    mainBar_->addAction(pauseAct_);
     mainBar_->addAction(cancelAct_);
 
     connect(engineCombo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [this] {
@@ -645,6 +723,10 @@ void MainWindow::createStatusBar()
     engineLabel_ = new QLabel(this);
     coords_ = new QLabel(this);
     coords_->setMinimumWidth(190);
+    runState_ = new QLabel(this);
+    runState_->setVisible(false);
+    runState_->setStyleSheet(QString("color: %1; font-weight: 600;").arg(theme::kWarning.name()));
+    statusBar()->addPermanentWidget(runState_);
     statusBar()->addPermanentWidget(progress_);
     statusBar()->addPermanentWidget(countsLabel_);
     statusBar()->addPermanentWidget(unitsLabel_);
@@ -834,6 +916,12 @@ void MainWindow::updateCompatibility()
 {
     const auto* desc = currentEngine();
     props_->setEngine(desc);
+    browser_->setEngine(desc);
+    for (int i = 0; i < tabs_->count(); ++i)
+    {
+        if (auto* editor = qobject_cast<ObjectEditor*>(tabs_->widget(i)))
+            editor->setEngine(desc);
+    }
     // Replace the previous compatibility notes; keep the run log.
     for (int i = messages_->count() - 1; i >= 0; --i)
     {
@@ -1149,7 +1237,7 @@ void MainWindow::runSimulation()
     }
     const QString base = runBase();
     QStringList args = {"run", runInput_, "--engine", QString::fromStdString(desc->id), "--out", base + ".anr",
-                        "--report", base + ".rpt"};
+                        "--report", base + ".rpt", "--live"};
     if (desc->multiSpecies)
         args << "--msx" << msxPath();
     messages_->clear();
@@ -1158,24 +1246,76 @@ void MainWindow::runSimulation()
     progress_->setVisible(true);
     runAct_->setEnabled(false);
     cancelAct_->setEnabled(true);
+    discardRun_ = false;
     solver_->start(args);
+    updatePauseAction();
+}
+
+void MainWindow::togglePause()
+{
+    if (!solver_->isRunning())
+        return;
+    if (solver_->isPaused() || pauseAct_->data().toBool())
+    {
+        pauseAct_->setData(false);
+        solver_->resume();
+        runState_->setText(tr("Resuming..."));
+    }
+    else
+    {
+        pauseAct_->setData(true);
+        solver_->pause();
+        runState_->setText(tr("Pausing..."));
+    }
+    runState_->setVisible(true);
+    updatePauseAction();
+}
+
+void MainWindow::stopSimulation()
+{
+    if (solver_->isRunning())
+        solver_->cancel();
+}
+
+void MainWindow::updatePauseAction()
+{
+    const bool running = solver_->isRunning();
+    const bool paused = running && (solver_->isPaused() || pauseAct_->data().toBool());
+    pauseAct_->setEnabled(running);
+    pauseAct_->setIcon(icons::get(paused ? "play" : "pause"));
+    pauseAct_->setText(paused ? tr("Resume simulation") : tr("Pause simulation"));
+    pauseAct_->setToolTip(paused ? tr("Continue the simulation (F6)")
+                                 : tr("Pause the simulation between two time steps (F6)"));
 }
 
 void MainWindow::simulationFinished(bool ok, const QJsonObject& r)
 {
     progress_->setVisible(false);
     cancelAct_->setEnabled(false);
+    pauseAct_->setData(false);
+    runState_->setVisible(false);
+    updatePauseAction();
     if (!runInput_.isEmpty())
     {
         QFile::remove(runInput_);
         runInput_.clear();
     }
+    if (discardRun_)
+    {
+        discardRun_ = false;
+        updateCompatibility();
+        emit simulationCompleted(false);
+        return;
+    }
+    const QString reached = QString::fromStdString(text::formatDuration(solver_->liveTime()));
     if (ok)
     {
         message("info", tr("Simulation finished in %1 s with %2 reporting periods.")
                             .arg(r.value("seconds").toDouble(), 0, 'f', 2)
                             .arg(r.value("periods").toInt()));
-        loadResults(r.value("results").toString());
+        // The saved results replace the live ones.
+        if (!loadResults(r.value("results").toString()))
+            doc_->endLiveResults(tr("Partial results (the saved results could not be read)"));
         showDock("resultsDock");
         statusBar()->showMessage(tr("Simulation finished. Color the map with the bar above it, and open Reports for "
                                     "tables and charts."),
@@ -1183,10 +1323,22 @@ void MainWindow::simulationFinished(bool ok, const QJsonObject& r)
     }
     else if (r.value("cancelled").toBool())
     {
-        message("warning", tr("Simulation cancelled."));
+        if (doc_->isLive())
+        {
+            doc_->endLiveResults(tr("Partial results (cancelled at %1)").arg(reached));
+            message("warning", tr("Simulation cancelled at %1. The map shows the partial results; they are "
+                                  "not saved.")
+                                   .arg(reached));
+        }
+        else
+        {
+            message("warning", tr("Simulation cancelled."));
+        }
     }
     else
     {
+        if (doc_->isLive())
+            doc_->endLiveResults(tr("Partial results (the run failed at %1)").arg(reached));
         message("error", tr("Simulation failed: %1").arg(r.value("message").toString()));
     }
     updateCompatibility();
@@ -1265,6 +1417,9 @@ void MainWindow::openReport(const QString& kind)
 
 void MainWindow::openDataEditor(const QString& section, const QString& id)
 {
+    // LID controls, transects, unit hydrographs, control rules and LID usage.
+    if (openSpecialEditor(section, id))
+        return;
     const QString name = "data:" + section + ":" + id;
     for (int i = 0; i < tabs_->count(); ++i)
     {
@@ -1274,12 +1429,78 @@ void MainWindow::openDataEditor(const QString& section, const QString& id)
             return;
         }
     }
-    auto* editor = new DataEditor(doc_, section, id, tabs_);
+    QWidget* editor = nullptr;
+    QIcon icon;
+    const auto* def = core::findSectionDef(doc_->model().dialect(), section.toStdString());
+    if (section == "PATTERNS" || section == "CURVES" || section == "TIMESERIES")
+    {
+        editor = new DataEditor(doc_, section, id, tabs_);
+        icon = icons::get(section == "PATTERNS" ? "pattern" : section == "TIMESERIES" ? "chart" : "curve");
+    }
+    // Named objects without a specialised editor use the schema-driven object editor.
+    else if (def && !def->objectKind.empty())
+    {
+        auto* objectEditor = new ObjectEditor(doc_, QString::fromStdString(def->objectKind), id, tabs_);
+        objectEditor->setEngine(currentEngine());
+        connect(objectEditor, &ObjectEditor::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
+        editor = objectEditor;
+        icon = objectKindIcon(QString::fromStdString(def->objectKind));
+    }
+    if (!editor)
+        return;
     editor->setObjectName(name);
-    const QString icon = section == "PATTERNS" ? "pattern" : section == "TIMESERIES" ? "chart" : "curve";
-    const int index = tabs_->addTab(editor, icons::get(icon), id);
+    const int index = tabs_->addTab(editor, icon, id);
     decorateTab(index);
     tabs_->setCurrentIndex(index);
+    browser_->revealData(section, id);
+}
+
+void MainWindow::showSimulationOptions(const QString& page)
+{
+    if (doc_->model().dialect() == Dialect::Msx)
+        return;
+    OptionsDialog dlg(doc_, this);
+    if (!page.isEmpty())
+        dlg.showPage(page);
+    if (dlg.exec() == QDialog::Accepted && dlg.changedCount() > 0)
+        statusBar()->showMessage(tr("Simulation options updated (%n value(s) changed).", nullptr, dlg.changedCount()), 6000);
+}
+
+bool MainWindow::openSpecialEditor(const QString& section, const QString& id)
+{
+    const Dialect dialect = doc_->model().dialect();
+    if (!hasSpecialEditor(dialect, section))
+        return false;
+    if (section == "LID_USAGE")
+    {
+        // Shown from the event loop, so callers (menus, automation) return first.
+        QTimer::singleShot(0, this, [this, id] { LidUsageDialog::edit(doc_, id, this); });
+        return true;
+    }
+    const QString name = "object:" + section + ":" + id;
+    for (int i = 0; i < tabs_->count(); ++i)
+    {
+        if (tabs_->widget(i)->objectName() == name)
+        {
+            tabs_->setCurrentIndex(i);
+            return true;
+        }
+    }
+    SpecialEditor* editor = createSpecialEditor(doc_, section, id, tabs_);
+    if (!editor)
+        return false;
+    editor->setObjectName(name);
+    const int index =
+        tabs_->addTab(editor, icons::get(objectEditorIcon(section)), objectEditorTitle(dialect, section, id));
+    decorateTab(index);
+    tabs_->setCurrentIndex(index);
+    connect(editor, &SpecialEditor::renamed, this, [this, editor](const QString& sec, const QString& newId) {
+        editor->setObjectName("object:" + sec + ":" + newId);
+        const int i = tabs_->indexOf(editor);
+        if (i >= 0)
+            tabs_->setTabText(i, objectEditorTitle(doc_->model().dialect(), sec, newId));
+    });
+    return true;
 }
 
 void MainWindow::decorateTab(int index)
@@ -1409,6 +1630,18 @@ void MainWindow::chooseBackdrop()
     if (f.isEmpty())
         return;
     QString err;
+    const QString suffix = QFileInfo(f).suffix().toLower();
+    if (suffix == "tif" || suffix == "tiff")
+    {
+        // GeoTIFF files carry their own georeferencing: show them as raster layers.
+        auto r = openRaster(f, &err);
+        if (r && r->info().georeferenced)
+        {
+            if (RasterLayersDialog::addLayer(doc_, this, f))
+                map_->reloadRasters();
+            return;
+        }
+    }
     if (!map_->setBackdrop(f, &err))
     {
         QMessageBox::warning(this, tr("Backdrop"), err);
@@ -1417,6 +1650,48 @@ void MainWindow::chooseBackdrop()
     doc_->settings().backdropImage = doc_->path().isEmpty() ? f.toStdString()
                                                             : QFileInfo(doc_->path()).dir().relativeFilePath(f).toStdString();
     doc_->markSettingsChanged();
+}
+
+void MainWindow::addMapService()
+{
+    MapServiceDialog dlg(QString::fromStdString(doc_->settings().crs), this);
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+    const Basemap::Provider p = dlg.provider();
+    Basemap::addService(p);
+    QString why;
+    if (!map_->basemapUsable(&why))
+    {
+        statusBar()->showMessage(why, 8000);
+        return;
+    }
+    map_->chooseBasemap(p.id);
+    mapPage_->refreshBasemapMenu();
+}
+
+void MainWindow::showRasterLayers()
+{
+    RasterLayersDialog dlg(doc_, this);
+    connect(&dlg, &RasterLayersDialog::layersChanged, map_, &MapView::reloadRasters);
+    dlg.exec();
+}
+
+void MainWindow::elevationsFromDem()
+{
+    ElevationDialog dlg(doc_, this);
+    connect(&dlg, &ElevationDialog::layersChanged, map_, &MapView::reloadRasters);
+    if (dlg.exec() == QDialog::Accepted)
+        statusBar()->showMessage(tr("Elevations updated from the DEM. Undo restores the previous values."), 8000);
+}
+
+void MainWindow::openTool(const QString& name)
+{
+    if (name == "elevations")
+        elevationsFromDem();
+    else if (name == "raster-layers")
+        showRasterLayers();
+    else if (name == "map-service")
+        addMapService();
 }
 
 // ---------------------------------------------------------------------------

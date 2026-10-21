@@ -36,11 +36,14 @@ namespace mirab::engine::detail
 std::string formatEpanetVersion(int v);
 
 /// Runs hydraulics and single-species quality concurrently on an open
-/// session and records every reporting period into @p results.
-/// Progress is mapped into [progressFrom, progressTo]. Returns false when
-/// the user cancelled.
+/// session and records every reporting period into @p results. Frames are
+/// delivered through @p pacer with layout 1. Progress is mapped into
+/// [progressFrom, progressTo]. Returns false when the user cancelled.
 bool runEpanetLoop(EpanetSession& session, const std::filesystem::path& inputFile,
-                   core::ResultSet& results, const RunCallbacks& callbacks,
+                   core::ResultSet& results, const RunCallbacks& callbacks, FramePacer& pacer,
                    double progressFrom = 0.0, double progressTo = 1.0);
+
+/// Frame of the last period recorded in @p results.
+ResultFrame lastFrame(const core::ResultSet& results, int layout);
 
 } // namespace mirab::engine::detail

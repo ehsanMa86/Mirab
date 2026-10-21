@@ -26,6 +26,7 @@
 
 #include "ChartWidget.h"
 #include "Icons.h"
+#include "RasterLayers.h"
 #include "Theme.h"
 #include "mirab/core/Text.h"
 #include "mirab/core/Units.h"
@@ -834,6 +835,54 @@ protected:
             labels.append({distances_[i], QString::fromStdString(nodes_[i])});
         }
         QVector<ChartWidget::Series> series;
+        // Ground from the project's elevation model and, for SWMM, the node rims and conduit crowns.
+        QVector<ChartWidget::Series> terrain;
+        ChartWidget::Series dem;
+        dem.name = tr("Ground (DEM)");
+        dem.color = QColor(96, 72, 44);
+        dem.width = 1.6;
+        dem.points = terrainProfile(doc_, nodes_, distances_);
+        if (!dem.points.isEmpty())
+            terrain << dem;
+        if (m.dialect() == core::Dialect::Swmm)
+        {
+            ChartWidget::Series rim, crown;
+            rim.name = tr("Rim (invert + maximum depth)");
+            rim.color = QColor(150, 110, 60);
+            rim.dashed = true;
+            rim.width = 1.4;
+            crown.name = tr("Conduit crown");
+            crown.color = QColor(90, 100, 115);
+            crown.width = 1.2;
+            const bool offsetsAreElevations = text::toUpper(m.option("LINK_OFFSETS")) == "ELEVATION";
+            for (std::size_t i = 0; i < nodes_.size(); ++i)
+            {
+                const double invert = elementNumber(m, Category::Node, nodes_[i], {"Elevation"}).value_or(0.0);
+                const double depth = elementNumber(m, Category::Node, nodes_[i], {"MaxDepth"}).value_or(0.0);
+                if (depth > 0)
+                    rim.points.append(QPointF(distances_[i], invert + depth));
+                if (i + 1 == nodes_.size())
+                    continue;
+                for (const auto& l : m.links())
+                {
+                    const bool forward = l.from == nodes_[i] && l.to == nodes_[i + 1];
+                    if (l.kind != "Conduit" || !(forward || (l.to == nodes_[i] && l.from == nodes_[i + 1])))
+                        continue;
+                    const double height = elementNumber(m, Category::Link, l.id, {"Geom1"}).value_or(0.0);
+                    const double in = elementNumber(m, Category::Link, l.id, {"InOffset"}).value_or(0.0);
+                    const double out = elementNumber(m, Category::Link, l.id, {"OutOffset"}).value_or(0.0);
+                    const double next = elementNumber(m, Category::Node, nodes_[i + 1], {"Elevation"}).value_or(0.0);
+                    const double a = forward ? in : out, b = forward ? out : in;
+                    crown.points.append(QPointF(distances_[i], (offsetsAreElevations ? a : invert + a) + height));
+                    crown.points.append(QPointF(distances_[i + 1], (offsetsAreElevations ? b : next + b) + height));
+                    break;
+                }
+            }
+            if (!crown.points.isEmpty())
+                terrain << crown;
+            if (!rim.points.isEmpty())
+                terrain << rim;
+        }
         const auto* r = doc_->results();
         const auto* t = r ? r->table("node") : nullptr;
         const int head = t ? t->variableIndex("Head") : -1;
@@ -862,11 +911,11 @@ protected:
                 band.upper.append(QPointF(distances_[i], hi));
                 hgl.points.append(QPointF(distances_[i], t->value(doc_->period(), head, e)));
             }
-            series << band << ground << hgl;
+            series << band << ground << terrain << hgl;
         }
         else
         {
-            series << ground;
+            series << ground << terrain;
         }
         chart_->setXAxis(tr("Distance along the path (%1)").arg(QString::fromStdString(units.label("length"))), false);
         chart_->setXAnnotations(labels);

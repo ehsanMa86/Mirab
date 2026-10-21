@@ -50,6 +50,7 @@ private:
     void load();
     void apply();
     void updateChart();
+    void updatePatternLabels();
     void setDirty(bool on);
     double patternStepHours() const;
 

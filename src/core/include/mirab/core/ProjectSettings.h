@@ -26,9 +26,38 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace mirab::core
 {
+
+/// A raster shown on the map: an elevation model or georeferenced imagery.
+struct RasterLayerSettings
+{
+    std::string path;               ///< relative to the .inp file
+    std::string style = "hillshade"; ///< "hillshade", "color", "hillshade-color" or "image"
+    double opacity = 0.7;
+    bool visible = true;
+    double verticalUnit = 0.0;      ///< metres per DEM unit; 0 = as declared in the file
+    double exaggeration = 1.0;      ///< vertical exaggeration of the hillshade
+};
+
+/// A user-defined web map service used as the basemap.
+struct MapServiceSettings
+{
+    std::string id;     ///< "custom:<name>"
+    std::string name;
+    std::string type;   ///< "xyz", "wms" or "wmts"
+    std::string url;    ///< tile template (xyz), GetMap endpoint (wms) or tile endpoint/template (wmts)
+    std::string layer;
+    std::string style;
+    std::string format;
+    std::string crs;    ///< "EPSG:3857" or the system the server draws in
+    std::string matrixSet; ///< WMTS tile matrix set
+    std::string version;   ///< WMS version
+    std::string attribution;
+    bool valid() const { return !id.empty() && !url.empty(); }
+};
 
 /// Settings that are not part of the engine input format. They live in a
 /// small JSON file beside the .inp so that the .inp stays the canonical,
@@ -42,6 +71,8 @@ struct ProjectSettings
     std::string backdropImage; ///< georeferenced image (with world file)
     std::string basemap;      ///< web basemap shown under the network, e.g. "osm"; empty for none
     double pressureThreshold = 0.0; ///< minimum service pressure for resilience tools
+    std::vector<RasterLayerSettings> rasters; ///< drawn under the network, first at the bottom
+    MapServiceSettings mapService; ///< definition of a custom basemap, so the project opens anywhere
 
     static std::filesystem::path sidecarPath(const std::filesystem::path& inpFile);
     /// Returns default settings when the sidecar does not exist or is invalid.

@@ -29,6 +29,7 @@
 #include "mirab/core/Schema.h"
 #include "mirab/engine/DynamicLibrary.h"
 
+#include <chrono>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -87,11 +88,30 @@ enum class LogLevel
     Error
 };
 
+/// Values of one reporting period, delivered while a run is in progress.
+/// The tables of @c results have the same kinds, elements and variables as
+/// the final results; values an engine cannot read during the run are NaN.
+struct ResultFrame
+{
+    const core::ResultSet* results = nullptr; ///< layout and values
+    int slot = 0;      ///< period of @c results that holds this frame's values
+    int period = 0;    ///< index of the reporting period in the final results
+    double time = 0.0; ///< seconds from the start of the simulation
+    int layout = 1;    ///< changes when the tables or their variables change
+};
+
 struct RunCallbacks
 {
     std::function<void(double fraction, const std::string& stage)> progress;
     std::function<void(LogLevel level, const std::string& message)> log;
     std::function<bool()> cancelRequested;
+    /// Receives reporting periods during the run (optional).
+    std::function<void(const ResultFrame& frame)> frame;
+    /// Minimum wall-clock seconds between two frames; 0 delivers every period.
+    double frameInterval = 0.25;
+    /// Called between time steps with the simulation time reached, in
+    /// seconds. It may block, which pauses the run.
+    std::function<void(double seconds)> checkpoint;
 
     void report(double f, const std::string& stage) const
     {
@@ -104,6 +124,39 @@ struct RunCallbacks
             log(level, m);
     }
     bool cancelled() const { return cancelRequested && cancelRequested(); }
+    /// Engines call this between time steps: waits while the run is paused
+    /// and returns false when the run should stop.
+    bool proceed(double seconds) const
+    {
+        if (checkpoint)
+            checkpoint(seconds);
+        return !cancelled();
+    }
+};
+
+/// Paces the frames of one run: at most one per RunCallbacks::frameInterval,
+/// and the final state is always delivered by finish().
+class FramePacer
+{
+public:
+    explicit FramePacer(const RunCallbacks& callbacks) : cb_(callbacks) {}
+
+    bool active() const { return static_cast<bool>(cb_.frame); }
+    /// True when a newly computed period should be delivered now.
+    bool due() const;
+    void send(const ResultFrame& frame);
+    /// Delivers @p frame unless that period was the last one delivered.
+    void finish(const ResultFrame& frame);
+    /// Forgets the last delivered period (a new layout starts over).
+    void restart();
+    int lastPeriod() const { return lastPeriod_; }
+
+private:
+    const RunCallbacks& cb_;
+    int lastPeriod_ = -1;
+    int lastLayout_ = 0;
+    std::chrono::steady_clock::time_point last_{};
+    bool sentAny_ = false;
 };
 
 struct RunOutcome

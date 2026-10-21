@@ -26,6 +26,7 @@
 
 #include "ChartWidget.h"
 #include "Icons.h"
+#include "SchemaWidgets.h"
 #include "mirab/core/Text.h"
 
 #include <QComboBox>
@@ -34,9 +35,11 @@
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMessageBox>
 #include <QSet>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -48,6 +51,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include <cmath>
 #include <functional>
 
 namespace mirab::app
@@ -81,6 +85,7 @@ ResultsPanel::ResultsPanel(ProjectDocument* doc, QWidget* parent) : QWidget(pare
     });
     connect(chartVar_, &QComboBox::currentTextChanged, this, &ResultsPanel::refreshChart);
     connect(doc_, &ProjectDocument::resultsChanged, this, &ResultsPanel::refreshChart);
+    connect(doc_, &ProjectDocument::liveResultsUpdated, this, &ResultsPanel::plot);
     connect(doc_, &ProjectDocument::selectionChanged, this, &ResultsPanel::refreshChart);
     refreshChart();
 }
@@ -108,6 +113,18 @@ void ResultsPanel::refreshChart()
     }
     chartVar_->setVisible(t != nullptr);
     chartVar_->blockSignals(false);
+    plot();
+}
+
+void ResultsPanel::plot()
+{
+    const auto* r = doc_->results();
+    const Selection& sel = doc_->selection();
+    const char* table = sel.category == Category::Node   ? "node"
+                        : sel.category == Category::Link ? "link"
+                        : sel.category == Category::Area ? "subcatchment"
+                                                         : nullptr;
+    const core::ResultTable* t = (r && table) ? r->table(table) : nullptr;
     if (!r)
     {
         title_->clear();
@@ -130,8 +147,19 @@ void ResultsPanel::refreshChart()
     ChartWidget::Series s;
     s.name = sel.id;
     for (int p = 0; p < r->periodCount(); ++p)
-        s.points.append(QPointF(r->times[static_cast<std::size_t>(p)], t->value(p, v, e)));
+    {
+        const float y = t->value(p, v, e);
+        if (!std::isnan(y)) // not available while the simulation runs
+            s.points.append(QPointF(r->times[static_cast<std::size_t>(p)], y));
+    }
     const auto& var = t->variables[static_cast<std::size_t>(v)];
+    if (s.points.isEmpty())
+    {
+        title_->setText(sel.id + "  ·  " + QString::fromStdString(var.name));
+        chart_->clear(
+            tr("%1 is available when the simulation ends.").arg(QString::fromStdString(var.name)));
+        return;
+    }
     title_->setText(sel.id + "  ·  " + QString::fromStdString(var.name));
     chart_->setXAxis(tr("Time"), true);
     chart_->setSeries({s}, QString::fromStdString(var.name) + (var.unit.empty() ? QString() : " (" + QString::fromStdString(var.unit) + ")"));
@@ -174,7 +202,8 @@ enum BrowserRole
 {
     CategoryRole = Qt::UserRole,
     KindRole = Qt::UserRole + 1,
-    DataSectionRole = Qt::UserRole + 2
+    DataSectionRole = Qt::UserRole + 2,
+    ObjectKindRole = Qt::UserRole + 3 ///< named-object kind of a collection or its items
 };
 
 constexpr int kOptionsCategory = -1;
@@ -236,6 +265,10 @@ ProjectBrowser::ProjectBrowser(ProjectDocument* doc, QWidget* parent) : QWidget(
             emit zoomToRequested(doc_->selection());
             emit elementActivated();
         }
+        else
+        {
+            emit optionsActivated();
+        }
     });
     connect(tree_, &QTreeWidget::customContextMenuRequested, this, &ProjectBrowser::showContextMenu);
     connect(doc_, &ProjectDocument::modelChanged, this, &ProjectBrowser::rebuild);
@@ -244,23 +277,126 @@ ProjectBrowser::ProjectBrowser(ProjectDocument* doc, QWidget* parent) : QWidget(
     rebuild();
 }
 
+void ProjectBrowser::setEngine(const engine::EngineDescriptor* engine)
+{
+    engine_ = engine;
+    rebuild();
+}
+
+void ProjectBrowser::revealData(const QString& section, const QString& id)
+{
+    for (auto* item : tree_->findItems(id, Qt::MatchExactly | Qt::MatchRecursive))
+    {
+        if (item->data(0, DataSectionRole).toString() != section)
+            continue;
+        syncing_ = true;
+        if (item->parent())
+            item->parent()->setExpanded(true);
+        tree_->setCurrentItem(item);
+        tree_->scrollToItem(item);
+        syncing_ = false;
+        return;
+    }
+}
+
+void ProjectBrowser::addObject(const QString& kind)
+{
+    const std::string k = kind.toStdString();
+    const auto& m = doc_->model();
+    static const QHash<QString, QString> prefixes = {{"Pollutant", "P"},  {"Landuse", "LU"},    {"Aquifer", "AQ"},
+                                                     {"Snowpack", "SP"},  {"Hydrograph", "UH"}, {"Transect", "TR"},
+                                                     {"Street", "ST"},    {"Inlet", "IN"},      {"LID", "LID"},
+                                                     {"Rule", "R"}};
+    const QString suggestion = QString::fromStdString(m.uniqueObjectName(k, prefixes.value(kind, "X").toStdString()));
+    bool ok = false;
+    const QString name = QInputDialog::getText(this, tr("New %1").arg(objectKindLabel(kind).toLower()), tr("Name:"),
+                                               QLineEdit::Normal, suggestion, &ok)
+                             .trimmed();
+    if (!ok || name.isEmpty())
+        return;
+    QString err;
+    if (!doc_->edit(tr("Add %1 %2").arg(objectKindLabel(kind).toLower(), name),
+                    [&](core::Model& model, std::string* e) { return model.addObject(k, name.toStdString(), e); }, &err))
+    {
+        emit statusMessage(tr("%1 was not added: %2").arg(name, err));
+        return;
+    }
+    if (const auto* def = core::sectionForObject(m.dialect(), k))
+        emit dataActivated(QString::fromStdString(def->name), name);
+}
+
+void ProjectBrowser::renameObject(const QString& kind, const QString& name)
+{
+    bool ok = false;
+    const QString to = QInputDialog::getText(this, tr("Rename %1").arg(objectKindLabel(kind).toLower()), tr("New name:"),
+                                             QLineEdit::Normal, name, &ok)
+                           .trimmed();
+    if (!ok || to.isEmpty() || to == name)
+        return;
+    QString err;
+    if (!doc_->edit(tr("Rename %1").arg(name),
+                    [&](core::Model& model, std::string* e) {
+                        return model.renameObject(kind.toStdString(), name.toStdString(), to.toStdString(), e);
+                    },
+                    &err))
+    {
+        emit statusMessage(tr("%1 was not renamed: %2").arg(name, err));
+        return;
+    }
+    if (const auto* def = core::sectionForObject(doc_->model().dialect(), kind.toStdString()))
+        emit objectRenamed(QString::fromStdString(def->name), name, to);
+}
+
+void ProjectBrowser::deleteObject(const QString& kind, const QString& name)
+{
+    const auto answer = QMessageBox::question(
+        this, tr("Delete %1").arg(objectKindLabel(kind).toLower()),
+        tr("Delete %1 %2? Data that needs it (inflows, buildup, coverages, ...) is removed too and optional "
+           "references to it are cleared. You can undo this.")
+            .arg(objectKindLabel(kind).toLower(), name));
+    if (answer != QMessageBox::Yes)
+        return;
+    doc_->edit(tr("Delete %1").arg(name), [&](core::Model& model, std::string*) {
+        return model.removeObject(kind.toStdString(), name.toStdString());
+    });
+}
+
 void ProjectBrowser::showContextMenu(const QPoint& pos)
 {
     QTreeWidgetItem* item = tree_->itemAt(pos);
-    if (!item || item->data(0, CategoryRole).isNull())
+    if (!item)
         return;
     QMenu menu(this);
-    if (!item->data(0, DataSectionRole).isNull())
+    const QString objectKind = item->data(0, ObjectKindRole).toString();
+    if (item->data(0, CategoryRole).isNull())
+    {
+        if (objectKind.isEmpty())
+            return;
+        menu.addAction(icons::get("new"), tr("Add %1...").arg(objectKindLabel(objectKind).toLower()), this,
+                       [this, objectKind] { addObject(objectKind); });
+    }
+    else if (!item->data(0, DataSectionRole).isNull())
     {
         const QString section = item->data(0, DataSectionRole).toString();
         const QString id = item->text(0);
         menu.addAction(icons::get("chart"), tr("Open editor"), this, [this, section, id] { emit dataActivated(section, id); });
+        if (!objectKind.isEmpty())
+        {
+            menu.addAction(tr("Rename..."), this, [this, objectKind, id] { renameObject(objectKind, id); });
+            menu.addAction(icons::get("delete"), tr("Delete"), this, [this, objectKind, id] { deleteObject(objectKind, id); });
+            menu.addSeparator();
+            menu.addAction(icons::get("new"), tr("Add %1...").arg(objectKindLabel(objectKind).toLower()), this,
+                           [this, objectKind] { addObject(objectKind); });
+        }
     }
     else if (item->data(0, CategoryRole).toInt() != kOptionsCategory)
     {
         tree_->setCurrentItem(item);
         menu.addAction(icons::get("zoom-fit"), tr("Zoom to"), this, [this] { emit zoomToRequested(doc_->selection()); });
         menu.addAction(icons::get("properties"), tr("Properties"), this, &ProjectBrowser::elementActivated);
+        if (item->data(0, CategoryRole).toInt() == static_cast<int>(Category::Area))
+            menu.addAction(icons::get("layers"), tr("LID usage..."), this,
+                           [this, id = item->text(0)] { emit dataActivated("LID_USAGE", id); });
         menu.addSeparator();
         menu.addAction(icons::get("delete"), tr("Delete"), this, &ProjectBrowser::deleteRequested);
     }
@@ -371,6 +507,42 @@ void ProjectBrowser::rebuild()
     {
         data(tr("Time series"), "timeseries", "chart", "TIMESERIES");
         data(tr("Curves"), "curves", "curve", "CURVES");
+        data(tr("Patterns"), "patterns", "pattern", "PATTERNS");
+        // Named objects: pollutants, land uses, aquifers, ...
+        const QColor grey = palette().color(QPalette::Disabled, QPalette::Text);
+        for (const auto& kind : core::objectKinds(m.dialect()))
+        {
+            const auto* def = core::sectionForObject(m.dialect(), kind);
+            if (!def)
+                continue;
+            const QString k = QString::fromStdString(kind);
+            const QString section = QString::fromStdString(def->name);
+            const auto names = m.objectNames(kind);
+            QString why;
+            const bool supported = engineSupportsSection(engine_, m.dialect(), def->name, {}, &why);
+            auto* top = new QTreeWidgetItem(tree_, {objectKindLabel(k, true) + "  (" + QString::number(names.size()) + ")"});
+            top->setIcon(0, objectKindIcon(k));
+            top->setFont(0, bold);
+            top->setData(0, KindRole, "objects/" + k);
+            top->setData(0, ObjectKindRole, k);
+            top->setToolTip(0, supported ? tr("[%1]  Right-click to add one.").arg(section) : why);
+            if (!supported)
+                top->setForeground(0, grey);
+            for (const auto& n : names)
+            {
+                auto* leaf = new QTreeWidgetItem(top, {QString::fromStdString(n)});
+                leaf->setData(0, CategoryRole, 0);
+                leaf->setData(0, DataSectionRole, section);
+                leaf->setData(0, ObjectKindRole, k);
+                leaf->setIcon(0, objectKindIcon(k));
+                if (!supported)
+                {
+                    leaf->setForeground(0, grey);
+                    leaf->setToolTip(0, why);
+                }
+            }
+            top->setExpanded(expanded.contains("objects/" + k));
+        }
     }
     else
     {

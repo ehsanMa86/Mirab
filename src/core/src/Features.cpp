@@ -155,4 +155,60 @@ std::vector<FeatureUse> detectFeatures(const Model& model)
     return out;
 }
 
+bool featureForSection(Dialect dialect, std::string_view section,
+                       const std::vector<std::string>& tokens, Feature& feature)
+{
+    const std::string s = text::toUpper(section);
+    if (dialect == Dialect::Epanet)
+    {
+        if (s == "LEAKAGE")
+        {
+            feature = Feature::EpanetLeakage;
+            return true;
+        }
+        return false;
+    }
+    if (dialect != Dialect::Swmm)
+        return false;
+    struct Map
+    {
+        const char* section;
+        Feature feature;
+    };
+    static const Map maps[] = {{"POLLUTANTS", Feature::SwmmWaterQuality},
+                               {"LANDUSES", Feature::SwmmWaterQuality},
+                               {"BUILDUP", Feature::SwmmWaterQuality},
+                               {"WASHOFF", Feature::SwmmWaterQuality},
+                               {"COVERAGES", Feature::SwmmWaterQuality},
+                               {"LOADINGS", Feature::SwmmWaterQuality},
+                               {"TREATMENT", Feature::SwmmWaterQuality},
+                               {"LID_CONTROLS", Feature::SwmmLowImpactDevelopment},
+                               {"LID_USAGE", Feature::SwmmLowImpactDevelopment},
+                               {"AQUIFERS", Feature::SwmmGroundwater},
+                               {"GROUNDWATER", Feature::SwmmGroundwater},
+                               {"GWF", Feature::SwmmGroundwater},
+                               {"SNOWPACKS", Feature::SwmmSnowmelt},
+                               {"HYDROGRAPHS", Feature::SwmmRdii},
+                               {"RDII", Feature::SwmmRdii},
+                               {"STREETS", Feature::SwmmStreetsAndInlets},
+                               {"INLETS", Feature::SwmmStreetsAndInlets},
+                               {"INLET_USAGE", Feature::SwmmStreetsAndInlets},
+                               {"CONTROLS", Feature::SwmmControls}};
+    for (const auto& m : maps)
+    {
+        if (s == m.section)
+        {
+            feature = m.feature;
+            return true;
+        }
+    }
+    // Inflows of a pollutant (rather than of FLOW) need water quality.
+    if ((s == "INFLOWS" || s == "DWF") && tokens.size() > 1 && !text::iequals(tokens[1], "FLOW"))
+    {
+        feature = Feature::SwmmWaterQuality;
+        return true;
+    }
+    return false;
+}
+
 } // namespace mirab::core

@@ -113,12 +113,14 @@ public:
         try
         {
             // 1. Hydraulics (and any single-species quality) through the thread-safe API.
+            FramePacer pacer(cb);
             {
                 EpanetSession s(epanet_.api());
                 cb.report(0.0, "Reading the network");
                 s.open(req.input, req.reportFile);
-                if (!runEpanetLoop(s, req.input, out.results, cb, 0.02, 0.40))
+                if (!runEpanetLoop(s, req.input, out.results, cb, pacer, 0.02, 0.40))
                 {
+                    pacer.finish(lastFrame(out.results, 1));
                     out.cancelled = true;
                     out.message = "simulation cancelled";
                     return out;
@@ -196,6 +198,18 @@ public:
             const auto& times = out.results.times;
             const double duration = times.empty() ? 0.0 : times.back();
             std::size_t nextPeriod = 0;
+            // The species add variables: frames start over with a second layout.
+            constexpr int kSpeciesLayout = 2;
+            pacer.restart();
+            auto frameAt = [&](int p) {
+                ResultFrame f;
+                f.results = &out.results;
+                f.slot = p;
+                f.period = p;
+                f.time = p >= 0 ? times[static_cast<std::size_t>(p)] : 0.0;
+                f.layout = kSpeciesLayout;
+                return f;
+            };
             auto sampleUpTo = [&](double t) {
                 while (nextPeriod < times.size() && times[nextPeriod] <= t + 0.5)
                 {
@@ -219,6 +233,8 @@ public:
                         }
                     }
                     ++nextPeriod;
+                    if (pacer.due())
+                        pacer.send(frameAt(p));
                 }
             };
             sampleUpTo(0.0);
@@ -234,14 +250,16 @@ public:
                 sampleUpTo(t);
                 cb.report(0.45 + 0.5 * (duration > 0 ? std::min(1.0, t / duration) : 1.0),
                           "Simulating multi-species water quality");
-                if (cb.cancelled())
+                if (!cb.proceed(t))
                 {
+                    pacer.finish(frameAt(static_cast<int>(nextPeriod) - 1));
                     cleanup();
                     out.cancelled = true;
                     out.message = "simulation cancelled";
                     return out;
                 }
             }
+            pacer.finish(frameAt(static_cast<int>(nextPeriod) - 1));
             api_.MSXreport();
             cleanup();
             out.success = true;

@@ -23,11 +23,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include "mirab/MirabConfig.h"
+#include "mirab/core/Elevation.h"
 #include "mirab/core/Features.h"
 #include "mirab/core/Json.h"
+#include "mirab/core/LiveResults.h"
 #include "mirab/core/Model.h"
 #include "mirab/core/ProjectSettings.h"
+#include "mirab/core/Raster.h"
 #include "mirab/core/Results.h"
+#include "mirab/core/SwmmObjects.h"
 #include "mirab/core/Text.h"
 #include "mirab/engine/Compatibility.h"
 #include "mirab/engine/EngineInstall.h"
@@ -38,6 +42,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -102,7 +107,8 @@ struct Args
 const std::vector<std::string> kValueOptions = {
     "target", "engine", "msx", "out", "report", "workdir", "table", "variable", "element", "results",
     "period", "crs", "required-pressure", "threshold", "links", "nodes", "flow", "residual",
-    "time", "max-flow", "minimum-pressure"};
+    "time", "max-flow", "minimum-pressure", "dem", "mode", "swmm", "dem-units", "decimals",
+    "frame-interval"};
 
 Args parseArgs(const std::vector<std::string>& argv, std::size_t from)
 {
@@ -178,8 +184,15 @@ public:
         if (!machine_)
             return;
         payload.set("event", type);
+        line(payload.dump());
+    }
+    /// Writes one prepared JSON line (machine mode only).
+    void line(const std::string& text)
+    {
+        if (!machine_)
+            return;
         std::lock_guard<std::mutex> lock(mutex_);
-        std::cout << payload.dump() << "\n" << std::flush;
+        std::cout << text << "\n" << std::flush;
     }
     void progress(double fraction, const std::string& stage)
     {
@@ -224,23 +237,93 @@ private:
 };
 
 std::atomic<bool> g_cancel{false};
+std::atomic<bool> g_pause{false};
 std::atomic<bool> g_stdinWatcher{false};
+std::mutex g_controlMutex;
+std::condition_variable g_control;
 
-void watchStdinForCancel()
+void setControl(std::atomic<bool>& flag, bool value)
+{
+    {
+        std::lock_guard<std::mutex> lock(g_controlMutex);
+        flag = value;
+    }
+    g_control.notify_all();
+}
+
+/// Reads "cancel", "pause" and "resume" commands from standard input.
+void watchStdinForCommands()
 {
     g_stdinWatcher = true;
     std::thread([] {
         std::string line;
         while (std::getline(std::cin, line))
         {
-            if (text::trim(line) == "cancel")
-            {
-                g_cancel = true;
-                return;
-            }
+            const std::string cmd = text::trim(line);
+            if (cmd == "cancel")
+                setControl(g_cancel, true);
+            else if (cmd == "pause")
+                setControl(g_pause, true);
+            else if (cmd == "resume")
+                setControl(g_pause, false);
         }
+        // Nobody can resume once standard input is closed.
+        setControl(g_pause, false);
     }).detach();
 }
+
+/// Blocks the engine between two time steps while a pause is requested.
+void waitWhilePaused(Output& out, double seconds)
+{
+    if (!g_pause)
+        return;
+    std::unique_lock<std::mutex> lock(g_controlMutex);
+    if (!g_pause || g_cancel)
+        return;
+    json::Value v = json::Value::object();
+    v.set("time", seconds);
+    out.event("paused", v);
+    g_control.wait(lock, [] { return !g_pause || g_cancel; });
+    if (!g_cancel)
+    {
+        json::Value r = json::Value::object();
+        r.set("time", seconds);
+        out.event("resumed", r);
+    }
+}
+
+/// Turns the engine's result frames into "layout" and "frame" events.
+class FrameStream
+{
+public:
+    explicit FrameStream(Output& out) : out_(out) {}
+
+    void send(const engine::ResultFrame& f)
+    {
+        if (!f.results)
+            return;
+        const bool known = announced_ > 0 && f.layout == engineLayout_ && f.results == source_;
+        if (!known && (announced_ == 0 || !core::live::sameLayout(shape_, *f.results)))
+        {
+            shape_ = core::ResultSet();
+            for (const auto& t : f.results->tables)
+                shape_.defineTable(t.kind, t.ids, t.variables);
+            json::Value v = core::live::layoutPayload(*f.results, ++announced_);
+            v.set("event", "layout");
+            out_.line(v.dump());
+        }
+        engineLayout_ = f.layout;
+        source_ = f.results;
+        out_.line(core::live::frameLine(*f.results, f.slot, announced_, f.period, f.time));
+    }
+
+private:
+    Output& out_;
+    int announced_ = 0;
+    int engineLayout_ = 0;
+    const core::ResultSet* source_ = nullptr;
+    core::ResultSet shape_;
+};
 
 fs::path pathArg(const std::string& s)
 {
@@ -447,6 +530,9 @@ int cmdInfo(const Args& a)
     for (const auto& issue : model.validate())
         std::cout << (issue.severity == core::ModelIssue::Severity::Error ? "error: " : "warning: ")
                   << issue.message << "\n";
+    for (const auto& issue : core::validateObjectSections(model))
+        std::cout << (issue.severity == core::ModelIssue::Severity::Error ? "error: " : "warning: ")
+                  << issue.message << "\n";
     return 0;
 }
 
@@ -490,7 +576,7 @@ int cmdRun(const Args& a)
 {
     Output out(a.flag("machine"));
     if (out.machine())
-        watchStdinForCancel();
+        watchStdinForCommands();
     const fs::path inp = pathArg(a.positional.empty() ? std::string() : a.positional[0]);
     const auto model = loadModel(a);
     engine::EngineRegistry registry;
@@ -551,6 +637,14 @@ int cmdRun(const Args& a)
         out.log(l == engine::LogLevel::Error ? "error" : l == engine::LogLevel::Warning ? "warning" : "info", m);
     };
     cb.cancelRequested = [] { return g_cancel.load(); };
+    cb.checkpoint = [&](double seconds) { waitWhilePaused(out, seconds); };
+    FrameStream frames(out);
+    if (out.machine() && a.flag("live"))
+    {
+        cb.frame = [&](const engine::ResultFrame& f) { frames.send(f); };
+        if (a.has("frame-interval"))
+            cb.frameInterval = std::max(0.0, std::stod(a.opt("frame-interval")));
+    }
 
     const auto started = std::chrono::steady_clock::now();
     auto outcome = eng->run(req, cb);
@@ -685,7 +779,7 @@ int cmdResilience(const Args& a)
     rest.positional.erase(rest.positional.begin());
     Output out(a.flag("machine"));
     if (out.machine())
-        watchStdinForCancel();
+        watchStdinForCommands();
     const bool asJson = a.flag("json") || out.machine();
     Value payload = Value::object();
     payload.set("analysis", what);
@@ -944,6 +1038,120 @@ int cmdImport(const Args& a)
     return 0;
 }
 
+int cmdElevations(const Args& a)
+{
+    if (a.positional.empty() || !a.has("dem"))
+        throw std::runtime_error("usage: mirab-cli elevations <model.inp> --dem <file.tif|file.asc> [--out model.inp]");
+    const fs::path inp = pathArg(a.positional[0]);
+    auto model = core::Model::fromFile(inp);
+    std::string err;
+    std::shared_ptr<raster::Raster> dem(raster::Raster::open(pathArg(a.opt("dem")), &err).release());
+    if (!dem)
+        throw std::runtime_error(err);
+    if (dem->isImagery())
+        throw std::runtime_error(a.opt("dem") + " holds colour imagery, not elevations");
+    const auto settings = core::ProjectSettings::loadFor(inp);
+    double demUnit = 0.0;
+    const std::string units = text::toLower(a.opt("dem-units", "auto"));
+    if (units == "m" || units == "metre" || units == "meter" || units == "metres" || units == "meters")
+        demUnit = 1.0;
+    else if (units == "ft" || units == "feet")
+        demUnit = crs::kInternationalFoot;
+    else if (units == "usft" || units == "us-ft")
+        demUnit = crs::kUsSurveyFoot;
+    else if (units != "auto")
+        throw std::runtime_error("--dem-units expects m, ft, usft or auto");
+    const core::TerrainSampler terrain(dem, a.opt("crs", settings.crs), model.units(), demUnit);
+
+    core::ElevationOptions o;
+    const std::string mode = text::toLower(a.opt("mode", "all"));
+    if (mode == "missing")
+        o.scope = core::ElevationScope::Missing;
+    else if (mode == "selected")
+        o.scope = core::ElevationScope::Selected;
+    else if (mode != "all")
+        throw std::runtime_error("--mode expects all, missing or selected");
+    if (o.scope == core::ElevationScope::Selected)
+    {
+        o.selected = splitList(a.opt("nodes"));
+        if (o.selected.empty())
+            throw std::runtime_error("--mode selected needs --nodes ID,ID,...");
+    }
+    o.reservoirs = a.flag("reservoirs");
+    o.tanks = !a.flag("no-tanks");
+    o.junctions = !a.flag("no-junctions");
+    const std::string swmm = text::toLower(a.opt("swmm", "invert"));
+    if (swmm == "depth" || swmm == "maxdepth")
+        o.swmmMode = core::SwmmElevationMode::MaxDepth;
+    else if (swmm != "invert")
+        throw std::runtime_error("--swmm expects invert or depth");
+    o.decimals = static_cast<int>(a.num("decimals", 2));
+
+    const auto plan = core::planElevations(model, terrain, o);
+    std::map<core::ElevationChange::Status, int> counts;
+    for (const auto& c : plan)
+        ++counts[c.status];
+    auto fmt = [](const std::optional<double>& v) { return v ? text::formatDouble(*v, 10) : std::string("-"); };
+    if (a.flag("json"))
+    {
+        Value out = Value::object();
+        Value rows = Value::array();
+        for (const auto& c : plan)
+        {
+            Value r = Value::object();
+            r.set("id", c.id);
+            r.set("kind", c.kind);
+            r.set("field", c.field);
+            r.set("status", core::statusName(c.status));
+            if (c.ground)
+                r.set("ground", *c.ground);
+            if (c.oldValue)
+                r.set("old", *c.oldValue);
+            if (c.newValue)
+                r.set("new", *c.newValue);
+            if (!c.note.empty())
+                r.set("note", c.note);
+            rows.push(r);
+        }
+        out.set("nodes", rows);
+        Value notes = Value::array();
+        for (const auto& n : terrain.notes())
+            notes.push(n);
+        out.set("notes", notes);
+        std::cout << out.dump(2) << "\n";
+    }
+    else
+    {
+        const auto& info = dem->info();
+        std::cout << "DEM: " << info.width << " x " << info.height << " " << info.format
+                  << (info.crsDescription.empty() ? "" : ", " + info.crsDescription) << "\n";
+        for (const auto& n : terrain.notes())
+            std::cout << "note: " << n << "\n";
+        for (const auto& c : plan)
+        {
+            if (c.status == core::ElevationChange::Status::Same)
+                continue;
+            std::cout << "  " << c.id << "  " << c.field << "  " << fmt(c.oldValue) << " -> " << fmt(c.newValue)
+                      << "  (" << core::statusName(c.status) << (c.note.empty() ? "" : "; " + c.note) << ")\n";
+        }
+        using S = core::ElevationChange::Status;
+        std::cout << counts[S::Update] << " to update, " << counts[S::Same] << " unchanged, " << counts[S::Outside]
+                  << " outside the DEM, " << counts[S::NoData] << " on NoData, " << counts[S::Unplaced]
+                  << " without coordinates, " << counts[S::Skipped] << " skipped\n";
+    }
+    if (a.has("out"))
+    {
+        const int n = core::applyElevations(model, plan, o.decimals);
+        model.save(pathArg(a.opt("out")));
+        std::cerr << "Wrote " << a.opt("out") << " (" << n << " values changed)\n";
+    }
+    else if (!a.flag("json"))
+    {
+        std::cout << "Preview only: add --out <model.inp> to write the changes.\n";
+    }
+    return 0;
+}
+
 void usage()
 {
     std::cout <<
@@ -959,7 +1167,8 @@ Usage:
   mirab-cli info <model.inp>
   mirab-cli check <model.inp> [--engine ID] [--msx file.msx] [--json]
   mirab-cli run <model.inp> [--engine ID] [--msx file.msx] [--out results.anr]
-                  [--report file.rpt] [--workdir DIR] [--machine]
+                  [--report file.rpt] [--workdir DIR] [--machine [--live]
+                  [--frame-interval SECONDS]]
   mirab-cli results <results.anr|.out> [--table node|link|subcatchment|system]
                   [--variable NAME] [--element ID[,ID...]]
   mirab-cli resilience todini <model.inp> --results FILE [--required-pressure P] [--json]
@@ -972,10 +1181,18 @@ Usage:
   mirab-cli export geojson|gpkg|wntr <model.inp> --out FILE [--crs EPSG:n]
                   [--results FILE [--period N]]
   mirab-cli import wntr <network.json> --out model.inp
+  mirab-cli elevations <model.inp> --dem FILE.tif|FILE.asc [--mode all|missing|selected]
+                  [--nodes ID,ID] [--reservoirs] [--no-tanks] [--swmm invert|depth]
+                  [--dem-units auto|m|ft|usft] [--crs EPSG:n] [--decimals N]
+                  [--out model.inp] [--json]
 
 Engines: epanet-2.2-epa, epanet-2.3-owa, epanet-msx-2.0-epa22, epanet-msx-2.0-owa23,
          swmm-5.2-epa, swmm5plus-1.0 (when installed). Run "mirab-cli engines".
 Pressures and flows are in the units of the model.
+With --machine, events are written as JSON lines and standard input accepts
+"cancel", "pause" and "resume"; --live adds the results of each reporting
+period while the run is in progress (at most one every --frame-interval
+seconds, default 0.25).
 )";
 }
 
@@ -1044,6 +1261,8 @@ int runMain(int argc, char** argv)
             return cmdExport(a);
         if (cmd == "import")
             return cmdImport(a);
+        if (cmd == "elevations")
+            return cmdElevations(a);
         std::cerr << "unknown command " << cmd << "\n";
         usage();
         return 1;

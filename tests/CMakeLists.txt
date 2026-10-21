@@ -20,7 +20,8 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_executable(mirab-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp)
+add_executable(mirab-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp
+    test_swmm_data.cpp test_swmm_objects.cpp test_raster.cpp)
 target_link_libraries(mirab-tests PRIVATE
     Mirab::core Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 target_compile_definitions(mirab-tests PRIVATE
@@ -33,7 +34,8 @@ if(TARGET mirab_engines)
     add_dependencies(mirab-tests mirab_engines)
 endif()
 
-foreach(group IN ITEMS text json inp model features results settings hash crs import)
+foreach(group IN ITEMS text json inp model features results settings hash crs import swmm
+                     lid lidusage transects hydrographs rules raster elevation)
     add_test(NAME ${group} COMMAND mirab-tests "${group}:")
 endforeach()
 if(MIRAB_BUILD_ENGINES)
@@ -46,6 +48,14 @@ find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_test(NAME license-headers
         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/license_headers.py" --check)
+    # Solver protocol as the desktop application uses it: live frames,
+    # pause, resume and cancel over standard input.
+    if(MIRAB_BUILD_ENGINES)
+        add_test(NAME cli-protocol
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli_protocol.py" $<TARGET_FILE:mirab-cli>
+                    "${PROJECT_SOURCE_DIR}/examples" "${CMAKE_CURRENT_BINARY_DIR}/cli-protocol")
+        set_tests_properties(cli-protocol PROPERTIES TIMEOUT 180)
+    endif()
 endif()
 
 # Desktop smoke test: open the demo, run it through the solver process and
@@ -65,4 +75,17 @@ if(MIRAB_BUILD_GUI AND MIRAB_BUILD_ENGINES)
     add_test(NAME gui-smoke-results
         COMMAND mirab-cli results "${CMAKE_CURRENT_BINARY_DIR}/gui-smoke.anr")
     set_tests_properties(gui-smoke-results PROPERTIES DEPENDS gui-smoke)
+endif()
+
+# Object editors: open each one offscreen on a model that uses them.
+if(MIRAB_BUILD_GUI)
+    foreach(target IN ITEMS LID_CONTROLS:BioCell LID_USAGE:S1 TRANSECTS:Main HYDROGRAPHS:UH1 CONTROLS:)
+        string(REGEX REPLACE "[:_]+" "-" name "gui-editor-${target}")
+        string(REGEX REPLACE "-$" "" name "${name}")
+        string(TOLOWER "${name}" name)
+        add_test(NAME ${name}
+            COMMAND Mirab "${CMAKE_CURRENT_SOURCE_DIR}/data/swmm-objects.inp" --show-data ${target}
+                    --delay 300 --screenshot "${CMAKE_CURRENT_BINARY_DIR}/${name}.png")
+        set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
+    endforeach()
 endif()

@@ -24,6 +24,8 @@
  */
 #include "SolverProcess.h"
 
+#include "mirab/core/LiveResults.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -54,6 +56,8 @@ SolverProcess::~SolverProcess()
 {
     if (isRunning())
     {
+        // The owner is being destroyed: it must not hear about this run any more.
+        process_.disconnect(this);
         process_.kill();
         process_.waitForFinished(2000);
     }
@@ -84,6 +88,11 @@ bool SolverProcess::start(const QStringList& arguments)
     done_ = {};
     haveDone_ = false;
     stderr_.clear();
+    paused_ = false;
+    live_.reset();
+    pendingLayout_.reset();
+    layoutId_ = 0;
+    liveTime_ = 0.0;
     QStringList args = arguments;
     args << "--machine";
     process_.setProgram(cliPath());
@@ -104,16 +113,80 @@ void SolverProcess::cancel()
     });
 }
 
+void SolverProcess::pause()
+{
+    if (isRunning())
+        process_.write("pause\n");
+}
+
+void SolverProcess::resume()
+{
+    if (isRunning())
+        process_.write("resume\n");
+}
+
+void SolverProcess::readLiveLine(const QByteArray& line, bool* started, bool* grew)
+{
+    const std::string_view text(line.constData(), static_cast<std::size_t>(line.size()));
+    try
+    {
+        if (line.startsWith("{\"event\":\"frame\""))
+        {
+            const auto frame = core::live::parseFrameLine(text);
+            if (frame.layout != layoutId_)
+                return;
+            if (pendingLayout_)
+            {
+                live_ = std::move(pendingLayout_);
+                *started = true;
+            }
+            const int p = live_ ? core::live::appendFrame(*live_, frame) : -1;
+            if (p >= 0)
+            {
+                liveTime_ = frame.time;
+                firstChanged_ = firstChanged_ < 0 ? p : std::min(firstChanged_, p);
+                *grew = true;
+            }
+            return;
+        }
+        int id = 0;
+        auto layout = core::live::parseLayout(json::Value::parse(text), &id);
+        pendingLayout_ = std::make_shared<core::ResultSet>(std::move(layout));
+        layoutId_ = id;
+    }
+    catch (const std::exception& e)
+    {
+        emit log("warning",
+                 tr("Live results could not be read: %1").arg(QString::fromUtf8(e.what())));
+    }
+}
+
 void SolverProcess::readOutput()
 {
     buffer_ += process_.readAllStandardOutput();
+    bool started = false, grew = false;
+    firstChanged_ = -1;
     int nl;
-    while ((nl = buffer_.indexOf('\n')) >= 0)
+    int from = 0;
+    while ((nl = buffer_.indexOf('\n', from)) >= 0)
     {
-        const QByteArray line = buffer_.left(nl).trimmed();
-        buffer_.remove(0, nl + 1);
+        QByteArray line = buffer_.mid(from, nl - from).trimmed();
+        from = nl + 1;
         if (line.isEmpty())
             continue;
+        // An engine may print to standard output without ending its line.
+        const int brace = line.startsWith('{') ? 0 : line.indexOf("{\"");
+        if (brace > 0)
+        {
+            emit log("info", QString::fromUtf8(line.left(brace)).trimmed());
+            line = line.mid(brace);
+        }
+        // Frames are large and frequent: they skip the general JSON parser.
+        if (line.startsWith("{\"event\":\"frame\"") || line.startsWith("{\"layout\""))
+        {
+            readLiveLine(line, &started, &grew);
+            continue;
+        }
         QJsonParseError err{};
         const QJsonDocument doc = QJsonDocument::fromJson(line, &err);
         if (err.error != QJsonParseError::NoError || !doc.isObject())
@@ -127,17 +200,33 @@ void SolverProcess::readOutput()
             emit progress(o.value("fraction").toDouble(), o.value("stage").toString());
         else if (event == "log")
             emit log(o.value("level").toString(), o.value("message").toString());
+        else if (event == "paused")
+        {
+            paused_ = true;
+            emit paused(o.value("time").toDouble());
+        }
+        else if (event == "resumed")
+        {
+            paused_ = false;
+            emit resumed();
+        }
         else if (event == "done")
         {
             done_ = o;
             haveDone_ = true;
         }
     }
+    buffer_.remove(0, from);
+    if (started)
+        emit liveStarted();
+    else if (grew)
+        emit liveUpdated(firstChanged_);
 }
 
 void SolverProcess::onFinished(int exitCode, QProcess::ExitStatus status)
 {
     readOutput();
+    paused_ = false;
     if (!haveDone_)
     {
         done_ = {};

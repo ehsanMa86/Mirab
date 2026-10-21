@@ -21,15 +21,22 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_library(mirab_core STATIC
+    src/ControlRules.cpp
     src/Crs.cpp
+    src/Elevation.cpp
     src/Features.cpp
     src/Hash.cpp
+    src/Inflate.cpp
     src/InpDocument.cpp
     src/Json.cpp
+    src/LiveResults.cpp
     src/Model.cpp
+    src/Objects.cpp
     src/ProjectSettings.cpp
+    src/Raster.cpp
     src/Results.cpp
     src/Schema.cpp
+    src/SwmmObjects.cpp
     src/Text.cpp
     src/Units.cpp)
 add_library(Mirab::core ALIAS mirab_core)

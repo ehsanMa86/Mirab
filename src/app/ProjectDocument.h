@@ -77,10 +77,24 @@ public:
     // Results
     bool hasResults() const { return results_ != nullptr; }
     const core::ResultSet* results() const { return results_.get(); }
+    /// Replaces the results. When live results were shown, the period at
+    /// the same time stays selected.
     void setResults(std::unique_ptr<core::ResultSet> r);
     void clearResults();
     int period() const { return period_; }
     void setPeriod(int p);
+
+    // Live results: a result set that grows while a simulation runs.
+    /// Shows @p live (at least one period) and follows its latest period.
+    void beginLiveResults(std::shared_ptr<const core::ResultSet> live);
+    /// Call after periods from @p firstChanged on were appended to (or
+    /// replaced in) the live result set @p live.
+    void liveResultsGrew(const core::ResultSet* live, int firstChanged);
+    /// Keeps the live results as partial results, described by @p note.
+    void endLiveResults(const QString& note);
+    bool isLive() const { return live_; }
+    /// Shown with partial results, e.g. "Partial results (cancelled at 6:00:00)".
+    QString resultsNote() const { return note_; }
 
     // Selection
     const Selection& selection() const { return selection_; }
@@ -94,6 +108,10 @@ signals:
     void modelReset();
     void selectionChanged();
     void resultsChanged();
+    /// Periods from @p firstChanged on were appended to or replaced in the live results.
+    void liveResultsUpdated(int firstChanged);
+    /// The live state or the results note changed.
+    void liveStateChanged();
     void periodChanged(int period);
     void titleChanged();
 
@@ -103,8 +121,11 @@ private:
     QString path_;
     QUndoStack undo_;
     bool settingsDirty_ = false;
-    std::unique_ptr<core::ResultSet> results_;
+    std::shared_ptr<const core::ResultSet> results_;
     int period_ = 0;
+    bool live_ = false;
+    bool followLatest_ = true;
+    QString note_;
     Selection selection_;
 };
 

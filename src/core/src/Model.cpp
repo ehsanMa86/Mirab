@@ -27,6 +27,7 @@
 #include "mirab/core/Text.h"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -496,6 +497,25 @@ double Model::durationSeconds() const
     return epanetTime(doc_, "DURATION", 0.0);
 }
 
+double Model::reportStartSeconds() const
+{
+    if (dialect_ == Dialect::Swmm)
+    {
+        // The report start date and time default to the simulation start.
+        bool okStart = false, okReport = false;
+        const double start = swmmDateTime(doc_, "START_DATE", "START_TIME", okStart);
+        const bool ownTime = doc_.keyValue("OPTIONS", "REPORT_START_TIME").has_value();
+        double report = swmmDateTime(doc_, "REPORT_START_DATE",
+                                     ownTime ? "REPORT_START_TIME" : "START_TIME", okReport);
+        if (!okStart)
+            return 0.0;
+        if (!okReport)
+            report += std::floor(start / 86400.0) * 86400.0;
+        return std::max(0.0, report - start);
+    }
+    return epanetTime(doc_, "REPORT START", 0.0);
+}
+
 double Model::reportStepSeconds() const
 {
     if (dialect_ == Dialect::Swmm)
@@ -556,12 +576,18 @@ bool Model::setToken(std::string_view section, int row, int column, const std::s
         return false;
     auto tokens = s->rowTokens(row);
     const std::string v = text::trim(value);
+    std::string blank = "*";
+    if (const SectionDef* def = findSectionDef(dialect_, section))
+    {
+        if (const ColumnDef* c = def->layout(tokens).column(static_cast<std::size_t>(column)))
+            blank = c->blank;
+    }
     if (column >= static_cast<int>(tokens.size()))
     {
         if (v.empty())
             return true;
         while (static_cast<int>(tokens.size()) < column)
-            tokens.push_back("*");
+            tokens.push_back(blank);
         tokens.push_back(v);
     }
     else if (v.empty() && column == static_cast<int>(tokens.size()) - 1 && column > 0)
@@ -570,7 +596,7 @@ bool Model::setToken(std::string_view section, int row, int column, const std::s
     }
     else
     {
-        tokens[static_cast<std::size_t>(column)] = v.empty() ? "*" : text::quoteIfNeeded(text::unquote(v));
+        tokens[static_cast<std::size_t>(column)] = v.empty() ? blank : text::quoteIfNeeded(text::unquote(v));
     }
     s->setRowTokens(row, tokens);
     rebuild();
@@ -1003,6 +1029,8 @@ bool Model::renameElement(Category category, std::string_view oldId, std::string
         const SectionDef* def = findSectionDef(dialect_, section.name);
         const auto allRows = section.allRowTokens();
         const int rows = static_cast<int>(allRows.size());
+        const RowLayout fixedLayout = def ? def->layout({}) : RowLayout{};
+        RowLayout rowLayout;
         for (int r = 0; r < rows; ++r)
         {
             auto tokens = allRows[static_cast<std::size_t>(r)];
@@ -1026,6 +1054,15 @@ bool Model::renameElement(Category category, std::string_view oldId, std::string
                     }
                 }
             }
+            else if (section.name == "HYDROGRAPHS")
+            {
+                // The first row of a unit hydrograph names its rain gage.
+                if (category == Category::Gage && tokens.size() == 2 && tokens[1] == from)
+                {
+                    tokens[1] = to;
+                    changed = true;
+                }
+            }
             else if (def)
             {
                 if (def->keyCategory == category && !tokens.empty() && tokens[0] == from)
@@ -1033,9 +1070,14 @@ bool Model::renameElement(Category category, std::string_view oldId, std::string
                     tokens[0] = to;
                     changed = true;
                 }
-                for (std::size_t c = 1; c < def->columns.size() && c < tokens.size(); ++c)
+                const RowLayout& layout =
+                    def->variantColumn >= 0 ? (rowLayout = def->layout(tokens)) : fixedLayout;
+                for (std::size_t c = 1; c < tokens.size(); ++c)
                 {
-                    const ColumnType t = def->columns[c].type;
+                    const ColumnDef* col = layout.column(c);
+                    if (!col)
+                        break;
+                    const ColumnType t = col->type;
                     const bool refers =
                         (category == Category::Node &&
                          (t == ColumnType::NodeRef || t == ColumnType::NodeOrAreaRef)) ||
@@ -1093,9 +1135,112 @@ std::vector<ModelIssue> Model::validate() const
                               "subcatchment " + a.id + " uses unknown rain gage " + a.gage,
                               a.section, a.row});
     }
+    appendReferenceIssues(issues);
     if (nodes_.empty())
         issues.push_back({ModelIssue::Severity::Warning, "the network has no nodes", {}, -1});
     return issues;
+}
+
+namespace
+{
+std::string objectLabel(std::string_view kind)
+{
+    static const std::map<std::string, std::string> labels = {
+        {"POLLUTANT", "pollutant"}, {"LANDUSE", "land use"},       {"AQUIFER", "aquifer"},
+        {"SNOWPACK", "snow pack"},  {"HYDROGRAPH", "unit hydrograph"}, {"TRANSECT", "transect"},
+        {"STREET", "street"},       {"INLET", "inlet"},            {"LID", "LID control"},
+        {"RULE", "control rule"}};
+    const auto it = labels.find(toUpper(kind));
+    return it == labels.end() ? text::toLower(kind) : it->second;
+}
+} // namespace
+
+void Model::appendReferenceIssues(std::vector<ModelIssue>& issues) const
+{
+    std::map<std::string, std::set<std::string>> objects;
+    for (const auto& kind : objectKinds(dialect_))
+    {
+        const auto names = objectNames(kind);
+        objects[toUpper(kind)] = std::set<std::string>(names.begin(), names.end());
+    }
+    for (const auto& def : sectionDefs(dialect_))
+    {
+        if (def.columns.empty() || def.name == "COORDINATES" || def.name == "VERTICES" ||
+            def.name == "POLYGONS" || def.name == "SYMBOLS")
+            continue;
+        const InpSection* s = doc_.find(def.name);
+        if (!s)
+            continue;
+        const bool element = !def.elementKind.empty();
+        const RowLayout fixedLayout = def.layout({});
+        RowLayout rowLayout;
+        std::set<std::string> names;
+        const auto allRows = s->allRowTokens();
+        for (std::size_t r = 0; r < allRows.size(); ++r)
+        {
+            const auto& tokens = allRows[r];
+            if (tokens.empty())
+                continue;
+            const int row = static_cast<int>(r);
+            if (!def.objectKind.empty() && !def.multiRowPerKey && !names.insert(tokens[0]).second)
+                issues.push_back({ModelIssue::Severity::Error,
+                                  "duplicate " + objectLabel(def.objectKind) + " name " + tokens[0], def.name, row});
+            const RowLayout& layout = def.variantColumn >= 0 ? (rowLayout = def.layout(tokens)) : fixedLayout;
+            for (std::size_t c = 0; c < tokens.size(); ++c)
+            {
+                const ColumnDef* col = layout.column(c);
+                if (!col || (layout.variadic && c + 1 >= layout.columns.size()))
+                    break;
+                if (element && (c == 0 || static_cast<int>(c) == def.fromColumn || static_cast<int>(c) == def.toColumn))
+                    continue;
+                if (def.name == "SUBCATCHMENTS" && (c == 1 || c == 2))
+                    continue; // reported above
+                const std::string& v = tokens[c];
+                if (v.empty() || v == "*" || v == "\"\"")
+                    continue;
+                bool keyword = false;
+                for (const auto& k : col->choices)
+                    keyword = keyword || iequals(k, v);
+                if (keyword)
+                    continue;
+                bool ok = true;
+                std::string what;
+                switch (col->type)
+                {
+                case ColumnType::NodeRef:
+                    ok = findNode(v) != nullptr;
+                    what = "node";
+                    break;
+                case ColumnType::LinkRef:
+                    ok = findLink(v) != nullptr;
+                    what = "link";
+                    break;
+                case ColumnType::AreaRef:
+                    ok = findArea(v) != nullptr;
+                    what = "subcatchment";
+                    break;
+                case ColumnType::NodeOrAreaRef:
+                    ok = findNode(v) || findArea(v);
+                    what = "node or subcatchment";
+                    break;
+                case ColumnType::GageRef:
+                    ok = findGage(v) != nullptr;
+                    what = "rain gage";
+                    break;
+                case ColumnType::ObjectRef:
+                    ok = objects[toUpper(col->object)].count(v) > 0;
+                    what = objectLabel(col->object);
+                    break;
+                default:
+                    break;
+                }
+                if (!ok)
+                    issues.push_back({ModelIssue::Severity::Error,
+                                      "[" + def.name + "] " + tokens[0] + " refers to unknown " + what + " " + v,
+                                      def.name, row});
+            }
+        }
+    }
 }
 
 } // namespace mirab::core

@@ -476,6 +476,46 @@ ResultSet ResultSet::readEpanetOutput(const std::filesystem::path& path)
     return r;
 }
 
+SwmmVariables swmmVariables(const std::string& flowUnits,
+                            const std::vector<std::string>& pollutants,
+                            const std::vector<std::string>& pollutantUnits)
+{
+    const auto units = ProjectUnits::fromFlowUnits(Dialect::Swmm, flowUnits);
+    const std::string len = units.label("length");
+    const std::string fl = units.label("flow");
+    SwmmVariables v;
+    v.subcatchment = {{"Rainfall", units.label("rainfall")},
+                      {"Snow Depth", units.system == UnitSystem::SI ? "mm" : "in"},
+                      {"Evaporation Loss", units.label("rainfall")},
+                      {"Infiltration Loss", units.label("rainfall")},
+                      {"Runoff", fl},
+                      {"Groundwater Flow", fl},
+                      {"Groundwater Elevation", len},
+                      {"Soil Moisture", ""}};
+    v.node = {{"Depth", len},           {"Head", len},          {"Volume", units.label("volume")},
+              {"Lateral Inflow", fl}, {"Total Inflow", fl}, {"Flooding", fl}};
+    v.link = {{"Flow", fl},
+              {"Depth", len},
+              {"Velocity", units.label("velocity")},
+              {"Volume", units.label("volume")},
+              {"Capacity", ""}};
+    for (std::size_t i = 0; i < pollutants.size(); ++i)
+    {
+        const std::string unit = i < pollutantUnits.size() ? pollutantUnits[i] : std::string();
+        v.subcatchment.push_back({"Washoff " + pollutants[i], unit});
+        v.node.push_back({pollutants[i], unit});
+        v.link.push_back({pollutants[i], unit});
+    }
+    static const char* sysNames[] = {"Air Temperature", "Rainfall",        "Snow Depth",
+                                     "Infiltration",    "Runoff",          "Dry Weather Inflow",
+                                     "Groundwater Inflow", "RDII Inflow",  "External Inflow",
+                                     "Total Lateral Inflow", "Flooding",   "Outflow",
+                                     "Storage Volume",  "Evaporation",     "Potential ET"};
+    for (const char* n : sysNames)
+        v.system.push_back({n, ""});
+    return v;
+}
+
 ResultSet ResultSet::readSwmmOutput(const std::filesystem::path& path)
 {
     BinaryReader in(path);
@@ -574,45 +614,19 @@ ResultSet ResultSet::readSwmmOutput(const std::filesystem::path& path)
     r.reportStep = reportStep;
     r.metadata["startDate"] = text::formatDouble(startDate, 12);
 
-    const std::string len = units.label("length");
-    const std::string fl = units.label("flow");
-    std::vector<Variable> subVars = {{"Rainfall", units.label("rainfall")},
-                                     {"Snow Depth", units.system == UnitSystem::SI ? "mm" : "in"},
-                                     {"Evaporation Loss", units.label("rainfall")},
-                                     {"Infiltration Loss", units.label("rainfall")},
-                                     {"Runoff", fl},
-                                     {"Groundwater Flow", fl},
-                                     {"Groundwater Elevation", len},
-                                     {"Soil Moisture", ""}};
-    std::vector<Variable> nodeVars = {{"Depth", len},   {"Head", len},
-                                      {"Volume", units.label("volume")},
-                                      {"Lateral Inflow", fl}, {"Total Inflow", fl},
-                                      {"Flooding", fl}};
-    std::vector<Variable> linkVars = {{"Flow", fl},
-                                      {"Depth", len},
-                                      {"Velocity", units.label("velocity")},
-                                      {"Volume", units.label("volume")},
-                                      {"Capacity", ""}};
-    for (int i = 0; i < nPoll; ++i)
-    {
-        subVars.push_back({"Washoff " + pollIds[static_cast<std::size_t>(i)], pollUnits[static_cast<std::size_t>(i)]});
-        nodeVars.push_back({pollIds[static_cast<std::size_t>(i)], pollUnits[static_cast<std::size_t>(i)]});
-        linkVars.push_back({pollIds[static_cast<std::size_t>(i)], pollUnits[static_cast<std::size_t>(i)]});
-    }
+    const auto vars = swmmVariables(r.flowUnits, pollIds, pollUnits);
     auto fit = [](std::vector<Variable> v, int n) {
         while (static_cast<int>(v.size()) < n)
             v.push_back({"Value " + std::to_string(v.size() + 1), ""});
         v.resize(static_cast<std::size_t>(n));
         return v;
     };
-    std::vector<Variable> sysVars;
-    static const char* sysNames[] = {"Air Temperature", "Rainfall",        "Snow Depth",
-                                     "Infiltration",    "Runoff",          "Dry Weather Inflow",
-                                     "Groundwater Inflow", "RDII Inflow",  "External Inflow",
-                                     "Total Lateral Inflow", "Flooding",   "Outflow",
-                                     "Storage Volume",  "Evaporation",     "Potential ET"};
-    for (int i = 0; i < nSysVars; ++i)
-        sysVars.push_back({i < 15 ? sysNames[i] : "System " + std::to_string(i + 1), ""});
+    std::vector<Variable> subVars = vars.subcatchment;
+    std::vector<Variable> nodeVars = vars.node;
+    std::vector<Variable> linkVars = vars.link;
+    std::vector<Variable> sysVars = fit(vars.system, nSysVars);
+    for (int i = static_cast<int>(vars.system.size()); i < nSysVars; ++i)
+        sysVars[static_cast<std::size_t>(i)].name = "System " + std::to_string(i + 1);
 
     if (nSub > 0)
         r.defineTable("subcatchment", subIds, fit(subVars, nSubVars));

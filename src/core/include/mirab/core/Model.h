@@ -156,6 +156,8 @@ public:
     void setOption(std::string_view key, const std::string& value);
     double durationSeconds() const;
     double reportStepSeconds() const;
+    /// Seconds from the simulation start to the first reported time.
+    double reportStartSeconds() const;
     double hydraulicStepSeconds() const;
     /// EPANET: demand model "DDA" or "PDA".
     std::string demandModel() const;
@@ -182,11 +184,44 @@ public:
     bool renameElement(Category category, std::string_view oldId, std::string_view newId,
                        std::string* error = nullptr);
 
+    // Named objects that are not drawn on the map: SWMM pollutants, land uses,
+    // aquifers, snow packs, unit hydrographs, transects, streets, inlets, LID
+    // controls and control rules (see objectKinds()).
+    std::vector<std::string> objectNames(std::string_view kind) const;
+    bool objectExists(std::string_view kind, std::string_view name) const;
+    std::string uniqueObjectName(std::string_view kind, std::string_view prefix) const;
+    /// Adds an object with default parameters.
+    bool addObject(std::string_view kind, std::string_view name, std::string* error = nullptr);
+    /// Renames an object and every reference to it.
+    bool renameObject(std::string_view kind, std::string_view oldName, std::string_view newName,
+                      std::string* error = nullptr);
+    /// Removes an object and the data that cannot exist without it (inflows
+    /// of a pollutant, buildup of a land use, ...); optional references are cleared.
+    bool removeObject(std::string_view kind, std::string_view name);
+    /// Rows that define an object, followed by rows of other sections keyed
+    /// by it (a land use's [BUILDUP] and [WASHOFF] rows).
+    std::vector<ElementRow> objectRows(std::string_view kind, std::string_view name) const;
+
+    /// Data rows of @p section that belong to @p key: rows whose first token is
+    /// the key, the X1 and GR rows of a transect, or the rows of a control rule.
+    std::vector<int> rowsOfKey(std::string_view section, std::string_view key) const;
+    /// Replaces the given data rows of a section by @p rows. Rows whose tokens
+    /// do not change keep their text and comments; new rows go after the last
+    /// replaced row (or at the end of the section).
+    void replaceRows(std::string_view section, const std::vector<int>& rowIndices,
+                     const std::vector<std::vector<std::string>>& rows);
+    /// A new row for a data section keyed by an element or object, with
+    /// default values. Returns an empty row and sets @p missing (e.g.
+    /// "Pollutant") when the row needs an object that does not exist yet.
+    std::vector<std::string> newDataRow(const SectionDef& def, std::string_view key,
+                                        std::string* missing = nullptr) const;
+
     /// Structural checks: dangling references, duplicate IDs, unplaced nodes.
     std::vector<ModelIssue> validate() const;
 
 private:
     void removeKeyedRows(Category category, std::string_view id);
+    void appendReferenceIssues(std::vector<ModelIssue>& issues) const;
     std::string coordinateSection(Category category) const;
 
     Dialect dialect_ = Dialect::Epanet;

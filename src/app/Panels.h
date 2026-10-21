@@ -25,6 +25,7 @@
 #pragma once
 
 #include "ProjectDocument.h"
+#include "mirab/engine/Engine.h"
 
 #include <QPlainTextEdit>
 #include <QSyntaxHighlighter>
@@ -55,6 +56,8 @@ public:
 
 private:
     void refreshChart();
+    /// Redraws the series only (live results grew).
+    void plot();
 
     ProjectDocument* doc_;
     QComboBox* chartVar_;
@@ -69,20 +72,32 @@ class ProjectBrowser : public QWidget
     Q_OBJECT
 public:
     explicit ProjectBrowser(ProjectDocument* doc, QWidget* parent = nullptr);
+    /// Engine used to grey out collections it does not simulate.
+    void setEngine(const engine::EngineDescriptor* engine);
+    /// Expands and selects the item of a pattern, curve, series or named object.
+    void revealData(const QString& section, const QString& id);
 
 signals:
     void elementActivated();
     void zoomToRequested(const Selection& sel);
     void deleteRequested();
     void dataActivated(const QString& section, const QString& id);
+    void optionsActivated();
+    void statusMessage(const QString& text);
+    /// A named object was renamed from the browser.
+    void objectRenamed(const QString& section, const QString& oldName, const QString& newName);
 
 private:
     void rebuild();
     void syncSelection();
     void applyFilter(const QString& text);
     void showContextMenu(const QPoint& pos);
+    void addObject(const QString& kind);
+    void renameObject(const QString& kind, const QString& name);
+    void deleteObject(const QString& kind, const QString& name);
 
     ProjectDocument* doc_;
+    const engine::EngineDescriptor* engine_ = nullptr;
     QLineEdit* filter_;
     QTreeWidget* tree_;
     QLabel* summary_;

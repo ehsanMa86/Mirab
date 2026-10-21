@@ -25,6 +25,7 @@
 #include "PropertyPanel.h"
 
 #include "Icons.h"
+#include "SchemaWidgets.h"
 #include "Theme.h"
 #include "mirab/core/Features.h"
 #include "mirab/core/Text.h"
@@ -40,6 +41,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <cmath>
 #include <map>
 #include <set>
 
@@ -170,6 +172,8 @@ PropertyPanel::PropertyPanel(ProjectDocument* doc, QWidget* parent) : QWidget(pa
     table_->setSelectionMode(QAbstractItemView::SingleSelection);
     table_->setWordWrap(false);
     table_->setItemDelegate(new ChoiceDelegate(table_));
+    table_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(table_, &QWidget::customContextMenuRequested, this, &PropertyPanel::showContextMenu);
     table_->setEditTriggers(QAbstractItemView::DoubleClicked | QAbstractItemView::SelectedClicked |
                             QAbstractItemView::EditKeyPressed | QAbstractItemView::AnyKeyPressed);
     // One click on a value starts editing it.
@@ -220,30 +224,44 @@ void PropertyPanel::setEngine(const engine::EngineDescriptor* engine)
     rebuild();
 }
 
-bool PropertyPanel::sectionSupported(const std::string& section, QString* why) const
+bool PropertyPanel::sectionSupported(const std::string& section, const std::vector<std::string>& tokens,
+                                     QString* why) const
 {
-    if (!engine_)
-        return true;
-    struct Map
-    {
-        const char* section;
-        core::Feature feature;
-    };
-    static const Map maps[] = {{"LEAKAGE", core::Feature::EpanetLeakage},
-                               {"POLLUTANTS", core::Feature::SwmmWaterQuality},
-                               {"LID_USAGE", core::Feature::SwmmLowImpactDevelopment},
-                               {"INLET_USAGE", core::Feature::SwmmStreetsAndInlets}};
-    for (const auto& m : maps)
-    {
-        if (section == m.section && engine_->supportFor(m.feature) != engine::Support::Full)
-        {
-            if (why)
-                *why = tr("%1 does not model %2.").arg(QString::fromStdString(engine_->name),
-                                                       QString::fromUtf8(core::featureName(m.feature)));
-            return false;
-        }
-    }
-    return true;
+    return engineSupportsSection(engine_, doc_->model().dialect(), section, tokens, why);
+}
+
+void PropertyPanel::showContextMenu(const QPoint& pos)
+{
+    const int r = table_->rowAt(pos.y());
+    if (r < 0)
+        return;
+    // The header row above the clicked row names the data row.
+    int h = r;
+    while (h >= 0 && table_->columnSpan(h, 0) <= 1)
+        --h;
+    if (h < 0)
+        return;
+    const QTableWidgetItem* header = table_->item(h, 0);
+    const QString section = header->data(SectionRole).toString();
+    const int row = header->data(RowRole).toInt();
+    if (section.isEmpty() || row < 0)
+        return;
+    const auto* def = core::findSectionDef(doc_->model().dialect(), section.toStdString());
+    if (!def || !def->elementKind.empty())
+        return;
+    QMenu menu(this);
+    menu.addAction(icons::get("delete"), tr("Remove this %1 row").arg(header->text().section("  #", 0, 0).toLower()), this,
+                   [this, section, row] {
+                       doc_->edit(tr("Remove [%1] row").arg(section), [&](core::Model& m, std::string*) {
+                           auto* s = m.document().find(section.toStdString());
+                           if (!s || row >= s->rowCount())
+                               return false;
+                           s->removeRow(row);
+                           m.rebuild();
+                           return true;
+                       });
+                   });
+    menu.exec(table_->viewport()->mapToGlobal(pos));
 }
 
 void PropertyPanel::rebuild()
@@ -337,19 +355,30 @@ void PropertyPanel::showElement(const Selection& sel)
     for (const auto& er : model.rowsFor(sel.category, id))
     {
         QString why;
-        const bool supported = sectionSupported(er.section, &why);
+        const bool supported = sectionSupported(er.section, er.tokens, &why);
         const int n = ++occurrence[er.section];
         QString header = er.def && !er.def->description.empty() ? QString::fromStdString(er.def->description)
                                                                  : "[" + QString::fromStdString(er.section) + "]";
         if (er.def && er.def->multiRowPerKey)
             header += "  #" + QString::number(n);
         addHeader(header, supported, why.isEmpty() ? "[" + QString::fromStdString(er.section) + "]" : why);
-        const auto& cols = er.def ? er.def->columns : std::vector<core::ColumnDef>{};
-        const std::size_t ncols = std::max(cols.size(), er.tokens.size());
+        QTableWidgetItem* headerItem = table_->item(table_->rowCount() - 1, 0);
+        headerItem->setData(SectionRole, QString::fromStdString(er.section));
+        headerItem->setData(RowRole, er.row);
+        const core::RowLayout layout = er.def ? er.def->layout(er.tokens) : core::RowLayout{};
+        const auto& cols = layout.columns;
+        std::size_t ncols = std::max(cols.size(), er.tokens.size());
+        if (layout.repeatFrom >= 0 && ncols > cols.size())
+        {
+            // Show whole groups of repeated columns (land use and percent, ...).
+            const std::size_t period = cols.size() - static_cast<std::size_t>(layout.repeatFrom);
+            ncols = cols.size() + (ncols - cols.size() + period - 1) / period * period;
+        }
         for (std::size_t c = 0; c < ncols; ++c)
         {
-            const bool known = c < cols.size();
-            const bool tail = known && er.def->variadic && c + 1 == cols.size();
+            const core::ColumnDef* colDef = layout.repeatFrom >= 0 || c < cols.size() ? layout.column(c) : nullptr;
+            const bool known = colDef != nullptr;
+            const bool tail = known && layout.variadic && c + 1 == cols.size();
             QString value;
             if (c < er.tokens.size())
             {
@@ -360,24 +389,27 @@ void PropertyPanel::showElement(const Selection& sel)
                 }
                 else
                 {
-                    value = QString::fromStdString(er.tokens[c]);
+                    value = QString::fromStdString(text::unquote(er.tokens[c]));
                 }
             }
-            const QString name = known ? QString::fromStdString(cols[c].name) : tr("Value %1").arg(c + 1);
-            const QString unit = known && !cols[c].quantity.empty() ? QString::fromStdString(units.label(cols[c].quantity)) : QString();
-            QString tip = known ? QString::fromStdString(cols[c].help) : QString();
+            if (value == "\"\"")
+                value.clear();
+            const QString name = known ? QString::fromStdString(layout.columnName(c)) : tr("Value %1").arg(c + 1);
+            const QString unit = known && !colDef->quantity.empty() ? QString::fromStdString(units.label(colDef->quantity)) : QString();
+            QString tip = known ? QString::fromStdString(colDef->help) : QString();
             if (!supported)
                 tip = why;
             QStringList choices;
             if (known)
             {
-                for (const auto& ch : cols[c].choices)
+                for (const auto& ch : colDef->choices)
                 {
                     // Grey out choices the selected engine cannot run.
                     if (engine_ && ch == "PCV" && engine_->supportFor(core::Feature::EpanetPcvValve) != engine::Support::Full)
                         continue;
                     choices << QString::fromStdString(ch);
                 }
+                choices << referenceChoices(model, *colDef);
             }
             addRow(name, value, unit, tip, QString::fromStdString(er.section), er.row, static_cast<int>(c), tail,
                    choices, supported);
@@ -397,9 +429,13 @@ void PropertyPanel::showElement(const Selection& sel)
                 addHeader(tr("Results at %1").arg(QString::fromStdString(text::formatDuration(r->times[static_cast<std::size_t>(doc_->period())]))),
                           true);
                 for (int v = 0; v < t->variableCount(); ++v)
+                {
+                    // NaN: not available while the simulation runs.
+                    const double x = t->value(doc_->period(), v, el);
                     addRow(QString::fromStdString(t->variables[v].name),
-                           QString::fromStdString(text::formatDouble(t->value(doc_->period(), v, el), 6)),
+                           std::isnan(x) ? tr("n/a") : QString::fromStdString(text::formatDouble(x, 6)),
                            QString::fromStdString(t->variables[v].unit), {}, {}, -1, -1, false, {}, true, false);
+                }
             }
         }
     }
@@ -534,29 +570,40 @@ void PropertyPanel::populateAddMenu()
             if (!l || l->kind != "Pipe")
                 continue;
         }
+        if (sel.category == Category::Link && (def.name == "INLET_USAGE" || def.name == "LOSSES"))
+        {
+            const auto* l = model.findLink(id);
+            if (!l || l->kind != "Conduit")
+                continue;
+        }
+        if (def.name == "GWF" && model.rowsOfKey(def.name, id).size() >= 2)
+            continue; // one LATERAL and one DEEP expression at most
         QString why;
         QAction* a = menu->addAction("[" + QString::fromStdString(def.name) + "]  " + QString::fromStdString(def.description));
-        if (!sectionSupported(def.name, &why))
+        std::string missing;
+        const auto row = model.newDataRow(def, id, &missing);
+        if (!sectionSupported(def.name, row, &why))
         {
             a->setEnabled(false);
             a->setToolTip(why);
             a->setText(a->text() + "  " + tr("(not supported by the selected engine)"));
         }
+        else if (row.empty())
+        {
+            a->setEnabled(false);
+            a->setText(a->text() + "  " +
+                       tr("(add a %1 first)").arg(objectKindLabel(QString::fromStdString(missing)).toLower()));
+        }
         const std::string section = def.name;
-        const std::size_t ncols = def.columns.size();
-        connect(a, &QAction::triggered, this, [this, section, id, ncols] {
+        connect(a, &QAction::triggered, this, [this, section, row] {
             doc_->edit(tr("Add [%1] data").arg(QString::fromStdString(section)), [&](core::Model& m, std::string*) {
-                std::vector<std::string> row = {id};
-                for (std::size_t c = 1; c < ncols; ++c)
-                    row.push_back(c == 1 ? "0" : "");
-                while (!row.empty() && row.back().empty())
-                    row.pop_back();
                 m.document().ensure(section).appendRow(row);
                 m.rebuild();
                 return true;
             });
         });
     }
+    menu->setToolTipsVisible(true);
     addButton_->setEnabled(!menu->isEmpty());
 }
 

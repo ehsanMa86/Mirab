@@ -50,7 +50,9 @@ struct ProjectUnits
                                       std::string_view pressureUnits = {});
 
     /// Display label for a quantity family (length, diameter, flow, pressure,
-    /// head, elevation, velocity, depth, area, volume, roughness, power, rainfall).
+    /// head, elevation, velocity, depth, area, volume, roughness, power, rainfall,
+    /// and for SWMM data smalldepth, rate, evaporation, loading, temperature,
+    /// meltrate, percent, days, decay).
     std::string label(std::string_view quantity) const;
 
     /// Factor that converts a value of the quantity in project units to SI

@@ -65,14 +65,24 @@ public:
     bool openFile(const QString& path);
     /// Starts a run with the selected engine (also used for automated screenshots).
     void runSimulation();
+    /// Pauses or resumes the running simulation.
+    void togglePause();
+    /// Stops the running simulation; the results computed so far stay on the map.
+    void stopSimulation();
     void selectElement(const QString& id);
     /// Opens a report tab by name (tables, timeseries, profile, frequency,
     /// variability, systemflow, energy, status); used by menus and automation.
     void openReport(const QString& kind);
+    /// Opens a tool dialog by name: "elevations", "raster-layers" or "map-service".
+    void openTool(const QString& name);
     /// Opens the import dialog for a shapefile, DXF drawing or CSV table.
     void importFile(const QString& path);
-    /// Opens the editor of a pattern, curve or time series ([PATTERNS], [CURVES], [TIMESERIES]).
+    /// Opens the editor of a pattern, curve or time series ([PATTERNS], [CURVES], [TIMESERIES]),
+    /// of a named object such as a SWMM pollutant ([POLLUTANTS]), LID control, transect or unit
+    /// hydrograph group, of the control rules, or the LID usage dialog of a subcatchment ("LID_USAGE").
     void openDataEditor(const QString& section, const QString& id);
+    /// Opens the simulation options dialog, optionally at a page (see OptionsDialog::showPage).
+    void showSimulationOptions(const QString& page = {});
 
     // PluginHost
     const core::Model& model() const override { return doc_->model(); }
@@ -114,6 +124,7 @@ private:
     void openDialog();
     void openExample(const QString& relative);
     void simulationFinished(bool ok, const QJsonObject& r);
+    void updatePauseAction();
     void loadResultsDialog();
     bool loadResults(const QString& path);
     void exportGis(bool geopackage);
@@ -127,6 +138,9 @@ private:
     void findElement();
     void chooseMsxFile();
     void chooseBackdrop();
+    void addMapService();
+    void showRasterLayers();
+    void elevationsFromDem();
     void chooseCoordinateSystem();
     void loadPlugins();
     QString writeRunInput(QString* error);
@@ -137,6 +151,7 @@ private:
     void message(const QString& level, const QString& text);
     void showDock(const QString& name);
     void decorateTab(int index);
+    bool openSpecialEditor(const QString& section, const QString& id);
     QString examplesDirectory() const;
 
     ProjectDocument* doc_;
@@ -159,8 +174,10 @@ private:
     QLabel* engineLabel_ = nullptr;
     QLabel* unitsLabel_ = nullptr;
     QLabel* countsLabel_ = nullptr;
+    QLabel* runState_ = nullptr;
     SolverProcess* solver_ = nullptr;
     QString runInput_;
+    bool discardRun_ = false; ///< the project changed during the run
     QByteArray defaultState_;
     bool layoutRestored_ = false;
     bool compatibilityPass_ = false;
@@ -178,6 +195,7 @@ private:
     QAction* zoomWindowAct_ = nullptr;
     QAction* runAct_ = nullptr;
     QAction* cancelAct_ = nullptr;
+    QAction* pauseAct_ = nullptr;
     QAction* saveAct_ = nullptr;
     QAction* undoAct_ = nullptr;
     QAction* redoAct_ = nullptr;

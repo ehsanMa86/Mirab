@@ -59,7 +59,8 @@ private:
     void commit(QTableWidgetItem* item);
     void populateAddMenu();
     void applyFilter();
-    bool sectionSupported(const std::string& section, QString* why) const;
+    bool sectionSupported(const std::string& section, const std::vector<std::string>& tokens, QString* why) const;
+    void showContextMenu(const QPoint& pos);
 
     ProjectDocument* doc_;
     const engine::EngineDescriptor* engine_ = nullptr;

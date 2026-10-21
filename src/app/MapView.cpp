@@ -25,6 +25,8 @@
 #include "MapView.h"
 
 #include "Basemap.h"
+#include "RasterLayers.h"
+#include "mirab/core/Elevation.h"
 #include "Theme.h"
 #include "mirab/core/Text.h"
 
@@ -40,6 +42,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 
 namespace mirab::app
@@ -95,20 +98,26 @@ double niceStep(double raw)
 }
 } // namespace
 
-MapView::MapView(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(doc), basemap_(new Basemap(this))
+MapView::MapView(ProjectDocument* doc, QWidget* parent)
+    : QWidget(parent), doc_(doc), basemap_(new Basemap(this)), rasters_(new RasterRenderer(doc, this))
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(320, 240);
     setAttribute(Qt::WA_OpaquePaintEvent);
     connect(basemap_, &Basemap::updated, this, qOverload<>(&QWidget::update));
+    connect(rasters_, &RasterRenderer::updated, this, qOverload<>(&QWidget::update));
     connect(doc_, &ProjectDocument::modelReset, this, [this] {
         fitted_ = false;
         userView_ = false;
         cancelPending();
         recomputeRanges();
         updateCoordinateSystem();
+        const auto& service = doc_->settings().mapService;
+        if (service.valid() && !Basemap::find(QString::fromStdString(service.id)))
+            Basemap::addService(Basemap::fromSettings(service), false);
         basemap_->setProvider(QString::fromStdString(doc_->settings().basemap));
+        rasters_->reload();
         fitToWindow();
     });
     connect(doc_, &ProjectDocument::modelChanged, this, [this] {
@@ -122,6 +131,10 @@ MapView::MapView(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(
         setAreaVariable(areaVar_);
     });
     connect(doc_, &ProjectDocument::periodChanged, this, qOverload<>(&QWidget::update));
+    connect(doc_, &ProjectDocument::liveResultsUpdated, this, [this](int firstNew) {
+        extendRanges(firstNew);
+        update();
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +160,16 @@ void MapView::setBasemap(const QString& id)
     update();
 }
 
+void MapView::chooseBasemap(const QString& id)
+{
+    setBasemap(id);
+    auto& settings = doc_->settings();
+    settings.basemap = id.toStdString();
+    if (const auto* p = Basemap::find(id); p && p->custom)
+        Basemap::toSettings(*p, settings.mapService);
+    doc_->markSettingsChanged();
+}
+
 QString MapView::basemap() const
 {
     return basemap_->provider();
@@ -157,6 +180,25 @@ bool MapView::basemapUsable(QString* why) const
     if (why)
         *why = basemap_->unusableReason();
     return basemap_->usable();
+}
+
+void MapView::reloadRasters()
+{
+    rasters_->reload();
+    update();
+}
+
+std::optional<double> MapView::groundElevationAt(const QPointF& world) const
+{
+    const auto terrain = projectTerrain(doc_);
+    if (!terrain)
+        return std::nullopt;
+    return terrain->groundAt(world.x(), world.y());
+}
+
+QString MapView::basemapError() const
+{
+    return basemap_->active() ? basemap_->serviceError() : QString();
 }
 
 void MapView::setCoordinateSystem(const QString& crs)
@@ -243,6 +285,15 @@ QPointF MapView::worldAt(const QPoint& screen) const
 void MapView::fitToWindow()
 {
     core::Bounds b = doc_->model().bounds();
+    if (!b.valid)
+    {
+        // An empty project: show the raster layers instead.
+        if (const auto e = rasters_->extent(crsText_))
+        {
+            b.include({e->left(), e->top()});
+            b.include({e->right(), e->bottom()});
+        }
+    }
     if (!backdropWorld_.isNull())
     {
         b.include({backdropWorld_.left(), backdropWorld_.top()});
@@ -392,6 +443,10 @@ void MapView::recomputeRanges()
     legendTitle_.clear();
     rangeMin_ = 0.0;
     rangeMax_ = 1.0;
+    rangeTable_ = nullptr;
+    rangeVar_ = -1;
+    rangeLo_ = std::numeric_limits<double>::max();
+    rangeHi_ = std::numeric_limits<double>::lowest();
     if (!r)
         return;
     const char* table = nullptr;
@@ -413,26 +468,41 @@ void MapView::recomputeRanges()
     }
     if (!table)
         return;
-    const auto* t = r->table(table);
-    double lo = std::numeric_limits<double>::max(), hi = std::numeric_limits<double>::lowest();
-    for (int p = 0; p < r->periodCount(); ++p)
+    rangeTable_ = table;
+    rangeVar_ = var;
+    extendRanges(0);
+}
+
+void MapView::extendRanges(int fromPeriod)
+{
+    const auto* r = doc_->results();
+    const auto* t = r && rangeTable_ ? r->table(rangeTable_) : nullptr;
+    if (!t || rangeVar_ < 0 || rangeVar_ >= t->variableCount())
+        return;
+    const bool magnitude = std::strcmp(rangeTable_, "link") == 0;
+    double lo = rangeLo_, hi = rangeHi_;
+    for (int p = std::max(0, fromPeriod); p < r->periodCount(); ++p)
     {
         for (int e = 0; e < t->elementCount(); ++e)
         {
-            double v = t->value(p, var, e);
-            if (std::string(table) == "link")
+            double v = t->value(p, rangeVar_, e);
+            if (std::isnan(v)) // not available during a run
+                continue;
+            if (magnitude)
                 v = std::fabs(v);
             lo = std::min(lo, v);
             hi = std::max(hi, v);
         }
     }
+    rangeLo_ = lo;
+    rangeHi_ = hi;
     if (lo > hi)
         return;
     if (hi - lo < 1e-12)
         hi = lo + 1.0;
     rangeMin_ = lo;
     rangeMax_ = hi;
-    const auto& v = t->variables[static_cast<std::size_t>(var)];
+    const auto& v = t->variables[static_cast<std::size_t>(rangeVar_)];
     legendTitle_ = QString::fromStdString(v.name) + (v.unit.empty() ? QString() : " (" + QString::fromStdString(v.unit) + ")");
 }
 
@@ -454,7 +524,10 @@ std::optional<double> MapView::resultValue(const char* table, int variable, cons
     const int e = t->elementIndex(id);
     if (e < 0)
         return std::nullopt;
-    return t->value(doc_->period(), variable, e);
+    const double v = t->value(doc_->period(), variable, e);
+    if (std::isnan(v))
+        return std::nullopt;
+    return v;
 }
 
 int MapView::flowVariable() const
@@ -660,6 +733,8 @@ void MapView::paintTo(QPainter& p, const QRect& area)
                 p.drawLine(QPointF(area.left(), toScreen(0, y).y()), QPointF(area.right(), toScreen(0, y).y()));
         }
     }
+
+    rasters_->paint(p, area, {center_.x, center_.y, scale_, area.size()}, crsText_);
 
     if (!backdrop_.isNull())
     {
@@ -1005,7 +1080,10 @@ void MapView::drawScaleBar(QPainter& p, const QRect& area)
 
 void MapView::drawAttribution(QPainter& p, const QRect& area)
 {
-    const QString text = basemap_->attribution();
+    QString text = basemap_->attribution();
+    const QString error = basemapError();
+    if (!error.isEmpty())
+        text = tr("Map service: %1").arg(error) + (text.isEmpty() ? QString() : "   " + text);
     if (text.isEmpty())
         return;
     QFont f = font();
@@ -1017,7 +1095,7 @@ void MapView::drawAttribution(QPainter& p, const QRect& area)
     p.setPen(Qt::NoPen);
     p.setBrush(QColor(255, 255, 255, 200));
     p.drawRect(box);
-    p.setPen(QColor(60, 70, 85));
+    p.setPen(error.isEmpty() ? QColor(60, 70, 85) : QColor(170, 40, 30));
     p.drawText(box, Qt::AlignCenter, text);
 }
 
@@ -1233,10 +1311,16 @@ void MapView::mouseMoveEvent(QMouseEvent* e)
                     {
                         tip += "<table style='margin-top:4px'>";
                         for (int v = 0; v < t->variableCount() && v < 8; ++v)
+                        {
+                            const double x = t->value(doc_->period(), v, el);
+                            // NaN: not available while the simulation runs.
+                            const QString shown =
+                                std::isnan(x) ? tr("n/a") : QString::fromStdString(text::formatDouble(x, 5));
                             tip += "<tr><td>" + QString::fromStdString(t->variables[v].name) + "&nbsp;&nbsp;</td><td align='right'>" +
-                                   QString::fromStdString(text::formatDouble(t->value(doc_->period(), v, el), 5)) +
+                                   shown +
                                    "</td><td>&nbsp;" + QString::fromStdString(t->variables[v].unit).toHtmlEscaped() +
                                    "</td></tr>";
+                        }
                         tip += "</table>";
                     }
                 }

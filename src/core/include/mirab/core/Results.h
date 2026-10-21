@@ -113,4 +113,17 @@ public:
     static ResultSet loadAny(const std::filesystem::path& path);
 };
 
+/// Variables of SWMM results, named as ResultSet::readSwmmOutput() names them.
+struct SwmmVariables
+{
+    std::vector<Variable> subcatchment;
+    std::vector<Variable> node;
+    std::vector<Variable> link;
+    std::vector<Variable> system;
+};
+
+/// @p pollutantUnits holds "mg/L", "ug/L" or "count/L" for each pollutant.
+SwmmVariables swmmVariables(const std::string& flowUnits, const std::vector<std::string>& pollutants,
+                            const std::vector<std::string>& pollutantUnits);
+
 } // namespace mirab::core

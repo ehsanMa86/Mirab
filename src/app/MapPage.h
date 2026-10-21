@@ -76,12 +76,15 @@ public:
 
 signals:
     void coordinateSystemRequested();
+    void mapServiceRequested();
+    void rasterLayersRequested();
 
 protected:
     void resizeEvent(QResizeEvent*) override;
 
 private:
     void resultsChanged();
+    void updateTimeControls();
     void updateTimeLabel();
     void placeOverlays();
 
@@ -98,6 +101,7 @@ private:
     QToolButton* stepForward_;
     QSlider* slider_;
     QLabel* timeLabel_;
+    QLabel* noteLabel_;
     QTimer* timer_;
     QToolButton* basemap_;
     QWidget* zoomBox_;

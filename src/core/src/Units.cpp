@@ -99,6 +99,8 @@ std::string ProjectUnits::label(std::string_view quantity) const
         return si ? "m/s" : "ft/s";
     if (q == "area")
         return dialect == Dialect::Swmm ? (si ? "ha" : "ac") : (si ? "m2" : "ft2");
+    if (q == "surfacearea")
+        return si ? "m2" : "ft2";
     if (q == "volume")
         return si ? "m3" : "ft3";
     if (q == "power")
@@ -107,6 +109,24 @@ std::string ProjectUnits::label(std::string_view quantity) const
         return si ? "mm/hr" : "in/hr";
     if (q == "headloss")
         return si ? "m/km" : "ft/kft";
+    if (q == "smalldepth")
+        return si ? "mm" : "in";
+    if (q == "rate")
+        return si ? "mm/hr" : "in/hr";
+    if (q == "evaporation")
+        return si ? "mm/day" : "in/day";
+    if (q == "loading")
+        return si ? "kg/ha" : "lbs/ac";
+    if (q == "temperature")
+        return si ? "\xC2\xB0" "C" : "\xC2\xB0" "F";
+    if (q == "meltrate")
+        return si ? "mm/hr/\xC2\xB0" "C" : "in/hr/\xC2\xB0" "F";
+    if (q == "percent")
+        return "%";
+    if (q == "days")
+        return "days";
+    if (q == "decay")
+        return "1/days";
     return {};
 }
 
@@ -136,8 +156,12 @@ double ProjectUnits::toSI(std::string_view quantity) const
         return si ? 1.0 : 0.3048;
     if (q == "area")
         return dialect == Dialect::Swmm ? (si ? 10000.0 : 4046.8564224) : (si ? 1.0 : 0.09290304);
+    if (q == "surfacearea")
+        return si ? 1.0 : 0.09290304;
     if (q == "volume")
         return si ? 1.0 : 0.028316846592;
+    if (q == "smalldepth")
+        return si ? 0.001 : 0.0254;
     return 1.0;
 }
 

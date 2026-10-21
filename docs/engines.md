@@ -40,10 +40,32 @@ Each engine declares how it handles features whose support differs between engin
 | Pollutants | | | yes | ignored |
 | LID controls | | | yes | ignored |
 | Streets and inlets | | | yes | ignored |
-| Kinematic wave or steady routing | | | yes | ignored (always dynamic wave) |
+| Kinematic wave or steady routing | | | yes | ignored (set to dynamic wave) |
 | `INERTIAL_DAMPING` PARTIAL or FULL | | | yes | set to NONE (the only mode SWMM5+ supports) |
 
-"Ignored" features are removed from the copy of the input file given to the engine, and the run reports what was removed. "Cannot run" blocks the run until you change the engine or the model.
+"Ignored" features are removed from the copy of the input file given to the engine; the project file itself does not change. The run log lists what was removed:
+
+| Feature | Removed from the engine's copy |
+|---|---|
+| FAVAD pipe leakage | `[LEAKAGE]` |
+| BAR or FEET pressure units | the `PRESSURE` option |
+| `EMITTER BACKFLOW` | the option |
+| Pollutants | `[POLLUTANTS]`, `[LANDUSES]`, `[COVERAGES]`, `[LOADINGS]`, `[BUILDUP]`, `[WASHOFF]`, `[TREATMENT]`, the pollutant rows of `[INFLOWS]` and `[DWF]` (flow rows stay), and the `REMOVALS` rows of `[LID_CONTROLS]` |
+| LID controls | `[LID_CONTROLS]`, `[LID_USAGE]` |
+| Streets and inlets | `[STREETS]`, `[INLETS]`, `[INLET_USAGE]` |
+| Kinematic wave or steady routing | `FLOW_ROUTING` is set to `DYNWAVE` |
+| `INERTIAL_DAMPING` | set to `NONE` |
+
+"Cannot run" blocks the run until you change the engine or the model.
+
+## Results during a run
+
+Every engine delivers the results of each reporting period while it runs, and every engine can be paused between two time steps (see [file-formats.md](file-formats.md#live-results)):
+
+- **EPANET 2.2 and 2.3:** all variables, exactly as in the final results.
+- **EPANET-MSX:** the hydraulic pass first, then the species pass with all variables.
+- **EPA SWMM 5.2:** read with the SWMM 5.2 `swmm_getValue` functions at the routing step that reaches each reporting time. Node depth, head, volume, inflows and flooding, link flow, depth and velocity, and subcatchment rainfall, evaporation, infiltration and runoff are available; link capacity is approximated from the depth; link volume, snow, groundwater, soil moisture, pollutants and most system values appear when the run ends. The final results are always read from the binary output file.
+- **SWMM5+:** node depth and head, link flow, depth and velocity, as in its final results.
 
 ## Why engines run in a separate process
 
@@ -89,6 +111,6 @@ Status: SWMM5+ upstream is developed with Intel Fortran. swmm5plus-capi builds i
 SWMM5+ also has modeling rules of its own, which Mirab applies or reports:
 
 - only `INERTIAL_DAMPING NONE` is supported; Mirab sets it for the run,
-- routing is always dynamic wave; other routing options are ignored,
-- pollutants and LID controls are not modeled,
+- routing is always dynamic wave; Mirab sets `FLOW_ROUTING DYNWAVE` for the run,
+- pollutants and LID controls are not modeled; Mirab removes them from the engine's copy of the input,
 - a subcatchment must drain to a storage node or to a junction next to a conduit; SWMM5+ stops with a configuration error otherwise.

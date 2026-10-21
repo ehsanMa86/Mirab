@@ -89,10 +89,13 @@ DataEditor::DataEditor(ProjectDocument* doc, const QString& section, const QStri
     titles->addWidget(state_);
     hl->addLayout(titles, 1);
     curveType_ = new QComboBox(head);
-    curveType_->addItems({"STORAGE", "SHAPE", "DIVERSION", "TIDAL", "PUMP1", "PUMP2", "PUMP3", "PUMP4", "PUMP5",
-                          "RATING", "CONTROL", "WEIR"});
-    curveType_->setVisible(swmm_ && section == "CURVES");
-    curveType_->setToolTip(tr("Curve type"));
+    if (section == "PATTERNS")
+        curveType_->addItems({"MONTHLY", "DAILY", "HOURLY", "WEEKEND"});
+    else
+        curveType_->addItems({"STORAGE", "SHAPE", "DIVERSION", "TIDAL", "PUMP1", "PUMP2", "PUMP3", "PUMP4", "PUMP5",
+                              "RATING", "CONTROL", "WEIR"});
+    curveType_->setVisible(swmm_ && (section == "CURVES" || section == "PATTERNS"));
+    curveType_->setToolTip(section == "PATTERNS" ? tr("Pattern type") : tr("Curve type"));
     hl->addWidget(curveType_);
     auto* addRow = new QPushButton(icons::get("new"), tr("Add row"), head);
     auto* delRow = new QPushButton(icons::get("delete"), tr("Delete row"), head);
@@ -123,20 +126,31 @@ DataEditor::DataEditor(ProjectDocument* doc, const QString& section, const QStri
         updateChart();
     });
     connect(curveType_, &QComboBox::currentIndexChanged, this, [this] {
-        if (!loading_)
-            setDirty(true);
+        if (loading_)
+            return;
+        setDirty(true);
+        if (section_ == "PATTERNS")
+        {
+            updatePatternLabels();
+            updateChart();
+        }
     });
     connect(addRow, &QPushButton::clicked, this, [this] {
         const int r = table_->currentRow() >= 0 ? table_->currentRow() + 1 : table_->rowCount();
         table_->insertRow(r);
         if (section_ == "PATTERNS")
+        {
             table_->setItem(r, 0, new QTableWidgetItem("1"));
+            updatePatternLabels();
+        }
         setDirty(true);
         updateChart();
     });
     connect(delRow, &QPushButton::clicked, this, [this] {
         if (table_->currentRow() >= 0)
             table_->removeRow(table_->currentRow());
+        if (section_ == "PATTERNS")
+            updatePatternLabels();
         setDirty(true);
         updateChart();
     });
@@ -151,6 +165,11 @@ DataEditor::DataEditor(ProjectDocument* doc, const QString& section, const QStri
 
 double DataEditor::patternStepHours() const
 {
+    if (swmm_)
+    {
+        const QString type = curveType_->currentText();
+        return type == "MONTHLY" ? 730.0 : type == "DAILY" ? 24.0 : 1.0;
+    }
     if (const auto* s = doc_->model().document().find("TIMES"))
     {
         for (const auto& tokens : s->allRowTokens())
@@ -191,13 +210,20 @@ void DataEditor::load()
         table_->setColumnCount(1);
         table_->setHorizontalHeaderLabels({tr("Multiplier")});
         for (const auto& tokens : rows)
-            for (std::size_t i = 1; i < tokens.size(); ++i)
+        {
+            std::size_t i = 1;
+            // SWMM patterns start with their type (MONTHLY, DAILY, HOURLY or WEEKEND).
+            if (swmm_ && i < tokens.size() && !isNumber(tokens[i]))
+            {
+                const int idx = curveType_->findText(QString::fromStdString(text::toUpper(tokens[i])));
+                if (idx >= 0)
+                    curveType_->setCurrentIndex(idx);
+                ++i;
+            }
+            for (; i < tokens.size(); ++i)
                 addRow({QString::fromStdString(tokens[i])});
-        QStringList periods;
-        const double step = patternStepHours();
-        for (int r = 0; r < table_->rowCount(); ++r)
-            periods << tr("%1 h").arg(QString::fromStdString(text::formatDouble(r * step, 4)));
-        table_->setVerticalHeaderLabels(periods);
+        }
+        updatePatternLabels();
     }
     else if (section_ == "TIMESERIES")
     {
@@ -250,6 +276,25 @@ void DataEditor::load()
     loading_ = false;
     setDirty(false);
     updateChart();
+}
+
+void DataEditor::updatePatternLabels()
+{
+    QStringList periods;
+    const QString type = swmm_ ? curveType_->currentText() : QString();
+    static const QStringList months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    static const QStringList days = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    const double step = patternStepHours();
+    for (int r = 0; r < table_->rowCount(); ++r)
+    {
+        if (type == "MONTHLY" && r < months.size())
+            periods << months[r];
+        else if (type == "DAILY" && r < days.size())
+            periods << days[r];
+        else
+            periods << tr("%1 h").arg(QString::fromStdString(text::formatDouble(r * step, 4)));
+    }
+    table_->setVerticalHeaderLabels(periods);
 }
 
 void DataEditor::updateChart()
@@ -314,20 +359,24 @@ void DataEditor::apply()
     };
     if (section_ == "PATTERNS")
     {
+        const bool typed = swmm_;
         std::vector<std::string> row = {id};
+        if (typed)
+            row.push_back(curveType_->currentText().toStdString());
+        const std::size_t full = typed ? 8 : 7;
         for (int r = 0; r < table_->rowCount(); ++r)
         {
             const std::string v = text(r, 0);
             if (v.empty())
                 continue;
             row.push_back(v);
-            if (row.size() == 7)
+            if (row.size() == full)
             {
                 rows.push_back(row);
                 row = {id};
             }
         }
-        if (row.size() > 1)
+        if (row.size() > 1 && !(typed && rows.empty() && row.size() == 2))
             rows.push_back(row);
     }
     else if (section_ == "TIMESERIES")
@@ -365,7 +414,7 @@ void DataEditor::apply()
         for (std::size_t i = 1; i < row.size(); ++i)
         {
             const bool timeColumn = section_ == "TIMESERIES" && i + 1 < row.size();
-            const bool typeColumn = swmm_ && section_ == "CURVES" && i == 1 && !isNumber(row[i]);
+            const bool typeColumn = swmm_ && (section_ == "CURVES" || section_ == "PATTERNS") && i == 1 && !isNumber(row[i]);
             if (!timeColumn && !typeColumn && !isNumber(row[i]))
             {
                 state_->setText("<span style='color:#c84b4b'>" + tr("\"%1\" is not a number.").arg(QString::fromStdString(row[i])) +

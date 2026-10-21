@@ -30,12 +30,20 @@ set(APP_SOURCES
     ImportDialog.cpp ImportDialog.h
     MainWindow.cpp MainWindow.h
     MapPage.cpp MapPage.h
+    MapServices.cpp MapServices.h
     MapView.cpp MapView.h
+    ObjectEditor.cpp ObjectEditor.h
+    OptionsDialog.cpp OptionsDialog.h
     Panels.cpp Panels.h
     ProjectDocument.cpp ProjectDocument.h
     PropertyPanel.cpp PropertyPanel.h
+    RasterDialogs.cpp RasterDialogs.h
+    RasterLayers.cpp RasterLayers.h
     Reports.cpp Reports.h
+    RulesEditor.cpp RulesEditor.h
+    SchemaWidgets.cpp SchemaWidgets.h
     SolverProcess.cpp SolverProcess.h
+    SwmmEditors.cpp SwmmEditors.h
     Theme.cpp Theme.h
     include/mirab/app/PluginInterface.h
     main.cpp
