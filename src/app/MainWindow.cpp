@@ -25,6 +25,7 @@
 #include "MainWindow.h"
 
 #include "Basemap.h"
+#include "CalibrationDialogs.h"
 #include "DataEditor.h"
 #include "Dialogs.h"
 #include "Icons.h"
@@ -558,6 +559,13 @@ void MainWindow::createMenus()
         updateCompatibility();
         showDock("messagesDock");
     });
+    project->addSeparator();
+    QAction* observedAct = project->addAction(icons::get("table"), tr("Observed &data..."), this,
+                                              [this] { openTool("observed-data"); });
+    observedAct->setObjectName("observedDataAction");
+    QAction* calibrateAct = project->addAction(icons::get("calibration"), tr("Ca&librate..."), this,
+                                               [this] { openTool("calibration"); });
+    calibrateAct->setObjectName("calibrateAction");
 
     // Simulation
     QMenu* sim = menuBar()->addMenu(tr("&Simulation"));
@@ -1415,6 +1423,32 @@ void MainWindow::openReport(const QString& kind)
     tabs_->setCurrentIndex(index);
 }
 
+void MainWindow::openCalibrationTool(const QString& name)
+{
+    if (name == "observed-data")
+    {
+        ObservedDataDialog dlg(doc_, this);
+        dlg.exec();
+        return;
+    }
+    if (name != "calibration" && name != "calibration-run")
+        return;
+    const auto* desc = currentEngine();
+    if (!desc)
+        return;
+    if (inpEditor_->hasPendingEdits() && !inpEditor_->apply())
+    {
+        QMessageBox::warning(this, tr("Calibrate"), tr("The input text has errors."));
+        return;
+    }
+    if (msxEditor_->isModified())
+        msxEditor_->save();
+    CalibrationDialog dlg(doc_, currentEngineId(), desc->multiSpecies ? msxPath() : QString(), this);
+    if (name == "calibration-run")
+        QTimer::singleShot(300, &dlg, &CalibrationDialog::start);
+    dlg.exec();
+}
+
 void MainWindow::openDataEditor(const QString& section, const QString& id)
 {
     // LID controls, transects, unit hydrographs, control rules and LID usage.
@@ -1692,6 +1726,8 @@ void MainWindow::openTool(const QString& name)
         showRasterLayers();
     else if (name == "map-service")
         addMapService();
+    else
+        openCalibrationTool(name);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,22 @@
+{
+  "format": "mirab-project-settings/1",
+  "calibration": {
+    "observed": [
+      {"file": "mirab-urban-outfall.dat", "format": "swmm", "table": "node", "variable": "Total Inflow", "unit": "CMS"},
+      {
+        "file": "mirab-urban-depth.csv",
+        "format": "csv",
+        "links": [{"column": "J3 depth (m)", "table": "node", "element": "J3", "variable": "Depth", "unit": "m"}]
+      }
+    ],
+    "parameters": [
+      {"name": "Conduit roughness", "section": "CONDUITS", "column": "Roughness", "elements": "all",
+       "mode": "multiply", "min": 0.7, "max": 1.5},
+      {"name": "Impervious area", "section": "SUBCATCHMENTS", "column": "PctImperv", "elements": "all",
+       "mode": "multiply", "min": 0.7, "max": 1.2}
+    ],
+    "objective": [{"metric": "NSE", "weight": 1}, {"metric": "VolumeError", "weight": 0.5}],
+    "budget": 60,
+    "seed": 1
+  }
+}

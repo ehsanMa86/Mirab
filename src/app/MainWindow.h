@@ -71,10 +71,8 @@ public:
     void stopSimulation();
     void selectElement(const QString& id);
     /// Opens a report tab by name (tables, timeseries, profile, frequency,
-    /// variability, systemflow, energy, status); used by menus and automation.
+    /// variability, systemflow, energy, calibration, status); used by menus and automation.
     void openReport(const QString& kind);
-    /// Opens a tool dialog by name: "elevations", "raster-layers" or "map-service".
-    void openTool(const QString& name);
     /// Opens the import dialog for a shapefile, DXF drawing or CSV table.
     void importFile(const QString& path);
     /// Opens the editor of a pattern, curve or time series ([PATTERNS], [CURVES], [TIMESERIES]),
@@ -83,6 +81,9 @@ public:
     void openDataEditor(const QString& section, const QString& id);
     /// Opens the simulation options dialog, optionally at a page (see OptionsDialog::showPage).
     void showSimulationOptions(const QString& page = {});
+    /// Opens a tool dialog: "elevations", "raster-layers", "map-service", "observed-data",
+    /// "calibration" or "calibration-run" (the calibration dialog with the run started).
+    void openTool(const QString& name);
 
     // PluginHost
     const core::Model& model() const override { return doc_->model(); }
@@ -102,6 +103,7 @@ protected:
     void showEvent(QShowEvent* e) override;
 
 private:
+    void openCalibrationTool(const QString& name);
     void createActions();
     void createDocks();
     void createMenus();

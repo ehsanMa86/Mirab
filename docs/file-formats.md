@@ -10,6 +10,7 @@
 | `model.anr` | results of the last run |
 | `model.rpt` | the engine's text report |
 | `model.gpkg` | GeoPackage written by "Open in QGIS" |
+| `model-calibration/` | log (`evaluations.csv`), best values (`best.json`) and calibrated model of the last calibration |
 
 ### Settings sidecar
 
@@ -34,7 +35,7 @@
 }
 ```
 
-Paths are relative to the `.inp` file. `basemap` is a built-in provider (`osm`, `esri-imagery`, ...) or `custom:<name>`; `mapService` describes a custom one (`type` `xyz`, `wms` or `wmts`; WMTS also has `matrixSet`, `style` and `format`). Raster `style` is `hillshade`, `color`, `hillshade-color` or `image`; `verticalUnit` is metres per elevation unit and is left out when the file's own units are used.
+Paths are relative to the `.inp` file. `basemap` is a built-in provider (`osm`, `esri-imagery`, ...) or `custom:<name>`; `mapService` describes a custom one (`type` `xyz`, `wms` or `wmts`; WMTS also has `matrixSet`, `style` and `format`). Raster `style` is `hillshade`, `color`, `hillshade-color` or `image`; `verticalUnit` is metres per elevation unit and is left out when the file's own units are used. An optional `calibration` member holds the observed-data files, how their columns link to results, and the calibration parameters and objective; its layout is described in the [user guide](user-guide.md#from-the-command-line).
 
 ## Results format (`.anr`)
 
@@ -65,7 +66,8 @@ The desktop application runs `mirab-cli <command> ... --machine`. Every line on 
 | `frame` | runs with `--live`: `layout`, `period`, `time` (seconds from the simulation start), `data` |
 | `paused` | `time`: simulation seconds reached when the engine stopped between two time steps |
 | `resumed` | `time` |
-| `done` | `success`, `message`, and for runs `results`, `report`, `periods`, `seconds`, `engine`, `cancelled`; for analyses `payload` |
+| `evaluation` | calibration only: `index`, `objective`, `best` (best objective so far), `values`, `success` |
+| `done` | `success`, `message`, and for runs `results`, `report`, `periods`, `seconds`, `engine`, `cancelled`; for analyses and calibration `payload` |
 
 Standard input accepts one command per line:
 

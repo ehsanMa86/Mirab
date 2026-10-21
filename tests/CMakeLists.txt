@@ -21,7 +21,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_executable(mirab-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp
-    test_swmm_data.cpp test_swmm_objects.cpp test_raster.cpp)
+    test_swmm_data.cpp test_swmm_objects.cpp test_raster.cpp test_calibration.cpp)
 target_link_libraries(mirab-tests PRIVATE
     Mirab::core Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 target_compile_definitions(mirab-tests PRIVATE
@@ -35,15 +35,35 @@ if(TARGET mirab_engines)
 endif()
 
 foreach(group IN ITEMS text json inp model features results settings hash crs import swmm
-                     lid lidusage transects hydrographs rules raster elevation)
+                     lid lidusage transects hydrographs rules raster elevation
+                     calibration)
     add_test(NAME ${group} COMMAND mirab-tests "${group}:")
 endforeach()
 if(MIRAB_BUILD_ENGINES)
-    foreach(group IN ITEMS engines resilience interop)
+    foreach(group IN ITEMS engines resilience interop calibration-run)
         add_test(NAME ${group} COMMAND mirab-tests "${group}:")
     endforeach()
 endif()
 add_test(NAME cli-version COMMAND mirab-cli version)
+if(MIRAB_BUILD_ENGINES)
+    # Calibration through parallel engine processes, on a copy of the example.
+    set(_calib "${CMAKE_CURRENT_BINARY_DIR}/calibrate")
+    file(MAKE_DIRECTORY "${_calib}")
+    add_test(NAME cli-calibrate-setup
+        COMMAND ${CMAKE_COMMAND} -E copy
+                "${PROJECT_SOURCE_DIR}/examples/epanet/mirab-demo.inp"
+                "${PROJECT_SOURCE_DIR}/examples/epanet/mirab-demo.inp.mirab.json"
+                "${PROJECT_SOURCE_DIR}/examples/epanet/mirab-demo-pressure.csv"
+                "${PROJECT_SOURCE_DIR}/examples/epanet/mirab-demo-flow.dat"
+                "${_calib}/")
+    set_tests_properties(cli-calibrate-setup PROPERTIES FIXTURES_SETUP calib-input)
+    add_test(NAME cli-calibrate
+        COMMAND mirab-cli calibrate "${_calib}/mirab-demo.inp" --budget 10 --jobs 3
+                --out-dir "${_calib}/out")
+    set_tests_properties(cli-calibrate PROPERTIES
+        FIXTURES_REQUIRED calib-input
+        PASS_REGULAR_EXPRESSION "Pipe roughness = 0[.][89]")
+endif()
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_test(NAME license-headers

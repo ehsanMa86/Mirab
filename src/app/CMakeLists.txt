@@ -22,6 +22,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 set(APP_SOURCES
     Basemap.cpp Basemap.h
+    CalibrationDialogs.cpp CalibrationDialogs.h
+    CalibrationReport.cpp CalibrationReport.h
     ChartWidget.cpp ChartWidget.h
     DataEditor.cpp DataEditor.h
     Dialogs.cpp Dialogs.h
@@ -34,6 +36,7 @@ set(APP_SOURCES
     MapView.cpp MapView.h
     ObjectEditor.cpp ObjectEditor.h
     OptionsDialog.cpp OptionsDialog.h
+    ObservedData.cpp ObservedData.h
     Panels.cpp Panels.h
     ProjectDocument.cpp ProjectDocument.h
     PropertyPanel.cpp PropertyPanel.h

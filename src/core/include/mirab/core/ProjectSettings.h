@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "mirab/core/Json.h"
+
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -73,6 +75,7 @@ struct ProjectSettings
     double pressureThreshold = 0.0; ///< minimum service pressure for resilience tools
     std::vector<RasterLayerSettings> rasters; ///< drawn under the network, first at the bottom
     MapServiceSettings mapService; ///< definition of a custom basemap, so the project opens anywhere
+    json::Value calibration;  ///< observed data and calibration set-up (core::CalibrationConfig)
 
     static std::filesystem::path sidecarPath(const std::filesystem::path& inpFile);
     /// Returns default settings when the sidecar does not exist or is invalid.

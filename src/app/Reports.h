@@ -34,7 +34,7 @@ namespace mirab::app
 
 struct ReportInfo
 {
-    QString kind;   ///< "tables", "timeseries", "profile", "frequency", "variability", "systemflow", "energy", "status"
+    QString kind;   ///< "tables", "timeseries", "profile", "frequency", "variability", "systemflow", "energy", "calibration", "status"
     QString title;
     QString icon;
     QString description;

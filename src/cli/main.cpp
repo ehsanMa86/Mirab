@@ -22,6 +22,7 @@
  *
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
+#include "Calibrate.h"
 #include "mirab/MirabConfig.h"
 #include "mirab/core/Elevation.h"
 #include "mirab/core/Features.h"
@@ -1185,10 +1186,12 @@ Usage:
                   [--nodes ID,ID] [--reservoirs] [--no-tanks] [--swmm invert|depth]
                   [--dem-units auto|m|ft|usft] [--crs EPSG:n] [--decimals N]
                   [--out model.inp] [--json]
+)" << cli::calibrateUsage() << R"(
 
 Engines: epanet-2.2-epa, epanet-2.3-owa, epanet-msx-2.0-epa22, epanet-msx-2.0-owa23,
          swmm-5.2-epa, swmm5plus-1.0 (when installed). Run "mirab-cli engines".
-Pressures and flows are in the units of the model.
+Pressures and flows are in the units of the model. Calibration settings live in the
+project sidecar (model.inp.mirab.json) or a --config file; see docs/user-guide.md.
 With --machine, events are written as JSON lines and standard input accepts
 "cancel", "pause" and "resume"; --live adds the results of each reporting
 period while the run is in progress (at most one every --frame-interval
@@ -1263,6 +1266,8 @@ int runMain(int argc, char** argv)
             return cmdImport(a);
         if (cmd == "elevations")
             return cmdElevations(a);
+        if (cmd == "calibrate")
+            return cli::runCalibrate(std::vector<std::string>(argsv.begin() + 2, argsv.end()));
         std::cerr << "unknown command " << cmd << "\n";
         usage();
         return 1;

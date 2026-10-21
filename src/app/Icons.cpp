@@ -378,6 +378,17 @@ const QHash<QString, Draw>& table()
              s.cubicTo(13, 18.5, 11, 5, 20, 5);
              p.drawPath(s);
          }},
+        {"calibration",
+         [](QPainter& p, const Ink& k) {
+             p.setPen(pen(k.line, 1.5));
+             p.drawPolyline(QPolygonF({QPointF(4, 3.5), QPointF(4, 20), QPointF(21, 20)}));
+             p.setPen(QPen(k.line, 1.2, Qt::DashLine));
+             p.drawLine(QPointF(6, 18), QPointF(20, 4));
+             p.setPen(Qt::NoPen);
+             p.setBrush(k.accent);
+             for (const QPointF& c : {QPointF(8, 14.5), QPointF(11, 13), QPointF(13.5, 8.5), QPointF(17, 8)})
+                 p.drawEllipse(c, 1.6, 1.6);
+         }},
         {"variability",
          [](QPainter& p, const Ink& k) {
              p.setPen(pen(k.line, 1.5));

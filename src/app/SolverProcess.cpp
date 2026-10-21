@@ -215,6 +215,8 @@ void SolverProcess::readOutput()
             done_ = o;
             haveDone_ = true;
         }
+        else if (!event.isEmpty())
+            emit this->event(event, o);
     }
     buffer_.remove(0, from);
     if (started)

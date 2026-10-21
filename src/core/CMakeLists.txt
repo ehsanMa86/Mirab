@@ -22,6 +22,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_library(mirab_core STATIC
     src/ControlRules.cpp
+    src/Calibration.cpp
     src/Crs.cpp
     src/Elevation.cpp
     src/Features.cpp
@@ -32,6 +33,7 @@ add_library(mirab_core STATIC
     src/LiveResults.cpp
     src/Model.cpp
     src/Objects.cpp
+    src/Optimizer.cpp
     src/ProjectSettings.cpp
     src/Raster.cpp
     src/Results.cpp

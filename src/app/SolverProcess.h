@@ -70,6 +70,8 @@ signals:
     void liveUpdated(int firstChanged);
     void paused(double seconds);
     void resumed();
+    /// Any other event line (for example "evaluation" from calibrate).
+    void event(const QString& name, const QJsonObject& payload);
 
 private:
     void readOutput();

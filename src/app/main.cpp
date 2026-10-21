@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
         "(the published release for this computer), a manifest URL or a local manifest file.",
         "source");
     const QCommandLineOption reportOpt("report", "With --screenshot: open a report tab (tables, timeseries, profile, "
-                                                 "frequency, variability, systemflow, energy, status) first.",
+                                                 "frequency, variability, systemflow, energy, calibration, status) first.",
                                        "kind");
     const QCommandLineOption delayOpt("delay", "With --screenshot: milliseconds to wait before the picture (default 700).",
                                       "ms");
@@ -94,7 +94,9 @@ int main(int argc, char* argv[])
                                                           "reactions, report for EPANET).",
                                         "page");
     const QCommandLineOption toolOpt("open-tool", "Open a tool dialog after the file: elevations (from a DEM), "
-                                                  "raster-layers or map-service.",
+                                                  "raster-layers, map-service, observed-data, calibration or "
+                                                  "calibration-run (starts the calibration; use --delay to "
+                                                  "picture its progress).",
                                      "name");
     parser.addOption(toolOpt);
     parser.addOption(importOpt);
@@ -161,15 +163,15 @@ int main(int argc, char* argv[])
         const QString page = parser.value(optionsOpt);
         QTimer::singleShot(200, &window, [&window, page] { window.showSimulationOptions(page); });
     }
-    if (parser.isSet(toolOpt))
-    {
-        const QString tool = parser.value(toolOpt);
-        QTimer::singleShot(200, &window, [&window, tool] { window.openTool(tool); });
-    }
     if (parser.isSet(importOpt))
     {
         const QString f = QFileInfo(parser.value(importOpt)).absoluteFilePath();
         QTimer::singleShot(200, &window, [&window, f] { window.importFile(f); });
+    }
+    if (parser.isSet(toolOpt))
+    {
+        const QString name = parser.value(toolOpt);
+        QTimer::singleShot(parser.isSet(runFirst) ? 3000 : 300, &window, [&window, name] { window.openTool(name); });
     }
     if (parser.isSet(screenshot))
     {

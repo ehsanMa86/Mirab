@@ -24,9 +24,11 @@
  */
 #include "Reports.h"
 
+#include "CalibrationReport.h"
 #include "ChartWidget.h"
 #include "Icons.h"
 #include "RasterLayers.h"
+#include "ObservedData.h"
 #include "Theme.h"
 #include "mirab/core/Text.h"
 #include "mirab/core/Units.h"
@@ -555,6 +557,7 @@ public:
             plot();
         });
         connect(exportBtn, &QPushButton::clicked, this, [this] { saveText(this, "time-series.csv", chart_->toCsv()); });
+        connect(ObservedData::of(doc_), &ObservedData::changed, this, [this] { plot(); });
         connect(doc_, &ProjectDocument::periodChanged, this, [this](int p) {
             if (doc_->results())
                 chart_->setMarker(doc_->results()->times[static_cast<std::size_t>(p)]);
@@ -624,6 +627,17 @@ protected:
             for (int p = 0; p < r->periodCount(); ++p)
                 s.points.append(QPointF(r->times[static_cast<std::size_t>(p)], t->value(p, v, e)));
             series << s;
+            // Measurements linked to the element are drawn as markers.
+            ChartWidget::Series o;
+            o.points = ObservedData::of(doc_)->pointsFor(static_cast<Category>(category_->currentData().toInt()), s.name,
+                                                         variable_->currentText(),
+                                                         QString::fromStdString(t->variables[static_cast<std::size_t>(v)].unit));
+            if (!o.points.isEmpty())
+            {
+                o.name = tr("%1 observed").arg(s.name);
+                o.style = ChartWidget::Series::Style::Points;
+                series << o;
+            }
         }
         if (series.isEmpty())
         {
@@ -1568,6 +1582,8 @@ QList<ReportInfo> availableReports(core::Dialect dialect)
     };
     if (dialect == core::Dialect::Epanet)
         list.append({"energy", QObject::tr("Energy report"), "energy", QObject::tr("Pump energy use and cost")});
+    list.append({"calibration", QObject::tr("Calibration"), "calibration",
+                 QObject::tr("Simulated against observed data, with goodness of fit")});
     list.append({"status", QObject::tr("Status report"), "report", QObject::tr("The engine's report file")});
     return list;
 }
@@ -1590,6 +1606,8 @@ QWidget* createReport(const QString& kind, ProjectDocument* doc, const QString& 
         return new EnergyReport(doc, parent);
     if (kind == "status")
         return new StatusReport(doc, reportFile, parent);
+    if (kind == "calibration")
+        return createCalibrationReport(doc, parent);
     return nullptr;
 }
 

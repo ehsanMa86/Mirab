@@ -145,7 +145,7 @@ SWMM5+ is an optional engine. Open *Project > Simulation engines* and click *Ins
   - **Error:** the engine cannot run the project, and the Run button is disabled.
 - **Greyed-out data:** data the selected engine does not model is greyed out in *Properties*. For example, the `[LEAKAGE]` rows of a pipe are greyed out under EPA EPANET 2.2, and PCV is not offered as a valve type.
 
-The choice of engine, the MSX file, the coordinate system, the basemap (with the definition of a custom map service), the raster layers and the backdrop are saved next to the model in `<model>.inp.mirab.json`.
+The choice of engine, the MSX file, the coordinate system, the basemap (with the definition of a custom map service), the raster layers, the backdrop, and the observed data and calibration set-up are saved next to the model in `<model>.inp.mirab.json`.
 
 ## Running and viewing results
 
@@ -179,6 +179,7 @@ The *Reports* menu and tool bar button open report tabs. Each report follows new
 | Variability plot | The minimum, 10th-90th percentile band, median, mean and maximum of a result over all elements (or one type) at every time. |
 | System flow | EPANET: water supplied by reservoirs, consumed by demands and stored in tanks. SWMM: runoff, outfall discharge and flooding. |
 | Energy report | EPANET pumps: utilization, average efficiency, energy per volume pumped, average and peak power, energy and cost per day. |
+| Calibration | Every observed series against the simulation: a goodness-of-fit table and, for the selected series, a time-series chart and a 1:1 scatter plot. See [Calibration](#calibration). |
 | Status report | The engine's own report file. |
 
 *Reports > Fire flow analysis* opens the fire-flow capacity analysis of the resilience tools.
@@ -236,6 +237,103 @@ These SWMM sections have their own editors. They open in a tab like the pattern 
 
 *Analysis* offers five analyses for EPANET models: the Todini index, water service availability, network topology, pipe criticality and fire-flow capacity. See [resilience.md](resilience.md) for the methods. Selecting a row in the result table highlights the element on the map.
 
+## Calibration
+
+Mirab compares simulations with measurements and can adjust model inputs until they match. It works the same way for EPANET and SWMM models.
+
+### Observed data
+
+*Project > Observed data* lists the measurement files of the project. *Add files* accepts:
+
+- **Text tables** (`.csv`, `.tsv`, `.txt`): one time column and one or more value columns, separated by commas, semicolons, tabs or blanks. A first row of names is optional; rows starting with `#` are comments. Times can be dates and times (`2024-05-01 13:30`, `2024-05-01T13:30:00`, `05/01/2024 1:30 PM`, `01-May-2024 13:30`, or a date column followed by a time column) or elapsed time since the start of the simulation (`1.5` hours, or minutes, seconds or days, or `36:30`). Choose *Day first* for `DD/MM/YYYY` dates. Empty cells, `NA`, `NaN` and `-` are missing values, and you can add your own marker such as `-9999`. Decimal commas are read when the separator is a semicolon or a tab.
+- **EPANET calibration files** (`.dat`): rows of location ID, time (hours or `h:mm`) and value. A row without an ID continues the location above. Text after `;` is a comment.
+
+  ```
+  ; Flow in pipes P1 and P13 (L/s)
+  P1    0:00   21.2
+        1:00   19.4
+  P13   1:00   26.9
+  ```
+
+- **SWMM calibration files** (`.dat`): a location ID on a line of its own, followed by rows of date, time and value (`01/01/2026 00:15 0.2`) or elapsed days, time and value (`0 00:15 0.2`).
+
+Each column or location becomes a series linked to an element type (node, link or subcatchment), an element ID and a result, such as junction `J5` *Pressure*, pipe `P12` *Flow*, SWMM node *Depth* or outfall *Total Inflow*. Mirab proposes the links from column names such as `J5 Pressure (psi)` or `P1_flow`. Give the unit of the measurements when it differs from the model's (`psi`, `kPa`, `bar`, `m`, `ft`, `in`, `mm`; `GPM`, `LPS`, `L/s`, `CFS`, `CMS`, `m3/s`, `MGD`, `MLD`, `CMH`, `m3/h`; `m/s`, `ft/s`); pressures and heads convert through metres of water. The weight sets how much a series counts in the calibration objective. The preview shows the selected series over the simulated result.
+
+Times have no time zone. Dated measurements are placed on the simulation clock with the start date: SWMM models use `START_DATE` and `START_TIME`; EPANET models start at their start clock time on the day of the first measurement, unless you enter *Simulation starts at*. Measurements outside the simulated period are left out.
+
+The list is saved with the project in `<model>.inp.mirab.json`, with file paths relative to the model. Once linked, measurements appear as markers in the Time series panel and the Time series report.
+
+### Goodness of fit
+
+*Reports > Calibration* aligns each series with the simulation: the simulated result is interpolated linearly at every measurement time. The table, which sorts by any column and exports CSV, gives:
+
+| Metric | Definition (observed *o*, simulated *s*, means *ō*, *s̄*) | Best |
+|---|---|---|
+| NSE | Nash-Sutcliffe efficiency, 1 - Σ(s - o)² / Σ(o - ō)² | 1 |
+| KGE | Kling-Gupta efficiency (2012), 1 - √((r - 1)² + (β - 1)² + (γ - 1)²) with correlation r, bias ratio β = s̄/ō and ratio of the coefficients of variation γ | 1 |
+| PBIAS | Percent bias, 100 Σ(s - o) / Σo; positive values mean the model over-predicts | 0 |
+| RMSE, MAE | Root mean square error and mean absolute error, in result units | 0 |
+| R² | Square of the Pearson correlation | 1 |
+| Peak error | Simulated peak minus observed peak, in percent of the observed peak | 0 |
+| Peak timing | Time of the simulated peak minus time of the observed peak, hours | 0 |
+| Volume error | Difference of the volumes under the two series (trapezoidal rule), in percent; flows only | 0 |
+
+Cells are coloured by quality bands: NSE above 0.75 very good, 0.65 good, 0.50 satisfactory; PBIAS within ±10 % very good, ±15 % good, ±25 % satisfactory (Moriasi et al., 2007); R² above 0.85, 0.75, 0.60 (Moriasi et al., 2015); KGE above 0.75, 0.60, 0.50; volume error within 5, 10, 20 %; peak error within 10, 20, 30 %. The rating column combines NSE and PBIAS. Selecting a row plots the series over time, with the measurements as markers, and as a scatter plot with the 1:1 line and the least-squares fit.
+
+![Calibration report](images/calibration-report.png)
+
+### Automated calibration
+
+*Project > Calibrate* adjusts model inputs to minimise an objective:
+
+- **Parameters.** Each parameter is a numeric column of a section (for example `[PIPES]` *Roughness*, `[CONDUITS]` *Roughness*, `[SUBCATCHMENTS]` *PctImperv* or `[JUNCTIONS]` *Demand*) for all its rows or for listed element IDs (*Use selected element* adds the element selected on the map). *Multiply* scales the current values by a factor between the minimum and maximum; *Replace* sets the value itself. The *Rows* column shows how many rows a parameter changes.
+- **Objective.** A weighted sum over the series (each with its weight) of chosen metrics: NSE, KGE and R² count as 1 minus the value; PBIAS, peak error and volume error as their size in percent divided by 100; RMSE and MAE in result units; peak timing in hours. Metrics that do not apply to a series (volume error of a pressure) are left out.
+- **Runs.** The number of model runs, how many run in parallel and the random seed.
+
+The search is Dynamically Dimensioned Search (Tolson and Shoemaker, 2007): it starts from the current model, then perturbs a random subset of the parameters of the best set found so far, a subset that shrinks as the runs are used up. It suits budgets from a few dozen to a few thousand runs. *Sensitivity screening* instead runs a Latin hypercube sample of the parameter ranges and reports the rank correlation of each parameter with the objective.
+
+Every run writes a modified copy of the model and simulates it in its own `mirab-cli` process, so an engine failure ends that run only. The chart shows the objective of each run and the best so far; *Cancel run* stops the runs in progress. When it finishes, *Apply best parameters* writes the best values into the model as one edit, which *Undo* reverts. Each calibration also leaves a folder `<model>-calibration` next to the model with `evaluations.csv` (every run: objective, parameter values and the first metric of each series), `best.json` (the best values and their metrics) and `<model>-best.inp`.
+
+![Calibration dialog](images/calibration-dialog.png)
+
+### Try it
+
+The examples include measurements of models that differ from the examples in known ways:
+
+- `epanet/mirab-demo.inp`: pressures at J5 and J9 every 30 minutes (`mirab-demo-pressure.csv`) and flows in P1 and P13 (`mirab-demo-flow.dat`), measured with pipe roughness coefficients 15 % below the model's. Calibrating *Pipe roughness* should find a multiplier close to 0.85.
+- `swmm/mirab-urban.inp`: outfall flow (`mirab-urban-outfall.dat`) and the depth at J3 (`mirab-urban-depth.csv`) of a model with conduit roughness 20 % higher and imperviousness 10 % lower. Calibration finds an imperviousness multiplier close to 0.9; the outfall flow is much less sensitive to the roughness, so its multiplier is found less precisely, as a sensitivity screening shows.
+
+Both measurement sets include noise, so the fit is good but not perfect.
+
+### From the command line
+
+```
+mirab-cli calibrate metrics model.inp [--observed calib.json|data.csv|data.dat] [--results model.anr] [--json|--csv]
+mirab-cli calibrate model.inp [--config calib.json] [--engine ID] [--jobs N] [--budget N] [--seed N]
+                  [--method dds|lhs] [--out-dir DIR] [--start "2024-05-01 00:00"] [--keep-runs]
+```
+
+`calibrate metrics` compares existing results (`model.anr`, or `--results`) with the observed data of the project. `calibrate` runs the optimisation with the set-up saved with the project, or with a `--config` file in the same form, and prints each run. The set-up is the `calibration` member of the project file (a `--config` file may also hold it alone):
+
+```json
+{
+  "observed": [
+    {"file": "pressure.csv", "format": "csv", "noData": "-9999",
+     "links": [{"column": "J5 Pressure (m)", "table": "node", "element": "J5", "variable": "Pressure", "unit": "m"}]},
+    {"file": "flow.dat", "format": "epanet", "table": "link", "variable": "Flow", "unit": "LPS"}
+  ],
+  "simulationStart": "2024-05-01 00:00",
+  "parameters": [
+    {"name": "Pipe roughness", "section": "PIPES", "column": "Roughness", "elements": "all",
+     "mode": "multiply", "min": 0.6, "max": 1.4}
+  ],
+  "objective": [{"metric": "NSE", "weight": 1}],
+  "budget": 100, "jobs": 4, "seed": 1
+}
+```
+
+`format` is `csv`, `epanet`, `swmm` or `auto`. Text tables also take `timeColumn`, `timeFormat` (`datetime` or `elapsed`), `timeUnit` (`hours`, `minutes`, `seconds`, `days`) and `dateOrder` (`MDY` or `DMY`). Without `links`, every column is linked by its name. With `--machine`, `calibrate` reports each run as an `evaluation` event (index, objective, best so far, parameter values) and stops on a `cancel` line.
+
 ## GIS and QGIS
 
 - *File > Export > GeoPackage* writes one layer per element type (junctions, pipes, conduits, subcatchments, ...) with every input value and, when results are loaded, the values of the current period.
@@ -272,8 +370,8 @@ These SWMM sections have their own editors. They open in a tab like the pattern 
 | `--show-data SECTION:ID` | Opens the editor of a pattern, curve, time series, named object, LID control, transect or unit hydrograph group, for example `PATTERNS:PAT1`, `POLLUTANTS:TSS` or `LID_CONTROLS:Cell1`; `CONTROLS:` or `RULES:` opens the control rules and `LID_USAGE:S1` the LID usage of subcatchment S1. |
 | `--options-dialog PAGE` | Opens the simulation options dialog at a page: `general`, `dates`, `steps`, `dynwave`, `files`, `report`, `evaporation`, `climate`, `adjustments` (SWMM) or `hydraulics`, `quality`, `times`, `energy`, `report` (EPANET). |
 | `--select ID` | Selects an element. |
-| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers` or `map-service`. |
+| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, or `calibration-run` (starts the calibration). |
 | `--install-engine swmm5plus` | Installs SWMM5+ without opening a window (also a manifest URL or file). |
-| `--screenshot FILE.png` | Saves a picture of the window and quits; with `--run` (run first), `--report KIND` (open a report: tables, timeseries, profile, frequency, variability, systemflow, energy, status) and `--delay MS`. With `--run`, `--run-for MS` takes the picture while the simulation runs, and `--pause-after MS` or `--stop-after MS` pause or stop it first. |
+| `--screenshot FILE.png` | Saves a picture of the window and quits; with `--run` (run first), `--report KIND` (open a report: tables, timeseries, profile, frequency, variability, systemflow, energy, calibration, status) and `--delay MS`. With `--run`, `--run-for MS` takes the picture while the simulation runs, and `--pause-after MS` or `--stop-after MS` pause or stop it first. |
 
 Every analysis is also available without a window through `mirab-cli`; run `mirab-cli` without arguments for its commands.

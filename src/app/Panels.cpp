@@ -27,6 +27,7 @@
 #include "ChartWidget.h"
 #include "Icons.h"
 #include "SchemaWidgets.h"
+#include "ObservedData.h"
 #include "mirab/core/Text.h"
 
 #include <QComboBox>
@@ -87,6 +88,7 @@ ResultsPanel::ResultsPanel(ProjectDocument* doc, QWidget* parent) : QWidget(pare
     connect(doc_, &ProjectDocument::resultsChanged, this, &ResultsPanel::refreshChart);
     connect(doc_, &ProjectDocument::liveResultsUpdated, this, &ResultsPanel::plot);
     connect(doc_, &ProjectDocument::selectionChanged, this, &ResultsPanel::refreshChart);
+    connect(ObservedData::of(doc_), &ObservedData::changed, this, &ResultsPanel::refreshChart);
     refreshChart();
 }
 
@@ -161,8 +163,20 @@ void ResultsPanel::plot()
         return;
     }
     title_->setText(sel.id + "  ·  " + QString::fromStdString(var.name));
+    QVector<ChartWidget::Series> series = {s};
+    // Measurements linked to the element are drawn as markers.
+    ChartWidget::Series observed;
+    observed.points = ObservedData::of(doc_)->pointsFor(sel.category, sel.id, QString::fromStdString(var.name),
+                                                        QString::fromStdString(var.unit));
+    if (!observed.points.isEmpty())
+    {
+        observed.name = tr("Observed");
+        observed.style = ChartWidget::Series::Style::Points;
+        observed.color = QColor(224, 82, 60);
+        series << observed;
+    }
     chart_->setXAxis(tr("Time"), true);
-    chart_->setSeries({s}, QString::fromStdString(var.name) + (var.unit.empty() ? QString() : " (" + QString::fromStdString(var.unit) + ")"));
+    chart_->setSeries(series, QString::fromStdString(var.name) + (var.unit.empty() ? QString() : " (" + QString::fromStdString(var.unit) + ")"));
     chart_->setMarker(r->times[static_cast<std::size_t>(doc_->period())]);
 }
 
