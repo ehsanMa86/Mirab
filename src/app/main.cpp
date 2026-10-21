@@ -102,6 +102,28 @@ int main(int argc, char* argv[])
     parser.addOption(importOpt);
     parser.addOption(dataOpt);
     parser.addOption(optionsOpt);
+    const QCommandLineOption animationOpt(
+        "export-animation",
+        "Save the results animation to <file> (.gif, or .png for numbered images) and quit. "
+        "Add --run to simulate first.",
+        "file");
+    const QCommandLineOption layoutOpt(
+        "export-layout", "Save a print layout of the map to <file> (.pdf or .png) and quit.",
+        "file");
+    const QCommandLineOption layoutChartOpt(
+        "layout-chart",
+        "With --export-layout: put this report (systemflow, "
+        "variability, frequency, profile, energy, calibration, tables) below the map.",
+        "kind");
+    const QCommandLineOption reportDocOpt(
+        "export-report", "Save a report document to <file> (.pdf or .html) and quit.", "file");
+    const QCommandLineOption exportDialogOpt(
+        "export-dialog", "Open an export dialog: layout, report or animation.", "name");
+    parser.addOption(animationOpt);
+    parser.addOption(layoutOpt);
+    parser.addOption(layoutChartOpt);
+    parser.addOption(reportDocOpt);
+    parser.addOption(exportDialogOpt);
     parser.addOption(delayOpt);
     parser.addOption(selectOpt);
     parser.addOption(installEngine);
@@ -138,14 +160,17 @@ int main(int argc, char* argv[])
 
     // Automated runs (screenshots, tests) keep their settings in a temporary
     // folder, so they never change the user's recent files or window layout.
+    const bool exporting =
+        parser.isSet(animationOpt) || parser.isSet(layoutOpt) || parser.isSet(reportDocOpt);
     QTemporaryDir automationSettings;
-    if (parser.isSet(screenshot) && automationSettings.isValid())
+    if ((parser.isSet(screenshot) || exporting) && automationSettings.isValid())
     {
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, automationSettings.path());
     }
 
     bool runFailed = false;
+    bool exportFailed = false;
     mirab::app::MainWindow window;
     window.show();
     const QStringList files = parser.positionalArguments();
@@ -163,6 +188,20 @@ int main(int argc, char* argv[])
         const QString page = parser.value(optionsOpt);
         QTimer::singleShot(200, &window, [&window, page] { window.showSimulationOptions(page); });
     }
+    if (parser.isSet(exportDialogOpt))
+    {
+        const QString name = parser.value(exportDialogOpt);
+        QTimer::singleShot(200, &window,
+                           [&window, name]
+                           {
+                               if (name == "layout")
+                                   window.exportLayout();
+                               else if (name == "report")
+                                   window.exportReport();
+                               else if (name == "animation")
+                                   window.exportAnimation();
+                           });
+    }
     if (parser.isSet(importOpt))
     {
         const QString f = QFileInfo(parser.value(importOpt)).absoluteFilePath();
@@ -173,12 +212,18 @@ int main(int argc, char* argv[])
         const QString name = parser.value(toolOpt);
         QTimer::singleShot(parser.isSet(runFirst) ? 3000 : 300, &window, [&window, name] { window.openTool(name); });
     }
-    if (parser.isSet(screenshot))
+    if (parser.isSet(screenshot) || exporting)
     {
         const QString target = parser.value(screenshot);
         const QString report = parser.value(reportOpt);
         const int delay = parser.isSet(delayOpt) ? parser.value(delayOpt).toInt() : 700;
-        auto shoot = [&window, target, report, delay] {
+        auto shoot = [&window, target, report, delay]
+        {
+            if (target.isEmpty())
+            {
+                QApplication::quit();
+                return;
+            }
             if (!report.isEmpty())
                 window.openReport(report);
             QTimer::singleShot(delay, &window, [&window, target] {
@@ -188,37 +233,67 @@ int main(int argc, char* argv[])
                 QApplication::quit();
             });
         };
+        // Exports run after the window is laid out (and after --run), then the picture is taken.
+        auto exportThenShoot = [&window, &parser, &exportFailed, shoot, animationOpt, layoutOpt,
+                                layoutChartOpt, reportDocOpt]
+        {
+            const auto file = [&parser](const QCommandLineOption& o)
+            { return QFileInfo(parser.value(o)).absoluteFilePath(); };
+            if (parser.isSet(layoutOpt) &&
+                !window.exportLayout(file(layoutOpt), parser.value(layoutChartOpt)))
+                exportFailed = true;
+            if (parser.isSet(reportDocOpt) && !window.exportReport(file(reportDocOpt)))
+                exportFailed = true;
+            if (!parser.isSet(animationOpt))
+            {
+                shoot();
+                return;
+            }
+            QObject::connect(
+                &window, &mirab::app::MainWindow::animationExported, &window,
+                [shoot, &exportFailed](bool ok)
+                {
+                    exportFailed = exportFailed || !ok;
+                    shoot();
+                },
+                Qt::SingleShotConnection);
+            window.exportAnimation(file(animationOpt));
+        };
         if (parser.isSet(runFirst))
         {
-            // Pictures during a run: after a delay, after pausing, or after stopping.
+            // Pictures (and exports) during a run: after a delay, after pausing, or after stopping.
             const int during = parser.isSet(runFor) ? parser.value(runFor).toInt() : -1;
             const int pause = parser.isSet(pauseAfter) ? parser.value(pauseAfter).toInt() : -1;
             const int stop = parser.isSet(stopAfter) ? parser.value(stopAfter).toInt() : -1;
             QObject::connect(&window, &mirab::app::MainWindow::simulationCompleted, &window,
-                             [shoot, &runFailed, during, pause, stop](bool ok) {
+                             [exportThenShoot, &runFailed, during, pause, stop](bool ok)
+                             {
                                  if (during >= 0 || pause >= 0)
                                      return; // the picture was planned during the run
                                  runFailed = !ok && stop < 0;
-                                 shoot();
+                                 exportThenShoot();
                              });
             QTimer::singleShot(500, &window, [&window] { window.runSimulation(); });
             if (during >= 0)
-                QTimer::singleShot(500 + during, &window, shoot);
+                QTimer::singleShot(500 + during, &window, exportThenShoot);
             else if (pause >= 0)
-                QTimer::singleShot(500 + pause, &window, [&window, shoot] {
-                    window.togglePause();
-                    shoot();
-                });
+                QTimer::singleShot(500 + pause, &window,
+                                   [&window, exportThenShoot]
+                                   {
+                                       window.togglePause();
+                                       exportThenShoot();
+                                   });
             else if (stop >= 0)
                 QTimer::singleShot(500 + stop, &window, [&window] { window.stopSimulation(); });
         }
         else
         {
-            shoot();
+            QTimer::singleShot(exporting ? 300 : 0, &window, exportThenShoot);
         }
-        QTimer::singleShot(60000 + delay, &app, &QApplication::quit); // safety net
+        QTimer::singleShot((exporting ? 600000 : 60000) + delay, &app,
+                           &QApplication::quit); // safety net
     }
     const int code = app.exec();
     // A failed --run still saves the picture, but tests must see the failure.
-    return runFailed ? 1 : code;
+    return runFailed || exportFailed ? 1 : code;
 }

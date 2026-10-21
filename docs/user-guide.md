@@ -186,6 +186,43 @@ The *Reports* menu and tool bar button open report tabs. Each report follows new
 
 ![Profile plot](images/report-profile.png)
 
+## Printing and exporting
+
+*File > Export* has three deliverables besides the CSV and GIS exports. They all use the map as it is shown: the current view, result colors, labels, basemap (web tiles, WMS or WMTS) and raster layers such as a hillshade.
+
+### Print layout
+
+*Print layout* composes one page with the map and its furniture, with a live preview:
+
+- **Templates.** *Legend beside the map* puts the legend (result classes and element symbols), the north arrow, the scale bar and your notes in a sidebar. *Chart or table below the map* places the legend, north arrow and scale bar inside the map frame and shows a chart or table from a report under it, for example the system flow or the variability plot. Open report tabs keep the elements and results chosen in them.
+- **Page.** A4, A3, Letter or Tabloid, portrait or landscape. *Map size* moves the split between the map and the sidebar or chart.
+- **Texts.** Title, subtitle, date, notes and an optional logo image. The footer shows the coordinate system and the map scale at the chosen paper size.
+- **Output.** *Export PDF* writes vector graphics (the network, legend, charts and text stay sharp at any zoom; the basemap is one embedded image at about 200 dpi). *Export PNG* writes an image at 150, 300 or 600 dpi. *Print* sends the page to a printer.
+
+Basemap tiles are downloaded at the resolution of the output before the file is written, which can take a few seconds the first time.
+
+![Print layout](images/print-layout.jpg)
+
+### Report document
+
+*Report document* assembles a multi-page document with a cover, a table of contents and numbered sections. Tick the sections to include:
+
+- **Project summary**: title, file, model type, engine, units, element counts, simulation duration and time steps, demand model and coordinate system.
+- **Simulation status**: engine, reporting periods, SWMM continuity errors (runoff, flow routing and quality routing, rated good up to 1 %, acceptable up to 10 %) and the engine's messages.
+- **Map**: the current map view with its legend, scale bar and north arrow.
+- **Reports**: any of the report tabs, with their statistics, charts and tables. The calibration report adds the goodness-of-fit table and charts when the project has observed data. Long tables are cut after the number of rows you choose; export the report as CSV for all rows.
+
+*Export PDF* lays the document out on A4 or Letter pages with page numbers; charts and the network are vector graphics. *Export HTML* writes one self-contained web page (charts and the map are embedded images) that opens in any browser and can be e-mailed as a single file.
+
+### Results animation
+
+*Results animation* saves the map coloring over the reporting periods, with a title, a time stamp, the legend, a scale bar and a north arrow:
+
+- **Animated GIF**: one palette of up to 255 colors shared by all frames, optional dithering so basemap imagery keeps its shading (the flat colors of the network are never dithered), and only the changed part of each frame is stored, so files stay small. The animation loops.
+- **PNG image sequence**: numbered files `name_0001.png`, `name_0002.png`, ... for video editors and slides.
+
+Choose the periods (from, to and every n-th), the speed in frames per second, the size (the map view or a fixed size such as 1280 x 720) and whether to show the basemap. The frames are drawn a few at a time while a background thread writes the file, so the window stays responsive; *Cancel* stops the export and removes the partial output.
+
 ## Patterns, curves and time series
 
 Double-click a pattern, curve or time series in the *Project* panel to edit it in a tab. The tab shows a table of values next to a chart that updates while you type. *Apply* writes the changes as one undoable step, and *Revert* discards them.
@@ -373,5 +410,11 @@ mirab-cli calibrate model.inp [--config calib.json] [--engine ID] [--jobs N] [--
 | `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, or `calibration-run` (starts the calibration). |
 | `--install-engine swmm5plus` | Installs SWMM5+ without opening a window (also a manifest URL or file). |
 | `--screenshot FILE.png` | Saves a picture of the window and quits; with `--run` (run first), `--report KIND` (open a report: tables, timeseries, profile, frequency, variability, systemflow, energy, calibration, status) and `--delay MS`. With `--run`, `--run-for MS` takes the picture while the simulation runs, and `--pause-after MS` or `--stop-after MS` pause or stop it first. |
+| `--export-layout FILE` | Saves a print layout as PDF (`.pdf`) or a 200 dpi image (`.png`) and quits. `--layout-chart KIND` uses the template with that report below the map. |
+| `--export-report FILE` | Saves the report document as PDF (`.pdf`) or HTML (`.html`) and quits. |
+| `--export-animation FILE` | Saves the results animation as GIF (`.gif`) or numbered PNG images (`.png`) and quits. |
+| `--export-dialog NAME` | Opens the layout, report or animation dialog. |
+
+The export options can be combined, for example `mirab model.inp --run --export-report model.pdf --export-animation model.gif` runs the model and writes both files. They exit with status 1 when a run or an export fails.
 
 Every analysis is also available without a window through `mirab-cli`; run `mirab-cli` without arguments for its commands.

@@ -354,6 +354,22 @@ void RasterRenderer::paint(QPainter& p, const QRect& area, const View& view,
     p.drawImage(area.topLeft(), image_);
 }
 
+void RasterRenderer::paintExact(QPainter& p, const QRectF& target, const View& view,
+                                const QString& modelCrs, double pixelRatio)
+{
+    if (!hasVisibleLayers() || target.isEmpty())
+        return;
+    const double ratio = std::clamp(pixelRatio, 0.25, 4.0);
+    View device = view;
+    device.size = (target.size() * ratio).toSize();
+    device.scale = view.scale * ratio;
+    const QImage image = render(device, modelCrs);
+    p.save();
+    p.setRenderHint(QPainter::SmoothPixmapTransform);
+    p.drawImage(target, image);
+    p.restore();
+}
+
 QImage RasterRenderer::render(const View& view, const QString& modelCrs)
 {
     QImage out(view.size, QImage::Format_ARGB32_Premultiplied);

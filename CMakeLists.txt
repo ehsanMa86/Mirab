@@ -67,7 +67,7 @@ configure_file(cmake/MirabConfig.h.in
     "${PROJECT_BINARY_DIR}/generated/mirab/MirabConfig.h" @ONLY)
 
 if(MIRAB_BUILD_GUI)
-    find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network)
+    find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network PrintSupport)
     qt_standard_project_setup()
 endif()
 

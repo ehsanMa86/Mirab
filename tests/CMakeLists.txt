@@ -21,7 +21,8 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_executable(mirab-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp
-    test_swmm_data.cpp test_swmm_objects.cpp test_raster.cpp test_calibration.cpp)
+    test_swmm_data.cpp test_swmm_objects.cpp test_raster.cpp test_calibration.cpp
+    test_deliverables.cpp)
 target_link_libraries(mirab-tests PRIVATE
     Mirab::core Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 target_compile_definitions(mirab-tests PRIVATE
@@ -36,7 +37,7 @@ endif()
 
 foreach(group IN ITEMS text json inp model features results settings hash crs import swmm
                      lid lidusage transects hydrographs rules raster elevation
-                     calibration)
+                     calibration gif layout summary)
     add_test(NAME ${group} COMMAND mirab-tests "${group}:")
 endforeach()
 if(MIRAB_BUILD_ENGINES)
@@ -95,6 +96,22 @@ if(MIRAB_BUILD_GUI AND MIRAB_BUILD_ENGINES)
     add_test(NAME gui-smoke-results
         COMMAND mirab-cli results "${CMAKE_CURRENT_BINARY_DIR}/gui-smoke.anr")
     set_tests_properties(gui-smoke-results PROPERTIES DEPENDS gui-smoke)
+
+    # Deliverables: print layout, report document and animation written from
+    # the command line (its own copy of the demo, so runs do not collide).
+    add_test(NAME gui-export
+        COMMAND Mirab "${CMAKE_CURRENT_BINARY_DIR}/gui-export.inp" --run
+                --export-layout "${CMAKE_CURRENT_BINARY_DIR}/gui-export-layout.pdf"
+                --export-report "${CMAKE_CURRENT_BINARY_DIR}/gui-export-report.html"
+                --export-animation "${CMAKE_CURRENT_BINARY_DIR}/gui-export.gif")
+    set_tests_properties(gui-export PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        TIMEOUT 180
+        FIXTURES_REQUIRED gui-export-input)
+    add_test(NAME gui-export-setup
+        COMMAND ${CMAKE_COMMAND} -E copy "${PROJECT_SOURCE_DIR}/examples/epanet/mirab-demo.inp"
+                "${CMAKE_CURRENT_BINARY_DIR}/gui-export.inp")
+    set_tests_properties(gui-export-setup PROPERTIES FIXTURES_SETUP gui-export-input)
 endif()
 
 # Object editors: open each one offscreen on a model that uses them.

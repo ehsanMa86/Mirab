@@ -26,6 +26,7 @@ add_library(mirab_core STATIC
     src/Crs.cpp
     src/Elevation.cpp
     src/Features.cpp
+    src/Gif.cpp
     src/Hash.cpp
     src/Inflate.cpp
     src/InpDocument.cpp
@@ -34,6 +35,7 @@ add_library(mirab_core STATIC
     src/Model.cpp
     src/Objects.cpp
     src/Optimizer.cpp
+    src/PrintLayout.cpp
     src/ProjectSettings.cpp
     src/Raster.cpp
     src/Results.cpp

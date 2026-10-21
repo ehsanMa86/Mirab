@@ -24,12 +24,14 @@
  */
 #include "MainWindow.h"
 
+#include "AnimationExport.h"
 #include "Basemap.h"
 #include "CalibrationDialogs.h"
 #include "DataEditor.h"
 #include "Dialogs.h"
 #include "Icons.h"
 #include "ImportDialog.h"
+#include "LayoutDialog.h"
 #include "MapPage.h"
 #include "MapServices.h"
 #include "MapView.h"
@@ -39,6 +41,7 @@
 #include "PropertyPanel.h"
 #include "RasterDialogs.h"
 #include "RasterLayers.h"
+#include "ReportExport.h"
 #include "Reports.h"
 #include "SchemaWidgets.h"
 #include "SolverProcess.h"
@@ -75,6 +78,7 @@
 #include <QPluginLoader>
 #include <QProcess>
 #include <QProgressBar>
+#include <QProgressDialog>
 #include <QSettings>
 #include <QStandardItemModel>
 #include <QStandardPaths>
@@ -456,6 +460,12 @@ void MainWindow::createMenus()
     exp->addAction(tr("GeoJSON for GIS..."), this, [this] { exportGis(false); });
     exp->addAction(tr("WNTR network (JSON)..."), this, &MainWindow::exportWntr);
     exp->addAction(tr("Map image (PNG)..."), this, &MainWindow::exportMapImage);
+    exp->addSeparator();
+    exp->addAction(icons::get("report"), tr("Print layout (PDF, PNG or printer)..."), this,
+                   [this] { exportLayout(); });
+    exp->addAction(tr("Report document (PDF or HTML)..."), this, [this] { exportReport(); });
+    exp->addAction(tr("Results animation (GIF or PNG)..."), this, [this] { exportAnimation(); });
+    exp->addSeparator();
     exp->addAction(tr("Selected element time series (CSV)..."), this, [this] {
         const QString csv = results_->csvForSelection();
         if (csv.isEmpty())
@@ -1869,6 +1879,159 @@ void MainWindow::exportMapImage()
         return;
     if (map_->renderImage().save(f))
         statusBar()->showMessage(tr("Saved %1").arg(f), 5000);
+}
+
+// ---------------------------------------------------------------------------
+// Deliverables: print layout, report document, animation
+// ---------------------------------------------------------------------------
+namespace
+{
+QString deliverableTitle(const ProjectDocument* doc)
+{
+    const QString title = QString::fromStdString(doc->model().title()).trimmed();
+    if (!title.isEmpty())
+        return title;
+    return doc->path().isEmpty() ? QObject::tr("Untitled network")
+                                 : QFileInfo(doc->path()).completeBaseName();
+}
+} // namespace
+
+void MainWindow::exportAnimation(const QString& path)
+{
+    const bool interactive = path.isEmpty();
+    if (!doc_->hasResults() || doc_->results()->periodCount() == 0)
+    {
+        if (interactive)
+            QMessageBox::information(
+                this, tr("Export animation"),
+                tr("Run a simulation first: the animation shows the results over time."));
+        emit animationExported(false);
+        return;
+    }
+    AnimationSettings s;
+    if (interactive)
+    {
+        AnimationDialog dlg(map_, doc_, this);
+        if (dlg.exec() != QDialog::Accepted)
+            return;
+        s = dlg.settings();
+        const QString base = doc_->path().isEmpty() ? QStringLiteral("animation")
+                                                    : QFileInfo(doc_->path()).completeBaseName();
+        s.path = QFileDialog::getSaveFileName(
+            this, tr("Export animation"), base + (s.gif ? ".gif" : ".png"),
+            s.gif ? tr("Animated GIF (*.gif)") : tr("PNG images, numbered (*.png)"));
+        if (s.path.isEmpty())
+            return;
+    }
+    else
+    {
+        s.path = path;
+        s.gif = !path.endsWith(".png", Qt::CaseInsensitive);
+        s.title = deliverableTitle(doc_);
+        s.basemap = !map_->attribution().isEmpty();
+    }
+    auto* exporter = new AnimationExporter(map_, doc_, s, this);
+    QProgressDialog* progress = nullptr;
+    if (interactive)
+    {
+        progress = new QProgressDialog(tr("Preparing the animation..."), tr("Cancel"), 0, 0, this);
+        progress->setWindowTitle(tr("Export animation"));
+        progress->setWindowModality(Qt::WindowModal);
+        progress->setMinimumDuration(0);
+        progress->setAutoClose(false);
+        progress->setAutoReset(false);
+        connect(progress, &QProgressDialog::canceled, exporter, &AnimationExporter::cancel);
+        connect(exporter, &AnimationExporter::progress, progress,
+                [progress](int done, int total, const QString& stage)
+                {
+                    progress->setMaximum(total);
+                    progress->setValue(done);
+                    progress->setLabelText(stage);
+                });
+    }
+    connect(exporter, &AnimationExporter::finished, this,
+            [this, exporter, progress](bool ok, const QString& text)
+            {
+                if (progress)
+                    progress->deleteLater();
+                message(ok ? "info" : "warning", text);
+                statusBar()->showMessage(text, 8000);
+                exporter->deleteLater();
+                emit animationExported(ok);
+            });
+    exporter->start();
+}
+
+bool MainWindow::exportLayout(const QString& path, const QString& chartReport)
+{
+    auto reports = [this](const QString& kind)
+    {
+        QWidget* page = nullptr;
+        for (int i = 0; i < tabs_->count(); ++i)
+            if (tabs_->widget(i)->objectName() == "report:" + kind)
+                page = tabs_->widget(i);
+        return reportSnapshot(kind, doc_, runBase() + ".rpt", page);
+    };
+    if (path.isEmpty())
+    {
+        LayoutDialog dlg(map_, doc_, reports, this);
+        dlg.exec();
+        return true;
+    }
+    LayoutSettings s = LayoutSettings::load(doc_, map_);
+    s.basemap = !map_->attribution().isEmpty();
+    if (!chartReport.isEmpty())
+    {
+        s.page.layout = core::layout::Template::ChartBelow;
+        s.page.split = 0.62;
+        s.report = chartReport;
+    }
+    PageComposer composer(map_, doc_, reports);
+    QString error;
+    bool ok = false;
+    if (path.endsWith(".pdf", Qt::CaseInsensitive))
+    {
+        composer.waitForBasemap(s, 2.1);
+        ok = composer.exportPdf(path, s, &error);
+    }
+    else
+    {
+        composer.waitForBasemap(s, 200 / 96.0);
+        ok = composer.exportImage(path, s, 200, &error);
+    }
+    message(ok ? "info" : "error", ok ? tr("Saved the layout to %1").arg(path) : error);
+    return ok;
+}
+
+bool MainWindow::exportReport(const QString& path)
+{
+    auto reports = [this](const QString& kind)
+    {
+        QWidget* page = nullptr;
+        for (int i = 0; i < tabs_->count(); ++i)
+            if (tabs_->widget(i)->objectName() == "report:" + kind)
+                page = tabs_->widget(i);
+        return reportSnapshot(kind, doc_, runBase() + ".rpt", page);
+    };
+    const auto* engine = currentEngine();
+    const QString engineName = engine ? QString::fromStdString(engine->name) : QString();
+    if (path.isEmpty())
+    {
+        ReportDialog dlg(map_, doc_, reports, engineName, this);
+        dlg.exec();
+        return true;
+    }
+    ReportOptions o;
+    o.title = deliverableTitle(doc_);
+    o.engine = engineName;
+    o.reports = ReportBuilder::defaultReports(doc_->model().dialect());
+    ReportBuilder builder(map_, doc_, reports);
+    QString error;
+    const bool ok = path.endsWith(".pdf", Qt::CaseInsensitive)
+                        ? builder.exportPdf(path, o, &error)
+                        : builder.exportHtml(path, o, &error);
+    message(ok ? "info" : "error", ok ? tr("Saved the report to %1").arg(path) : error);
+    return ok;
 }
 
 void MainWindow::showResilience(const QString& page)

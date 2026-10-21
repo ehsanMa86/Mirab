@@ -25,6 +25,7 @@
 #pragma once
 
 #include <QColor>
+#include <QFont>
 #include <QPointF>
 #include <QString>
 #include <QVector>
@@ -32,6 +33,8 @@
 
 #include <optional>
 #include <utility>
+
+class QPainter;
 
 namespace mirab::app
 {
@@ -61,6 +64,22 @@ public:
         bool inLegend = true;
     };
 
+    /// Everything a chart shows; copied for printing and documents.
+    struct Data
+    {
+        QVector<Series> series;
+        QString yLabel;
+        QString title;
+        QString xLabel;
+        bool timeAxis = true;
+        QVector<std::pair<double, QString>> annotations;
+        std::optional<double> yMin, yMax;
+        double marker = -1.0;
+        QString placeholder;
+        /// True when at least one series has points.
+        bool hasPoints() const;
+    };
+
     explicit ChartWidget(QWidget* parent = nullptr);
     void setSeries(const QVector<Series>& series, const QString& yLabel, const QString& title = {});
     /// Time axis (seconds shown as hours or days) or a plain numeric axis.
@@ -70,9 +89,15 @@ public:
     void setYRange(std::optional<double> min, std::optional<double> max);
     void setMarker(double x);
     void clear(const QString& placeholder = {});
+    const Data& data() const { return d_; }
     /// The plotted data as CSV text (one column per series).
     QString toCsv() const;
     QSize sizeHint() const override { return {520, 260}; }
+
+    /// Draws a chart into @p rect (painter units) with @p font, without the
+    /// interactive read-out. Used for print layouts and report documents.
+    static void paint(QPainter& p, const QRectF& rect, const QFont& font, const Data& data,
+                      bool background = true);
 
 protected:
     void paintEvent(QPaintEvent*) override;
@@ -81,20 +106,11 @@ protected:
     void contextMenuEvent(QContextMenuEvent*) override;
 
 private:
-    QColor colorOf(int index) const;
+    static void draw(QPainter& p, const QRectF& rect, const QFont& font, const Data& d,
+                     const QPointF& hover, bool background);
 
-    QVector<Series> series_;
-    QString yLabel_;
-    QString title_;
-    QString xLabel_;
-    bool timeAxis_ = true;
-    QVector<std::pair<double, QString>> annotations_;
-    std::optional<double> yMin_, yMax_;
-    double marker_ = -1.0;
-    QString placeholder_;
+    Data d_;
     QPointF hover_{-1, -1};
-    QRectF plot_;
-    double xmin_ = 0, xmax_ = 1, ymin_ = 0, ymax_ = 1;
 };
 
 } // namespace mirab::app

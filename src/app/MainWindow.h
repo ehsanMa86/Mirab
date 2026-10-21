@@ -85,6 +85,12 @@ public:
     /// "calibration" or "calibration-run" (the calibration dialog with the run started).
     void openTool(const QString& name);
 
+    // Deliverables. An empty path asks the user; a path exports without
+    // questions (automation) and reports through the return value or signal.
+    void exportAnimation(const QString& path = {});
+    bool exportLayout(const QString& path = {}, const QString& chartReport = {});
+    bool exportReport(const QString& path = {});
+
     // PluginHost
     const core::Model& model() const override { return doc_->model(); }
     bool editModel(const QString& description, const std::function<bool(core::Model&, std::string*)>& fn) override;
@@ -95,6 +101,7 @@ public:
 
 signals:
     void simulationCompleted(bool success);
+    void animationExported(bool success);
 
 protected:
     void closeEvent(QCloseEvent* e) override;

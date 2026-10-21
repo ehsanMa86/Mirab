@@ -24,9 +24,12 @@
  */
 #pragma once
 
+#include "ChartWidget.h"
 #include "ProjectDocument.h"
 
+#include <QList>
 #include <QString>
+#include <QStringList>
 #include <QWidget>
 
 namespace mirab::app
@@ -42,6 +45,30 @@ struct ReportInfo
 
 /// Reports offered for a model type.
 QList<ReportInfo> availableReports(core::Dialect dialect);
+
+/// Printable content of a report: its statistics, charts, table and text.
+struct ReportSnapshot
+{
+    QString kind;
+    QString title;
+    QString description;
+    QStringList notes; ///< summary and statistics lines
+    QVector<ChartWidget::Data> charts;
+    QStringList header;      ///< table columns
+    QList<QStringList> rows; ///< table cells
+    QList<bool> numeric;     ///< right-aligned columns
+    QString text;            ///< preformatted text (status report)
+    bool isEmpty() const
+    {
+        return notes.isEmpty() && charts.isEmpty() && rows.isEmpty() && text.isEmpty();
+    }
+};
+
+/// Content of a report for print layouts and documents. @p page is the open
+/// report tab of that kind, if any, so the choices made in it are kept;
+/// otherwise a report with default choices is built and discarded.
+ReportSnapshot reportSnapshot(const QString& kind, ProjectDocument* doc, const QString& reportFile,
+                              QWidget* page = nullptr);
 
 /// Creates a report page for a tab. @p reportFile is the engine report (.rpt)
 /// used by the status report. Returns nullptr for an unknown kind.

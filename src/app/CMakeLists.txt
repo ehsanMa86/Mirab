@@ -21,6 +21,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 set(APP_SOURCES
+    AnimationExport.cpp AnimationExport.h
     Basemap.cpp Basemap.h
     CalibrationDialogs.cpp CalibrationDialogs.h
     CalibrationReport.cpp CalibrationReport.h
@@ -30,7 +31,9 @@ set(APP_SOURCES
     EngineDownloader.cpp EngineDownloader.h
     Icons.cpp Icons.h
     ImportDialog.cpp ImportDialog.h
+    LayoutDialog.cpp LayoutDialog.h
     MainWindow.cpp MainWindow.h
+    MapDecorations.cpp MapDecorations.h
     MapPage.cpp MapPage.h
     MapServices.cpp MapServices.h
     MapView.cpp MapView.h
@@ -42,6 +45,7 @@ set(APP_SOURCES
     PropertyPanel.cpp PropertyPanel.h
     RasterDialogs.cpp RasterDialogs.h
     RasterLayers.cpp RasterLayers.h
+    ReportExport.cpp ReportExport.h
     Reports.cpp Reports.h
     RulesEditor.cpp RulesEditor.h
     SchemaWidgets.cpp SchemaWidgets.h
@@ -66,7 +70,7 @@ endif()
 qt_add_executable(Mirab WIN32 MACOSX_BUNDLE ${APP_SOURCES})
 target_include_directories(Mirab PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(Mirab PRIVATE
-    Qt6::Widgets Qt6::Network Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
+    Qt6::Widgets Qt6::Network Qt6::PrintSupport Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 
 if(APPLE)
     configure_file("${PROJECT_SOURCE_DIR}/packaging/macos/Info.plist.in"

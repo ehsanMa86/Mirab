@@ -60,8 +60,10 @@
 #include <cmath>
 #include <limits>
 #include <map>
+#include <memory>
 #include <queue>
 #include <set>
+#include <unordered_map>
 
 namespace mirab::app
 {
@@ -118,6 +120,32 @@ std::optional<double> elementNumber(const core::Model& m, Category c, const std:
     return std::nullopt;
 }
 
+/// Length column of every link, read in one pass over the link sections
+/// (looking links up one by one is slow on large networks).
+std::unordered_map<std::string, double> linkLengths(const core::Model& m)
+{
+    std::unordered_map<std::string, double> out;
+    for (const auto& def : core::sectionDefs(m.dialect()))
+    {
+        if (def.keyCategory != Category::Link)
+            continue;
+        std::size_t column = 0;
+        for (std::size_t i = 1; i < def.columns.size() && column == 0; ++i)
+            if (text::toUpper(def.columns[i].name) == "LENGTH")
+                column = i;
+        const auto* section = m.document().find(def.name);
+        if (column == 0 || !section)
+            continue;
+        for (const auto& tokens : section->allRowTokens())
+        {
+            if (tokens.size() > column)
+                if (const auto v = text::toDouble(tokens[column]))
+                    out.emplace(tokens[0], *v);
+        }
+    }
+    return out;
+}
+
 /// Header bar shared by every report: title, description and actions.
 QWidget* reportHeader(const QString& title, const QString& description, QWidget* parent, QHBoxLayout** actions)
 {
@@ -171,8 +199,40 @@ public:
         layout_->setContentsMargins(0, 0, 0, 0);
         layout_->setSpacing(0);
     }
+    /// Adds the printable content of the page.
+    virtual void snapshot(ReportSnapshot& s) const = 0;
 
 protected:
+    static void addChart(ReportSnapshot& s, const ChartWidget* chart)
+    {
+        if (chart->data().hasPoints())
+            s.charts.append(chart->data());
+        else if (!chart->data().placeholder.isEmpty())
+            s.notes << chart->data().placeholder;
+    }
+    static void addNote(ReportSnapshot& s, const QLabel* label)
+    {
+        if (!label->text().trimmed().isEmpty())
+            s.notes << label->text().trimmed();
+    }
+    static void addTable(ReportSnapshot& s, const QAbstractItemModel* model)
+    {
+        for (int c = 0; c < model->columnCount(); ++c)
+        {
+            s.header << model->headerData(c, Qt::Horizontal).toString();
+            const QVariant align =
+                model->rowCount() > 0 ? model->index(0, c).data(Qt::TextAlignmentRole) : QVariant();
+            s.numeric << (align.isValid() && (align.toInt() & Qt::AlignRight));
+        }
+        for (int r = 0; r < model->rowCount(); ++r)
+        {
+            QStringList cells;
+            for (int c = 0; c < model->columnCount(); ++c)
+                cells << model->index(r, c).data().toString();
+            s.rows << cells;
+        }
+    }
+
     void watch(bool period)
     {
         connect(doc_, &ProjectDocument::resultsChanged, this, [this] { refresh(); });
@@ -478,6 +538,17 @@ protected:
         return out;
     }
 
+    void snapshot(ReportSnapshot& s) const override
+    {
+        QString what = category_->currentText();
+        if (!kind_->isHidden() && kind_->currentIndex() > 0)
+            what += " (" + kind_->currentText() + ")";
+        if (!filter_->text().trimmed().isEmpty())
+            what += tr(", filter %1").arg(filter_->text().trimmed());
+        s.notes << what + "  ·  " + count_->text();
+        addTable(s, proxy_);
+    }
+
     QComboBox* category_;
     QComboBox* kind_;
     QLineEdit* filter_;
@@ -649,6 +720,8 @@ protected:
         chart_->setMarker(r->times[static_cast<std::size_t>(doc_->period())]);
     }
 
+    void snapshot(ReportSnapshot& s) const override { addChart(s, chart_); }
+
     QComboBox* category_;
     QComboBox* variable_;
     QListWidget* list_;
@@ -767,11 +840,13 @@ protected:
         }
         // Dijkstra over link lengths (geometric length when no length is given).
         std::map<std::string, std::vector<std::pair<std::string, double>>> adj;
+        const auto lengths = linkLengths(m);
         for (const auto& l : m.links())
         {
             const auto* n1 = m.findNode(l.from);
             const auto* n2 = m.findNode(l.to);
-            double len = elementNumber(m, Category::Link, l.id, {"Length"}).value_or(0.0);
+            const auto known = lengths.find(l.id);
+            double len = known != lengths.end() ? known->second : 0.0;
             if (len <= 0 && n1 && n2)
                 len = std::hypot(n1->pos.x - n2->pos.x, n1->pos.y - n2->pos.y);
             len = std::max(len, 1e-6);
@@ -937,6 +1012,12 @@ protected:
                           QString::fromStdString(nodes_.front()) + "  →  " + QString::fromStdString(nodes_.back()));
     }
 
+    void snapshot(ReportSnapshot& s) const override
+    {
+        addNote(s, path_);
+        addChart(s, chart_);
+    }
+
     QComboBox* from_;
     QComboBox* to_;
     QLabel* path_;
@@ -1048,6 +1129,12 @@ protected:
         chart_->setXAxis(varLabel(var), false);
         chart_->setYRange(0.0, 100.0);
         chart_->setSeries({s}, tr("Percent of elements at or below (%)"));
+    }
+
+    void snapshot(ReportSnapshot& s) const override
+    {
+        addNote(s, stats_);
+        addChart(s, chart_);
     }
 
     QComboBox* variable_;
@@ -1231,6 +1318,8 @@ protected:
         chart_->setMarker(r->times[static_cast<std::size_t>(doc_->period())]);
     }
 
+    void snapshot(ReportSnapshot& s) const override { addChart(s, chart_); }
+
     QComboBox* variable_;
     QComboBox* kind_;
     ChartWidget* chart_;
@@ -1344,6 +1433,13 @@ protected:
         chart_->setXAxis(tr("Time"), true);
         chart_->setSeries(series, tr("Flow (%1)").arg(unit));
         chart_->setMarker(r->times[static_cast<std::size_t>(doc_->period())]);
+    }
+
+    void snapshot(ReportSnapshot& s) const override
+    {
+        for (const QString& part : summary_->text().split("   ·   ", Qt::SkipEmptyParts))
+            s.notes << part.trimmed();
+        addChart(s, chart_);
     }
 
     QLabel* summary_;
@@ -1522,6 +1618,15 @@ protected:
         chart_->setSeries(series, tr("Pump power (kW)"), tr("Pump power"));
     }
 
+    void snapshot(ReportSnapshot& s) const override
+    {
+        addTable(s, model_);
+        if (!s.rows.isEmpty())
+            s.numeric[0] = false;
+        addChart(s, chart_);
+        addNote(s, note_);
+    }
+
     QTableView* table_;
     QStandardItemModel* model_;
     ChartWidget* chart_;
@@ -1565,6 +1670,8 @@ protected:
         edit_->setPlainText(QString::fromUtf8(f.readAll()));
     }
 
+    void snapshot(ReportSnapshot& s) const override { s.text = edit_->toPlainText(); }
+
     QString file_;
     QPlainTextEdit* edit_;
 };
@@ -1586,6 +1693,67 @@ QList<ReportInfo> availableReports(core::Dialect dialect)
                  QObject::tr("Simulated against observed data, with goodness of fit")});
     list.append({"status", QObject::tr("Status report"), "report", QObject::tr("The engine's report file")});
     return list;
+}
+
+ReportSnapshot reportSnapshot(const QString& kind, ProjectDocument* doc, const QString& reportFile,
+                              QWidget* page)
+{
+    ReportSnapshot s;
+    s.kind = kind;
+    for (const auto& r : availableReports(doc->model().dialect()))
+    {
+        if (r.kind == kind)
+        {
+            s.title = r.title;
+            s.description = r.description;
+        }
+    }
+    std::unique_ptr<QWidget> temporary;
+    if (!page)
+    {
+        temporary.reset(createReport(kind, doc, reportFile, nullptr));
+        page = temporary.get();
+    }
+    if (auto* report = dynamic_cast<ReportPage*>(page))
+    {
+        report->snapshot(s);
+    }
+    else if (page)
+    {
+        // Reports built elsewhere (calibration): their notes, first table and charts.
+        for (const auto* label : page->findChildren<QLabel*>())
+            if (label->objectName() == "muted" && !label->text().trimmed().isEmpty())
+                s.notes << label->text().trimmed();
+        if (const auto* view = page->findChild<QTableView*>(); view && view->model())
+        {
+            const QAbstractItemModel* model = view->model();
+            for (int c = 0; c < model->columnCount(); ++c)
+            {
+                s.header << model->headerData(c, Qt::Horizontal).toString();
+                bool numeric = model->rowCount() > 0;
+                for (int r = 0; r < std::min(model->rowCount(), 20) && numeric; ++r)
+                {
+                    const QString cell = model->index(r, c).data().toString();
+                    numeric = cell.isEmpty() || text::toDouble(cell.toStdString()).has_value();
+                }
+                s.numeric << numeric;
+            }
+            for (int r = 0; r < model->rowCount(); ++r)
+            {
+                QStringList cells;
+                for (int c = 0; c < model->columnCount(); ++c)
+                    cells << model->index(r, c).data().toString();
+                s.rows << cells;
+            }
+        }
+        for (const auto* chart : page->findChildren<ChartWidget*>())
+            if (chart->data().hasPoints())
+                s.charts.append(chart->data());
+        // Charts over time first, then the others (scatter plots).
+        std::stable_partition(s.charts.begin(), s.charts.end(),
+                              [](const ChartWidget::Data& d) { return d.timeAxis; });
+    }
+    return s;
 }
 
 QWidget* createReport(const QString& kind, ProjectDocument* doc, const QString& reportFile, QWidget* parent)

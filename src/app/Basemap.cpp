@@ -474,6 +474,7 @@ void Basemap::loadCapabilities(const Provider& prov)
     if (capabilitiesPending_.contains(prov.id))
         return;
     capabilitiesPending_.insert(prov.id);
+    capabilitiesLoading_.insert(prov.id);
     QNetworkRequest req(capabilitiesUrl(prov.url, "wmts"));
     req.setHeader(QNetworkRequest::UserAgentHeader, userAgent());
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
@@ -482,6 +483,7 @@ void Basemap::loadCapabilities(const Provider& prov)
     const QString id = prov.id;
     connect(reply, &QNetworkReply::finished, this, [this, reply, id] {
         reply->deleteLater();
+        capabilitiesLoading_.remove(id);
         const ServiceCapabilities caps = parseCapabilities(reply->readAll());
         for (auto& p : customList())
         {
@@ -500,8 +502,10 @@ void Basemap::loadCapabilities(const Provider& prov)
     });
 }
 
-void Basemap::paint(QPainter& p, const QRectF& viewport, const std::function<QPointF(double, double)>& toScreen,
-                    const std::function<QPointF(const QPointF&)>& toWorld)
+void Basemap::paint(QPainter& p, const QRectF& viewport,
+                    const std::function<QPointF(double, double)>& toScreen,
+                    const std::function<QPointF(const QPointF&)>& toWorld, double detail,
+                    int maxTiles)
 {
     const Provider* found = find(provider_);
     if (!found || !crs_ || viewport.isEmpty())
@@ -567,7 +571,9 @@ void Basemap::paint(QPainter& p, const QRectF& viewport, const std::function<QPo
     }
     if (good < 4 || maxX <= minX || maxY <= minY)
         return;
-    const double resolution = (maxX - minX) / std::max(1.0, viewport.width());
+    // Grid units per tile pixel; a higher detail picks finer levels (print).
+    const double resolution =
+        (maxX - minX) / std::max(1.0, viewport.width() * std::max(0.1, detail));
 
     // Levels: the Web Mercator pyramid, the server's tile matrices, or powers
     // of two of the grid unit (WMS in another system).
@@ -653,7 +659,7 @@ void Basemap::paint(QPainter& p, const QRectF& viewport, const std::function<QPo
     Level level = levelFor(z);
     int x0, x1, y0, y1;
     tileRange(level, x0, x1, y0, y1);
-    while (count(x0, x1, y0, y1) > 160 && z + coarser >= zMin && z + coarser <= zMax)
+    while (count(x0, x1, y0, y1) > maxTiles && z + coarser >= zMin && z + coarser <= zMax)
     {
         z += coarser;
         level = levelFor(z);

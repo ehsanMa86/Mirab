@@ -104,6 +104,11 @@ public:
     std::optional<QRectF> extent(const QString& modelCrs) const;
 
     void paint(QPainter& p, const QRect& area, const View& view, const QString& modelCrs);
+    /// Draws the layers for exactly @p view into @p target (painter units) at
+    /// @p pixelRatio device pixels per unit, for print and export. The screen
+    /// picture cache is neither used nor changed.
+    void paintExact(QPainter& p, const QRectF& target, const View& view, const QString& modelCrs,
+                    double pixelRatio);
 
 signals:
     void updated();

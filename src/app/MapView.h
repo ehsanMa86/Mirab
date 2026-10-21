@@ -26,9 +26,12 @@
 
 #include "ProjectDocument.h"
 
+#include <QFont>
 #include <QImage>
 #include <QPointF>
 #include <QRectF>
+#include <QStringList>
+#include <QVector>
 #include <QWidget>
 
 #include <optional>
@@ -96,6 +99,58 @@ public:
 
     /// Snapshot of the map as currently displayed.
     QImage renderImage();
+
+    /// What render() draws. Sizes are in painter units; a unit is a screen
+    /// pixel at 96 dpi, and the painter is scaled for print resolutions.
+    struct RenderOptions
+    {
+        int period = -1;        ///< reporting period; -1 follows the time slider
+        bool background = true; ///< background, basemap and backdrop image
+        bool basemap = true;    ///< web basemap tiles, when one is chosen
+        bool network = true;
+        bool overlays = false;   ///< the on-screen legend, scale bar and attribution
+        bool highlights = false; ///< selection, hover and pending edits
+        QFont font;              ///< label font; the widget font when not set
+        double pixelRatio = 1.0; ///< device pixels per painter unit
+        /// Basemap tile pixels per painter unit: 1 matches the screen; higher
+        /// values give sharper imagery with smaller labels.
+        double tileDetail = 1.0;
+        /// Draws the background as one image at pixelRatio (smaller PDF files
+        /// than one image per basemap tile); the network stays vector.
+        bool rasterBackground = false;
+    };
+    /// Draws the current view into @p target, keeping the visible extent.
+    void render(QPainter& p, const QRectF& target, const RenderOptions& options);
+    /// Requests the basemap tiles render() needs; true while some are still loading.
+    bool prepareBasemap(const QRectF& target, const RenderOptions& options);
+    /// Waits (processing events) until the basemap tiles are loaded or the time runs out.
+    void waitForBasemap(const QRectF& target, const RenderOptions& options, int timeoutMs = 20000);
+
+    struct LegendClass
+    {
+        QColor color;
+        QString label;
+    };
+    struct Legend
+    {
+        QString title; ///< result and unit; empty when the map shows no results
+        QVector<LegendClass> classes;
+    };
+    /// Color classes of the result shown on the map.
+    Legend legend() const;
+    /// Element types drawn on the map, for a symbol legend.
+    QStringList elementKinds() const;
+    /// Draws the map symbol of an element type centred on @p c.
+    static void drawSymbol(QPainter& p, const QPointF& c, double size, const QString& kind);
+    /// Ground length of one painter unit when the view is fitted into @p target;
+    /// @p unit receives "m" or "ft". 0 when unknown.
+    double groundPerUnit(const QRectF& target, QString* unit);
+    /// Clockwise angle in degrees from the top of the map to true north (0 when unknown).
+    double northAngle() const;
+    /// Copyright notice of the basemap, when one is shown.
+    QString attribution() const;
+    /// Colors of the result classes, from low to high.
+    static QVector<QColor> rampColors();
     /// Converts a screen position to model coordinates.
     QPointF worldAt(const QPoint& screen) const;
 
@@ -119,14 +174,18 @@ protected:
     void leaveEvent(QEvent*) override;
 
 private:
+    struct ViewScope;
+    QRectF viewRect() const { return viewOverride_ ? *viewOverride_ : QRectF(rect()); }
+    int currentPeriod() const { return periodOverride_ >= 0 ? periodOverride_ : doc_->period(); }
+    double groundPerPixel(const QPointF& a, QString* unit) const;
     QPointF toScreen(const core::Point& p) const;
     QPointF toScreen(double x, double y) const { return toScreen(core::Point{x, y}); }
     core::Point toWorld(const QPointF& s) const;
     Selection hitTest(const QPointF& screen) const;
-    void paintTo(QPainter& p, const QRect& area);
-    void drawLegend(QPainter& p, const QRect& area);
-    void drawScaleBar(QPainter& p, const QRect& area);
-    void drawAttribution(QPainter& p, const QRect& area);
+    void paintTo(QPainter& p, const QRectF& area, const RenderOptions& o);
+    void drawLegend(QPainter& p, const QRectF& area);
+    void drawScaleBar(QPainter& p, const QRectF& area);
+    void drawAttribution(QPainter& p, const QRectF& area);
     void drawLabel(QPainter& p, const QPointF& at, const QString& text);
     QColor colorFor(double value) const;
     void recomputeRanges();
@@ -179,6 +238,14 @@ private:
 
     QImage backdrop_;
     QRectF backdropWorld_;
+
+    // render() state
+    QFont paintFont_;
+    std::optional<QRectF> viewOverride_;
+    int periodOverride_ = -1;
+    bool highlights_ = true;
+    double detail_ = 1.0;     ///< basemap tile detail
+    double pixelRatio_ = 1.0; ///< device pixels per painter unit (raster layers)
 };
 
 } // namespace mirab::app

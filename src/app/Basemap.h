@@ -108,9 +108,14 @@ public:
     QString crsName() const { return crsName_; }
 
     /// Draws the tiles that cover @p viewport. toWorld/toScreen convert between
-    /// screen pixels and model coordinates.
-    void paint(QPainter& p, const QRectF& viewport, const std::function<QPointF(double, double)>& toScreen,
-               const std::function<QPointF(const QPointF&)>& toWorld);
+    /// screen pixels and model coordinates. @p detail is the number of device
+    /// pixels per painter unit (higher for print), @p maxTiles caps the download.
+    void paint(QPainter& p, const QRectF& viewport,
+               const std::function<QPointF(double, double)>& toScreen,
+               const std::function<QPointF(const QPointF&)>& toWorld, double detail = 1.0,
+               int maxTiles = 160);
+    /// True while tiles or the tile matrices of the service are being downloaded.
+    bool loading() const { return !pending_.isEmpty() || !capabilitiesLoading_.isEmpty(); }
     QString attribution() const;
     /// Last problem with the current service (capabilities or tiles), empty when none.
     QString serviceError() const { return serviceError_; }
@@ -140,6 +145,7 @@ private:
     QSet<QString> pending_;
     QSet<QString> failed_;
     QSet<QString> capabilitiesPending_;
+    QSet<QString> capabilitiesLoading_; ///< capabilities requests in flight
 };
 
 } // namespace mirab::app
