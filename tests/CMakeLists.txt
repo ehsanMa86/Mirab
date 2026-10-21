@@ -22,7 +22,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_executable(mirab-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp
     test_swmm_data.cpp test_swmm_objects.cpp test_raster.cpp test_calibration.cpp
-    test_deliverables.cpp)
+    test_deliverables.cpp test_scripting.cpp)
 target_link_libraries(mirab-tests PRIVATE
     Mirab::core Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 target_compile_definitions(mirab-tests PRIVATE
@@ -37,7 +37,7 @@ endif()
 
 foreach(group IN ITEMS text json inp model features results settings hash crs import swmm
                      lid lidusage transects hydrographs rules raster elevation
-                     calibration gif layout summary)
+                     calibration gif layout summary modeljson)
     add_test(NAME ${group} COMMAND mirab-tests "${group}:")
 endforeach()
 if(MIRAB_BUILD_ENGINES)
@@ -76,6 +76,20 @@ if(Python3_Interpreter_FOUND)
             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/cli_protocol.py" $<TARGET_FILE:mirab-cli>
                     "${PROJECT_SOURCE_DIR}/examples" "${CMAKE_CURRENT_BINARY_DIR}/cli-protocol")
         set_tests_properties(cli-protocol PROPERTIES TIMEOUT 180)
+    endif()
+    # The Python package (integrations/python) against this build's mirab-cli,
+    # when pytest is installed. Nothing in the build itself needs Python.
+    execute_process(COMMAND "${Python3_EXECUTABLE}" -c "import pytest"
+        RESULT_VARIABLE _mirab_pytest OUTPUT_QUIET ERROR_QUIET)
+    if(_mirab_pytest EQUAL 0)
+        add_test(NAME python-package
+            COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider
+                    "${PROJECT_SOURCE_DIR}/integrations/python/tests")
+        set_tests_properties(python-package PROPERTIES
+            ENVIRONMENT "MIRAB_CLI=$<TARGET_FILE:mirab-cli>;PYTHONPATH=${PROJECT_SOURCE_DIR}/integrations/python/src;PYTHONDONTWRITEBYTECODE=1;MIRAB_EXAMPLES=${PROJECT_SOURCE_DIR}/examples"
+            TIMEOUT 300)
+    else()
+        message(STATUS "pytest not found: the python-package test is skipped")
     endif()
 endif()
 

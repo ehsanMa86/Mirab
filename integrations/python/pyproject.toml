@@ -1,0 +1,47 @@
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
+#
+# Python package that scripts Mirab through mirab-cli.
+#
+# Copyright (C) 2026 Ehsan Madadi
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[build-system]
+requires = ["flit_core>=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "mirab"
+version = "0.1.0"
+description = "Scripting for Mirab water distribution and stormwater models through mirab-cli"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "GPL-3.0-or-later"}
+authors = [{name = "Ehsan Madadi"}]
+keywords = ["EPANET", "SWMM", "water distribution", "stormwater", "hydraulics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Hydrology",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+numpy = ["numpy"]
+pandas = ["numpy", "pandas"]
+plot = ["numpy", "pandas", "matplotlib"]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/ehsanMa86/Mirab"
+Documentation = "https://github.com/ehsanMa86/Mirab/blob/main/docs/python.md"
+
+[project.scripts]
+mirab-mcp = "mirab.mcp:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

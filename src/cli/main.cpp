@@ -29,6 +29,7 @@
 #include "mirab/core/Json.h"
 #include "mirab/core/LiveResults.h"
 #include "mirab/core/Model.h"
+#include "mirab/core/ModelJson.h"
 #include "mirab/core/ProjectSettings.h"
 #include "mirab/core/Raster.h"
 #include "mirab/core/Results.h"
@@ -44,12 +45,15 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -109,7 +113,8 @@ const std::vector<std::string> kValueOptions = {
     "target", "engine", "msx", "out", "report", "workdir", "table", "variable", "element", "results",
     "period", "crs", "required-pressure", "threshold", "links", "nodes", "flow", "residual",
     "time", "max-flow", "minimum-pressure", "dem", "mode", "swmm", "dem-units", "decimals",
-    "frame-interval"};
+    "frame-interval", "section", "id", "column", "value", "row", "option", "edits", "format",
+    "category"};
 
 Args parseArgs(const std::vector<std::string>& argv, std::size_t from)
 {
@@ -385,8 +390,19 @@ const char* supportName(engine::Support s)
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
-int cmdVersion()
+int cmdVersion(const Args& a)
 {
+    if (a.flag("json"))
+    {
+        Value v = Value::object();
+        v.set("name", "Mirab");
+        v.set("version", MIRAB_VERSION_STRING);
+        v.set("copyright", MIRAB_COPYRIGHT);
+        v.set("license", "GPL-3.0-or-later");
+        v.set("homepage", MIRAB_HOMEPAGE);
+        std::cout << v.dump(2) << "\n";
+        return 0;
+    }
     std::cout << "Mirab " << MIRAB_VERSION_STRING << "\n" << MIRAB_COPYRIGHT << "\n"
               << "License GPL-3.0-or-later: <https://www.gnu.org/licenses/gpl-3.0.html>\n"
               << MIRAB_HOMEPAGE << "\n";
@@ -414,6 +430,17 @@ int cmdEnginesManage(const Args& a)
         const auto manifest = engine::EngineManifest::load(manifestFile);
         resolveEngineId(registry, manifest.engine);
         engine::installFromManifest(manifest, manifestFile.parent_path(), target);
+        if (a.flag("json"))
+        {
+            Value v = Value::object();
+            v.set("engine", manifest.engine);
+            v.set("name", manifest.name);
+            v.set("version", manifest.version);
+            v.set("packageVersion", manifest.packageVersion);
+            v.set("target", target.u8string());
+            std::cout << v.dump(2) << "\n";
+            return 0;
+        }
         std::cout << "Installed " << manifest.name << " " << manifest.version << " (package "
                   << manifest.packageVersion << ") into " << target.u8string() << "\n";
         return 0;
@@ -425,6 +452,14 @@ int cmdEnginesManage(const Args& a)
         const std::string id = resolveEngineId(registry, a.positional[1]);
         if (!engine::uninstallEngine(id, target))
             throw std::runtime_error(id + " was not installed in " + target.u8string());
+        if (a.flag("json"))
+        {
+            Value v = Value::object();
+            v.set("engine", id);
+            v.set("target", target.u8string());
+            std::cout << v.dump(2) << "\n";
+            return 0;
+        }
         std::cout << "Removed " << id << " from " << target.u8string() << "\n";
         return 0;
     }
@@ -437,12 +472,29 @@ int cmdEnginesManage(const Args& a)
         auto eng = registry.create(id, &error);
         if (!eng)
             throw std::runtime_error(error);
+        if (a.flag("json"))
+        {
+            Value v = Value::object();
+            v.set("engine", id);
+            v.set("name", eng->descriptor().name);
+            v.set("version", eng->engineVersion());
+            v.set("library", eng->libraryPath().u8string());
+            std::cout << v.dump(2) << "\n";
+            return 0;
+        }
         std::cout << eng->descriptor().name << " loads correctly: version " << eng->engineVersion() << " from "
                   << eng->libraryPath().u8string() << "\n";
         return 0;
     }
     if (action == "where")
     {
+        if (a.flag("json"))
+        {
+            Value v = Value::object();
+            v.set("path", engine::userEngineDirectory().u8string());
+            std::cout << v.dump(2) << "\n";
+            return 0;
+        }
         std::cout << engine::userEngineDirectory().u8string() << "\n";
         return 0;
     }
@@ -500,10 +552,67 @@ int cmdEngines(const Args& a)
     return 0;
 }
 
+Value issueJson(const core::ModelIssue& issue)
+{
+    Value v = Value::object();
+    v.set("severity", issue.severity == core::ModelIssue::Severity::Error ? "error" : "warning");
+    v.set("message", issue.message);
+    v.set("section", issue.section);
+    v.set("row", issue.row);
+    return v;
+}
+
 int cmdInfo(const Args& a)
 {
     const auto model = loadModel(a);
     const auto units = model.units();
+    if (a.flag("json"))
+    {
+        Value v = Value::object();
+        v.set("path", a.positional[0]);
+        v.set("dialect", core::dialectName(model.dialect()));
+        v.set("title", model.title());
+        Value u = Value::object();
+        u.set("flow", units.flow);
+        u.set("system", units.system == core::UnitSystem::SI ? "SI" : "US");
+        v.set("units", u);
+        v.set("duration", model.durationSeconds());
+        v.set("reportStep", model.reportStepSeconds());
+        Value counts = Value::object();
+        counts.set("nodes", model.nodes().size());
+        counts.set("links", model.links().size());
+        counts.set("subcatchments", model.areas().size());
+        counts.set("gages", model.gages().size());
+        v.set("counts", counts);
+        std::map<std::string, int> kinds;
+        for (const auto& n : model.nodes())
+            ++kinds[n.kind];
+        for (const auto& l : model.links())
+            ++kinds[l.kind];
+        Value k = Value::object();
+        for (const auto& [name, n] : kinds)
+            k.set(name, n);
+        v.set("kinds", k);
+        Value features = Value::array();
+        for (const auto& f : core::detectFeatures(model))
+        {
+            Value fv = Value::object();
+            fv.set("feature", core::featureName(f.feature));
+            fv.set("detail", f.detail);
+            fv.set("section", f.section);
+            fv.set("row", f.row);
+            features.push(fv);
+        }
+        v.set("features", features);
+        Value issues = Value::array();
+        for (const auto& issue : model.validate())
+            issues.push(issueJson(issue));
+        for (const auto& issue : core::validateObjectSections(model))
+            issues.push(issueJson(issue));
+        v.set("issues", issues);
+        std::cout << v.dump(2) << "\n";
+        return 0;
+    }
     std::cout << "Model:      " << a.positional[0] << "\n"
               << "Format:     " << core::dialectName(model.dialect()) << "\n"
               << "Title:      " << model.title() << "\n"
@@ -548,6 +657,7 @@ int cmdCheck(const Args& a)
     const auto report = engine::checkCompatibility(model, *d);
     Value out = Value::object();
     out.set("engine", id);
+    out.set("engineName", d->name);
     out.set("runnable", report.runnable());
     Value issues = Value::array();
     for (const auto& i : report.issues)
@@ -678,6 +788,10 @@ int cmdRun(const Args& a)
     {
         out.event("done", done);
     }
+    else if (a.flag("json"))
+    {
+        std::cout << done.dump(2) << "\n";
+    }
     else
     {
         if (outcome.success)
@@ -692,14 +806,121 @@ int cmdRun(const Args& a)
     return outcome.success ? 0 : (outcome.cancelled ? 3 : 1);
 }
 
+Value variablesJson(const std::vector<core::Variable>& vars)
+{
+    Value list = Value::array();
+    for (const auto& v : vars)
+    {
+        Value e = Value::object();
+        e.set("name", v.name);
+        e.set("unit", v.unit);
+        list.push(e);
+    }
+    return list;
+}
+
+/// Same members as the header of an .anr file, plus the period count.
+Value resultsSummary(const core::ResultSet& r)
+{
+    Value v = Value::object();
+    v.set("engineId", r.engineId);
+    v.set("engineName", r.engineName);
+    v.set("title", r.title);
+    v.set("flowUnits", r.flowUnits);
+    v.set("unitSystem", r.unitSystem);
+    v.set("reportStart", r.reportStart);
+    v.set("reportStep", r.reportStep);
+    v.set("periods", r.periodCount());
+    Value times = Value::array();
+    for (double t : r.times)
+        times.push(t);
+    v.set("times", times);
+    Value meta = Value::object();
+    for (const auto& [k, m] : r.metadata)
+        meta.set(k, m);
+    v.set("metadata", meta);
+    Value messages = Value::array();
+    for (const auto& m : r.messages)
+        messages.push(m);
+    v.set("messages", messages);
+    Value tables = Value::array();
+    for (const auto& t : r.tables)
+    {
+        Value tv = Value::object();
+        tv.set("kind", t.kind);
+        Value ids = Value::array();
+        for (const auto& id : t.ids)
+            ids.push(id);
+        tv.set("ids", ids);
+        tv.set("variables", variablesJson(t.variables));
+        tables.push(tv);
+    }
+    v.set("tables", tables);
+    return v;
+}
+
+/// Writes a NumPy .npy file (format 1.0) of little-endian float32 values.
+void writeNpy(const fs::path& path, const std::vector<std::size_t>& shape,
+              const std::vector<float>& values)
+{
+    std::vector<std::string> dims;
+    for (std::size_t d : shape)
+        dims.push_back(std::to_string(d));
+    std::string header = "{'descr': '<f4', 'fortran_order': False, 'shape': (" +
+                         text::join(dims, ", ") + (shape.size() == 1 ? "," : "") + "), }";
+    const std::size_t total = 10 + header.size() + 1;
+    header.append((64 - total % 64) % 64, ' ');
+    header += '\n';
+    std::ofstream f(path, std::ios::binary | std::ios::trunc);
+    if (!f)
+        throw std::runtime_error("cannot write " + path.u8string());
+    const unsigned char magic[8] = {0x93, 'N', 'U', 'M', 'P', 'Y', 1, 0};
+    f.write(reinterpret_cast<const char*>(magic), 8);
+    const auto len = static_cast<std::uint16_t>(header.size());
+    const unsigned char lenBytes[2] = {static_cast<unsigned char>(len & 0xff),
+                                       static_cast<unsigned char>(len >> 8)};
+    f.write(reinterpret_cast<const char*>(lenBytes), 2);
+    f << header;
+    std::string block(values.size() * 4, '\0');
+    for (std::size_t i = 0; i < values.size(); ++i)
+    {
+        std::uint32_t bits = 0;
+        std::memcpy(&bits, &values[i], 4);
+        for (int b = 0; b < 4; ++b)
+            block[i * 4 + static_cast<std::size_t>(b)] =
+                static_cast<char>((bits >> (8 * b)) & 0xff);
+    }
+    f.write(block.data(), static_cast<std::streamsize>(block.size()));
+    if (!f)
+        throw std::runtime_error("cannot write " + path.u8string());
+}
+
 int cmdResults(const Args& a)
 {
     if (a.positional.empty())
         throw std::runtime_error("missing results file");
     const auto r = core::ResultSet::loadAny(pathArg(a.positional[0]));
+    const std::string format = text::toLower(a.opt("format", a.flag("json") ? "json" : "csv"));
+    if (format != "csv" && format != "json" && format != "npy" && format != "anr")
+        throw std::runtime_error("--format expects csv, json, npy or anr");
+    if ((format == "npy" || format == "anr") && !a.has("out"))
+        throw std::runtime_error("--format " + format + " needs --out <file>");
+    if (format == "anr")
+    {
+        r.save(pathArg(a.opt("out")));
+        std::cerr << "Wrote " << a.opt("out") << "\n";
+        return 0;
+    }
     const std::string tableName = a.opt("table");
     if (tableName.empty())
     {
+        if (format == "json")
+        {
+            std::cout << resultsSummary(r).dump(a.flag("compact") ? -1 : 2) << "\n";
+            return 0;
+        }
+        if (format == "npy")
+            throw std::runtime_error("--format npy needs --table");
         std::cout << "Engine:  " << r.engineName << "\nPeriods: " << r.periodCount()
                   << "\nUnits:   " << r.flowUnits << " (" << r.unitSystem << ")\n";
         for (const auto& t : r.tables)
@@ -716,9 +937,33 @@ int cmdResults(const Args& a)
     const auto* t = r.table(tableName);
     if (!t)
         throw std::runtime_error("no table " + tableName);
-    const int var = t->variableIndex(a.opt("variable", t->variables.empty() ? "" : t->variables[0].name));
-    if (var < 0)
-        throw std::runtime_error("unknown variable " + a.opt("variable"));
+
+    // Variables: those named by --variable, else the first one for CSV and
+    // every one for JSON and NumPy.
+    std::vector<int> vars;
+    if (a.has("variable"))
+    {
+        for (const auto& name : splitList(a.opt("variable")))
+        {
+            const int v = t->variableIndex(name);
+            if (v < 0)
+                throw std::runtime_error("unknown variable " + name);
+            vars.push_back(v);
+        }
+    }
+    else if (format == "csv")
+    {
+        if (t->variables.empty())
+            throw std::runtime_error("table " + tableName + " has no variables");
+        vars.push_back(0);
+    }
+    else
+    {
+        for (int v = 0; v < t->variableCount(); ++v)
+            vars.push_back(v);
+    }
+    if (format == "csv" && vars.size() != 1)
+        throw std::runtime_error("CSV output takes one --variable");
     std::vector<int> elements;
     if (a.has("element"))
     {
@@ -735,16 +980,95 @@ int cmdResults(const Args& a)
         for (int e = 0; e < t->elementCount(); ++e)
             elements.push_back(e);
     }
-    std::cout << "time_s";
-    for (int e : elements)
-        std::cout << "," << t->ids[static_cast<std::size_t>(e)];
-    std::cout << "\n";
-    for (int p = 0; p < r.periodCount(); ++p)
+    std::vector<int> periods;
+    if (a.has("period"))
     {
-        std::cout << text::formatDouble(r.times[static_cast<std::size_t>(p)]);
+        const int p = static_cast<int>(a.num("period", 0));
+        if (p < 0 || p >= r.periodCount())
+            throw std::runtime_error("--period must be between 0 and " +
+                                     std::to_string(r.periodCount() - 1));
+        periods.push_back(p);
+    }
+    else
+    {
+        for (int p = 0; p < r.periodCount(); ++p)
+            periods.push_back(p);
+    }
+
+    if (format == "npy")
+    {
+        // Shape (periods, elements) for one --variable, else (periods, variables, elements).
+        std::vector<float> values;
+        values.reserve(periods.size() * vars.size() * elements.size());
+        for (int p : periods)
+            for (int v : vars)
+                for (int e : elements)
+                    values.push_back(t->value(p, v, e));
+        std::vector<std::size_t> shape = {periods.size()};
+        if (vars.size() != 1 || !a.has("variable"))
+            shape.push_back(vars.size());
+        shape.push_back(elements.size());
+        writeNpy(pathArg(a.opt("out")), shape, values);
+        std::cerr << "Wrote " << a.opt("out") << "\n";
+        return 0;
+    }
+    if (format == "json")
+    {
+        Value out = Value::object();
+        out.set("table", t->kind);
+        Value pv = Value::array();
+        Value times = Value::array();
+        for (int p : periods)
+        {
+            pv.push(p);
+            times.push(r.times[static_cast<std::size_t>(p)]);
+        }
+        out.set("periods", pv);
+        out.set("times", times);
+        Value ids = Value::array();
         for (int e : elements)
-            std::cout << "," << text::formatDouble(t->value(p, var, e), 7);
-        std::cout << "\n";
+            ids.push(t->ids[static_cast<std::size_t>(e)]);
+        out.set("elements", ids);
+        Value variables = Value::array();
+        for (int v : vars)
+        {
+            Value vv = Value::object();
+            vv.set("name", t->variables[static_cast<std::size_t>(v)].name);
+            vv.set("unit", t->variables[static_cast<std::size_t>(v)].unit);
+            Value rows = Value::array();
+            for (int p : periods)
+            {
+                Value row = Value::array();
+                for (int e : elements)
+                    row.push(static_cast<double>(t->value(p, v, e)));
+                rows.push(row);
+            }
+            vv.set("values", rows);
+            variables.push(vv);
+        }
+        out.set("variables", variables);
+        std::cout << out.dump(a.flag("compact") ? -1 : 2) << "\n";
+        return 0;
+    }
+    std::ofstream file;
+    if (a.has("out"))
+    {
+        file.open(pathArg(a.opt("out")), std::ios::binary | std::ios::trunc);
+        if (!file)
+            throw std::runtime_error("cannot write " + a.opt("out"));
+    }
+    std::ostream& os = a.has("out") ? static_cast<std::ostream&>(file) : std::cout;
+    const int var = vars.front();
+    os << "time_s";
+    for (int e : elements)
+        os << "," << t->ids[static_cast<std::size_t>(e)];
+    os << "\n";
+    for (int p : periods)
+    {
+        os << text::formatDouble(r.times[static_cast<std::size_t>(p)]);
+        for (int e : elements)
+            os << "," << text::formatDouble(t->value(p, var, e), 7);
+        os << "\n";
     }
     return 0;
 }
@@ -1017,6 +1341,18 @@ int cmdExport(const Args& a)
         interop::writeWntrJson(model, out, &notes);
     else
         throw std::runtime_error("unknown export format " + format);
+    if (a.flag("json"))
+    {
+        Value v = Value::object();
+        v.set("format", format);
+        v.set("path", out.u8string());
+        Value list = Value::array();
+        for (const auto& n : notes)
+            list.push(n);
+        v.set("notes", list);
+        std::cout << v.dump(2) << "\n";
+        return 0;
+    }
     for (const auto& n : notes)
         std::cerr << "note: " << n << "\n";
     std::cout << "Wrote " << out.u8string() << "\n";
@@ -1032,6 +1368,19 @@ int cmdImport(const Args& a)
     std::vector<std::string> notes;
     const auto model = interop::readWntrJson(pathArg(a.positional[1]), &notes);
     model.save(pathArg(a.opt("out")));
+    if (a.flag("json"))
+    {
+        Value v = Value::object();
+        v.set("path", a.opt("out"));
+        v.set("nodes", model.nodes().size());
+        v.set("links", model.links().size());
+        Value list = Value::array();
+        for (const auto& n : notes)
+            list.push(n);
+        v.set("notes", list);
+        std::cout << v.dump(2) << "\n";
+        return 0;
+    }
     for (const auto& n : notes)
         std::cerr << "note: " << n << "\n";
     std::cout << "Wrote " << a.opt("out") << " (" << model.nodes().size() << " nodes, " << model.links().size()
@@ -1093,9 +1442,32 @@ int cmdElevations(const Args& a)
     for (const auto& c : plan)
         ++counts[c.status];
     auto fmt = [](const std::optional<double>& v) { return v ? text::formatDouble(*v, 10) : std::string("-"); };
+    int written = -1;
+    if (a.has("out"))
+    {
+        written = core::applyElevations(model, plan, o.decimals);
+        model.save(pathArg(a.opt("out")));
+    }
     if (a.flag("json"))
     {
         Value out = Value::object();
+        const auto& info = dem->info();
+        Value dv = Value::object();
+        dv.set("path", a.opt("dem"));
+        dv.set("format", info.format);
+        dv.set("width", info.width);
+        dv.set("height", info.height);
+        dv.set("crs", info.crsDescription);
+        out.set("dem", dv);
+        Value cv = Value::object();
+        for (const auto& [status, n] : counts)
+            cv.set(core::statusName(status), n);
+        out.set("counts", cv);
+        if (written >= 0)
+        {
+            out.set("written", a.opt("out"));
+            out.set("changed", written);
+        }
         Value rows = Value::array();
         for (const auto& c : plan)
         {
@@ -1140,15 +1512,130 @@ int cmdElevations(const Args& a)
                   << " outside the DEM, " << counts[S::NoData] << " on NoData, " << counts[S::Unplaced]
                   << " without coordinates, " << counts[S::Skipped] << " skipped\n";
     }
-    if (a.has("out"))
+    if (written >= 0)
     {
-        const int n = core::applyElevations(model, plan, o.decimals);
-        model.save(pathArg(a.opt("out")));
-        std::cerr << "Wrote " << a.opt("out") << " (" << n << " values changed)\n";
+        std::cerr << "Wrote " << a.opt("out") << " (" << written << " values changed)\n";
     }
     else if (!a.flag("json"))
     {
         std::cout << "Preview only: add --out <model.inp> to write the changes.\n";
+    }
+    return 0;
+}
+
+std::string readTextFile(const std::string& name)
+{
+    std::ostringstream text;
+    if (name == "-")
+    {
+        text << std::cin.rdbuf();
+        return text.str();
+    }
+    std::ifstream f(pathArg(name), std::ios::binary);
+    if (!f)
+        throw std::runtime_error("cannot read " + name);
+    text << f.rdbuf();
+    return text.str();
+}
+
+int cmdModel(const Args& a)
+{
+    if (a.positional.size() < 2 || (a.positional[0] != "get" && a.positional[0] != "set"))
+        throw std::runtime_error("usage: mirab-cli model get|set <model.inp> ... "
+                                 "(see mirab-cli help)");
+    const std::string action = a.positional[0];
+    Args rest = a;
+    rest.positional.erase(rest.positional.begin());
+    auto model = loadModel(rest);
+    if (action == "get")
+    {
+        Value v = core::modelToJson(model);
+        v.set("path", rest.positional[0]);
+        const std::string text = v.dump(a.flag("compact") ? -1 : 2);
+        if (a.has("out"))
+        {
+            std::ofstream f(pathArg(a.opt("out")), std::ios::binary | std::ios::trunc);
+            if (!f || !(f << text << "\n"))
+                throw std::runtime_error("cannot write " + a.opt("out"));
+        }
+        else
+        {
+            std::cout << text << "\n";
+        }
+        return 0;
+    }
+
+    Value edits = Value::array();
+    if (a.has("edits"))
+    {
+        Value file;
+        try
+        {
+            file = Value::parse(readTextFile(a.opt("edits")));
+        }
+        catch (const json::ParseError& e)
+        {
+            throw std::runtime_error(a.opt("edits") + ": " + e.what());
+        }
+        const Value* list = file.isObject() ? file.find("edits") : &file;
+        if (!list || !list->isArray())
+            throw std::runtime_error(a.opt("edits") +
+                                     " must hold a JSON array or an object with \"edits\"");
+        for (const auto& e : list->items())
+            edits.push(e);
+    }
+    if (a.has("option") || a.has("id"))
+    {
+        if (!a.has("value"))
+            throw std::runtime_error("--value is required");
+        Value e = Value::object();
+        if (a.has("option"))
+            e.set("option", a.opt("option"));
+        else
+        {
+            e.set("id", a.opt("id"));
+            const std::string column = a.opt("column");
+            if (column.empty())
+                throw std::runtime_error("--column is required with --id");
+            if (auto n = text::toInt(column))
+                e.set("column", static_cast<double>(*n));
+            else
+                e.set("column", column);
+        }
+        if (a.has("section"))
+            e.set("section", a.opt("section"));
+        if (a.has("row"))
+            e.set("row", a.num("row", 0));
+        if (a.has("category"))
+            e.set("category", a.opt("category"));
+        e.set("value", a.opt("value"));
+        edits.push(e);
+    }
+    if (edits.size() == 0)
+        throw std::runtime_error(
+            "nothing to change: use --id/--column/--value, --option/--value or --edits FILE");
+    const auto summary = core::applyEdits(model, edits);
+    const fs::path out = pathArg(a.opt("out", rest.positional[0]));
+    const bool write = summary.changed > 0 || a.has("out");
+    if (write)
+        model.save(out);
+    if (a.flag("json"))
+    {
+        Value v = Value::object();
+        v.set("path", out.u8string());
+        v.set("applied", summary.applied);
+        v.set("changed", summary.changed);
+        v.set("written", write);
+        Value issues = Value::array();
+        for (const auto& issue : model.validate())
+            issues.push(issueJson(issue));
+        v.set("issues", issues);
+        std::cout << v.dump(2) << "\n";
+    }
+    else
+    {
+        std::cout << summary.applied << " edit(s), " << summary.changed << " changed"
+                  << (write ? "; wrote " + out.u8string() : "; the file is unchanged") << "\n";
     }
     return 0;
 }
@@ -1159,19 +1646,25 @@ void usage()
         R"(Mirab command-line interface
 
 Usage:
-  mirab-cli version
+  mirab-cli version [--json]
   mirab-cli engines [--json]
-  mirab-cli engines install <manifest.json> [--target DIR]
-  mirab-cli engines uninstall <engine> [--target DIR]
-  mirab-cli engines verify <engine>
-  mirab-cli engines where
-  mirab-cli info <model.inp>
+  mirab-cli engines install <manifest.json> [--target DIR] [--json]
+  mirab-cli engines uninstall <engine> [--target DIR] [--json]
+  mirab-cli engines verify <engine> [--json]
+  mirab-cli engines where [--json]
+  mirab-cli info <model.inp> [--json]
   mirab-cli check <model.inp> [--engine ID] [--msx file.msx] [--json]
+  mirab-cli model get <model.inp> [--out FILE.json] [--compact]
+  mirab-cli model set <model.inp> [--id ID --column NAME --value V [--section S]
+                  [--row N] [--category node|link|subcatchment|gage|KIND]]
+                  [--option KEY --value V [--section S]] [--edits FILE.json|-]
+                  [--out model.inp] [--json]
   mirab-cli run <model.inp> [--engine ID] [--msx file.msx] [--out results.anr]
-                  [--report file.rpt] [--workdir DIR] [--machine [--live]
+                  [--report file.rpt] [--workdir DIR] [--json | --machine [--live]
                   [--frame-interval SECONDS]]
-  mirab-cli results <results.anr|.out> [--table node|link|subcatchment|system]
-                  [--variable NAME] [--element ID[,ID...]]
+  mirab-cli results <results.anr|.out> [--json] [--table node|link|subcatchment|system]
+                  [--variable NAME[,NAME...]] [--element ID[,ID...]] [--period N]
+                  [--format csv|json|npy|anr] [--out FILE] [--compact]
   mirab-cli resilience todini <model.inp> --results FILE [--required-pressure P] [--json]
   mirab-cli resilience service --results FILE [--json]
   mirab-cli resilience topology <model.inp> [--json]
@@ -1180,8 +1673,8 @@ Usage:
   mirab-cli resilience fireflow <model.inp> --flow Q [--residual P] [--time HOURS]
                   [--nodes ID,ID] [--max-flow Q] [--no-available] [--json]
   mirab-cli export geojson|gpkg|wntr <model.inp> --out FILE [--crs EPSG:n]
-                  [--results FILE [--period N]]
-  mirab-cli import wntr <network.json> --out model.inp
+                  [--results FILE [--period N]] [--json]
+  mirab-cli import wntr <network.json> --out model.inp [--json]
   mirab-cli elevations <model.inp> --dem FILE.tif|FILE.asc [--mode all|missing|selected]
                   [--nodes ID,ID] [--reservoirs] [--no-tanks] [--swmm invert|depth]
                   [--dem-units auto|m|ft|usft] [--crs EPSG:n] [--decimals N]
@@ -1195,7 +1688,8 @@ project sidecar (model.inp.mirab.json) or a --config file; see docs/user-guide.m
 With --machine, events are written as JSON lines and standard input accepts
 "cancel", "pause" and "resume"; --live adds the results of each reporting
 period while the run is in progress (at most one every --frame-interval
-seconds, default 0.25).
+seconds, default 0.25). --json writes the result as one JSON document;
+docs/cli.md describes every JSON layout.
 )";
 }
 
@@ -1247,7 +1741,7 @@ int runMain(int argc, char** argv)
     {
         const Args a = parseArgs(argsv, 2);
         if (cmd == "version" || cmd == "--version")
-            return cmdVersion();
+            return cmdVersion(a);
         if (cmd == "engines")
             return cmdEngines(a);
         if (cmd == "info")
@@ -1268,6 +1762,8 @@ int runMain(int argc, char** argv)
             return cmdElevations(a);
         if (cmd == "calibrate")
             return cli::runCalibrate(std::vector<std::string>(argsv.begin() + 2, argsv.end()));
+        if (cmd == "model")
+            return cmdModel(a);
         std::cerr << "unknown command " << cmd << "\n";
         usage();
         return 1;

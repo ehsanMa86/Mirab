@@ -33,6 +33,7 @@ add_library(mirab_core STATIC
     src/Json.cpp
     src/LiveResults.cpp
     src/Model.cpp
+    src/ModelJson.cpp
     src/Objects.cpp
     src/Optimizer.cpp
     src/PrintLayout.cpp

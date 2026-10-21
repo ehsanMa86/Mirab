@@ -50,9 +50,14 @@ mirab-cli run examples/epanet/mirab-demo.inp --engine epanet-msx-2.0-owa23 --msx
 mirab-cli results examples/epanet/mirab-demo.anr --table node --variable Pressure --element J5
 mirab-cli resilience fireflow examples/epanet/mirab-demo.inp --flow 30 --residual 14
 mirab-cli export gpkg examples/swmm/mirab-urban.inp --out urban.gpkg --crs EPSG:32614
+mirab-cli model set examples/epanet/mirab-demo.inp --id J1 --column Elevation --value 21 --out j1.inp
 ```
 
-Run `mirab-cli --help` for the full list.
+Run `mirab-cli --help` for the full list. Every command has a `--json` form, described in [docs/cli.md](docs/cli.md).
+
+### Python
+
+The `mirab` Python package in [integrations/python](integrations/python) scripts Mirab through `mirab-cli`: open a model, read and change element values, run simulations with live results, read result files into NumPy or pandas and run many variants in parallel. The desktop application itself does not need Python. See [docs/python.md](docs/python.md).
 
 ## Building from source
 
@@ -74,6 +79,8 @@ Use the `headless` preset to build the command-line tool and libraries without Q
 - [Resilience tools](docs/resilience.md)
 - [Architecture](docs/architecture.md)
 - [File formats and the solver protocol](docs/file-formats.md)
+- [Command line and JSON output](docs/cli.md)
+- [Python scripting](docs/python.md)
 - [Building and packaging](docs/building.md)
 - [Writing plugins](docs/plugins.md)
 
