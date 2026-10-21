@@ -34,6 +34,7 @@
 #include <QVector>
 #include <QWidget>
 
+#include <memory>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -84,6 +85,10 @@ public:
     void setShowLabels(bool on);
     void setShowArrows(bool on);
     void setShowLegend(bool on);
+    /// Colors by the shown results minus @p reference at the same time (for
+    /// links, the difference of magnitudes); null shows the results again.
+    void setDifference(std::shared_ptr<const core::ResultSet> reference, const QString& label);
+    bool showsDifference() const { return reference_ != nullptr; }
     /// Loads an image with a world file (.pgw/.jgw/.wld) or fits it to the network.
     bool setBackdrop(const QString& imagePath, QString* error = nullptr);
     void clearBackdrop();
@@ -160,7 +165,7 @@ public:
     /// Copyright notice of the basemap, when one is shown.
     QString attribution() const;
     /// Colors of the result classes, from low to high.
-    static QVector<QColor> rampColors();
+    QVector<QColor> rampColors() const;
     /// Converts a screen position to model coordinates.
     QPointF worldAt(const QPoint& screen) const;
 
@@ -198,10 +203,17 @@ private:
     void drawAttribution(QPainter& p, const QRectF& area);
     void drawLabel(QPainter& p, const QPointF& at, const QString& text);
     QColor colorFor(double value) const;
+    /// Lower edge of legend class @p i (0 to 4); class 5 is the top of the range.
+    double classEdge(int i) const;
     void recomputeRanges();
     /// Widens the legend range with the periods from @p fromPeriod on.
     void extendRanges(int fromPeriod);
+    /// Value used for coloring: the result, or its difference from the reference.
     std::optional<double> resultValue(const char* table, int variable, const std::string& id) const;
+    std::optional<double> rawValue(const char* table, int variable, const std::string& id) const;
+    /// Reference value of an element at the reference period matching @p period.
+    std::optional<double> referenceValue(const char* table, int variable, int element, int period) const;
+    const QColor* ramp() const;
     int flowVariable() const;
     void finishArea();
     void finishLasso();
@@ -263,6 +275,9 @@ private:
     bool showLabels_ = true;
     bool showArrows_ = true;
     bool showLegend_ = true;
+
+    std::shared_ptr<const core::ResultSet> reference_;
+    QString referenceLabel_;
 
     QImage backdrop_;
     QRectF backdropWorld_;

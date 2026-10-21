@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -35,5 +36,12 @@ int runCalibrate(const std::vector<std::string>& args);
 
 /// Usage lines for the help text.
 const char* calibrateUsage();
+
+/// Path of the running mirab-cli program; empty when unknown.
+std::filesystem::path programPath();
+/// Runs a program with its output written to @p log and waits for it; returns
+/// its exit code (-1 with @p error set when it could not be started).
+int runChildProcess(const std::filesystem::path& exe, const std::vector<std::string>& args,
+                    const std::filesystem::path& log, std::string* error);
 
 } // namespace mirab::cli

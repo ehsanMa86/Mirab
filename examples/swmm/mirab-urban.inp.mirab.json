@@ -18,5 +18,32 @@
     "objective": [{"metric": "NSE", "weight": 1}, {"metric": "VolumeError", "weight": 0.5}],
     "budget": 60,
     "seed": 1
-  }
+  },
+  "scenarios": [
+    {
+      "name": "10-year storm",
+      "description": "The base model carries the 2-year design storm; this one the 10-year storm",
+      "changes": [
+        {"op": "set", "section": "RAINGAGES", "key": "RG1", "column": 5, "from": "Storm1", "to": "Storm10"},
+        {"op": "add", "section": "TIMESERIES", "key": "Storm10", "to": ["Storm10", "0:00", "0"]},
+        {"op": "add", "section": "TIMESERIES", "key": "Storm10", "row": 1, "to": ["Storm10", "0:15", "10"]},
+        {"op": "add", "section": "TIMESERIES", "key": "Storm10", "row": 2, "to": ["Storm10", "0:30", "29"]},
+        {"op": "add", "section": "TIMESERIES", "key": "Storm10", "row": 3, "to": ["Storm10", "0:45", "68"]},
+        {"op": "add", "section": "TIMESERIES", "key": "Storm10", "row": 4, "to": ["Storm10", "1:00", "40"]},
+        {"op": "add", "section": "TIMESERIES", "key": "Storm10", "row": 5, "to": ["Storm10", "1:15", "19"]},
+        {"op": "add", "section": "TIMESERIES", "key": "Storm10", "row": 6, "to": ["Storm10", "1:30", "10"]},
+        {"op": "add", "section": "TIMESERIES", "key": "Storm10", "row": 7, "to": ["Storm10", "1:45", "3"]},
+        {"op": "add", "section": "TIMESERIES", "key": "Storm10", "row": 8, "to": ["Storm10", "2:00", "0"]}
+      ]
+    },
+    {
+      "name": "10-year storm, larger trunk",
+      "description": "The 10-year storm with the trunk sewer from J3 to the outfall enlarged to 1.2 m",
+      "parent": "10-year storm",
+      "changes": [
+        {"op": "set", "section": "XSECTIONS", "key": "C4", "column": 2, "from": "0.9", "to": "1.2"},
+        {"op": "set", "section": "XSECTIONS", "key": "C5", "column": 2, "from": "0.9", "to": "1.2"}
+      ]
+    }
+  ]
 }

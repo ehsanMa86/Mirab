@@ -741,6 +741,34 @@ const QHash<QString, Draw>& table()
              p.drawLine(QPointF(20, 16), QPointF(5, 16));
              arrowHead(p, QPointF(4, 16), 180, 4);
          }},
+        {"scenarios",
+         [](QPainter& p, const Ink& k) {
+             // A base model branching into two alternatives.
+             p.setPen(pen(k.line, 1.6));
+             p.setBrush(Qt::NoBrush);
+             QPainterPath branch;
+             branch.moveTo(8, 12);
+             branch.cubicTo(12, 12, 12, 6.5, 16, 6.5);
+             branch.moveTo(8, 12);
+             branch.cubicTo(12, 12, 12, 17.5, 16, 17.5);
+             p.drawPath(branch);
+             p.setBrush(Qt::white);
+             p.drawEllipse(QPointF(5.5, 12), 2.6, 2.6);
+             p.setPen(pen(k.accent, 1.6));
+             p.setBrush(k.fill);
+             p.drawEllipse(QPointF(18.5, 6.5), 2.6, 2.6);
+             p.drawEllipse(QPointF(18.5, 17.5), 2.6, 2.6);
+         }},
+        {"compare",
+         [](QPainter& p, const Ink& k) {
+             // Two series over the same axes.
+             p.setPen(pen(k.line, 1.5));
+             p.setBrush(Qt::NoBrush);
+             p.drawPolyline(QPolygonF({QPointF(3.5, 4), QPointF(3.5, 20), QPointF(20.5, 20)}));
+             p.drawPolyline(QPolygonF({QPointF(6, 16), QPointF(10, 11), QPointF(14, 13), QPointF(20, 6)}));
+             p.setPen(pen(k.accent, 1.5));
+             p.drawPolyline(QPolygonF({QPointF(6, 17.5), QPointF(10, 15), QPointF(14, 16.5), QPointF(20, 11)}));
+         }},
     };
     return t;
 }

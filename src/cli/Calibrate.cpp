@@ -105,7 +105,8 @@ struct Options
 Options parseOptions(const std::vector<std::string>& args)
 {
     static const std::vector<std::string> valued = {"config", "engine",   "msx",     "jobs",    "budget", "seed",
-                                                     "method", "out-dir",  "observed", "results", "start"};
+                                                     "method", "out-dir",  "observed", "results", "start",
+                                                     "scenario"};
     Options o;
     for (std::size_t i = 0; i < args.size(); ++i)
     {
@@ -652,6 +653,14 @@ int cmdCalibrate(const Options& o)
     s.inp = fs::absolute(fs::u8path(o.positional[0])).lexically_normal().make_preferred();
     s.model = core::Model::fromFile(s.inp);
     const auto settings = core::ProjectSettings::loadFor(s.inp);
+    // A scenario is calibrated with its own model and engine.
+    const std::string scenario = text::iequals(o.get("scenario"), "base") ? std::string() : o.get("scenario");
+    std::vector<core::ScenarioConflict> conflicts;
+    s.model = core::scenarioModel(s.model, settings.scenarios, scenario, &conflicts);
+    for (const auto& c : conflicts)
+        std::cerr << "warning: scenario " << c.scenario << ": " << c.message << "\n";
+    const auto chosen = core::scenarioEngine(settings.scenarios, scenario,
+                                             {settings.engineId, settings.useMsx, settings.msxFile});
     if (o.has("config"))
     {
         const fs::path cfg = fs::absolute(fs::u8path(o.get("config")));
@@ -679,14 +688,14 @@ int cmdCalibrate(const Options& o)
         throw std::runtime_error("--method is dds or lhs");
 
     // Engine
-    std::string engineId = o.get("engine", s.config.engine.empty() ? settings.engineId : s.config.engine);
+    std::string engineId = o.get("engine", s.config.engine.empty() ? chosen.engineId : s.config.engine);
     if (engineId == "swmm5plus" || engineId == "swmm5+")
         engineId = "swmm5plus-1.0";
     if (engineId.empty())
         engineId = engine::EngineRegistry::defaultEngineId(s.model.dialect());
     std::string msx = o.get("msx");
-    if (msx.empty() && settings.useMsx && !settings.msxFile.empty())
-        msx = (s.inp.parent_path() / fs::u8path(settings.msxFile)).u8string();
+    if (msx.empty() && chosen.useMsx && !chosen.msxFile.empty())
+        msx = (s.inp.parent_path() / fs::u8path(chosen.msxFile)).u8string();
 
     // Parameters
     std::vector<double> lower, upper, initial;
@@ -898,9 +907,20 @@ int cmdCalibrate(const Options& o)
 }
 } // namespace
 
+std::filesystem::path programPath()
+{
+    return selfPath();
+}
+
+int runChildProcess(const std::filesystem::path& exe, const std::vector<std::string>& args,
+                    const std::filesystem::path& log, std::string* error)
+{
+    return runProcess(exe, args, log, error);
+}
+
 const char* calibrateUsage()
 {
-    return R"(  mirab-cli calibrate <model.inp> [--config calib.json] [--engine ID] [--jobs N]
+    return R"(  mirab-cli calibrate <model.inp> [--scenario NAME] [--config calib.json] [--engine ID] [--jobs N]
                   [--budget N] [--seed N] [--method dds|lhs] [--out-dir DIR]
                   [--start "YYYY-MM-DD HH:MM"] [--keep-runs] [--machine]
   mirab-cli calibrate metrics <model.inp|results.anr> [--observed calib.json|data.csv|data.dat]

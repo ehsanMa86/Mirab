@@ -161,7 +161,7 @@ void AnimationExporter::begin()
             views.push_back({reinterpret_cast<const std::uint32_t*>(img.constBits()), img.width(),
                              img.height(), static_cast<int>(img.bytesPerLine() / 4)});
         std::vector<gif::Color> keys;
-        for (const QColor& c : MapView::rampColors())
+        for (const QColor& c : map_->rampColors())
             keys.push_back({static_cast<std::uint8_t>(c.red()),
                             static_cast<std::uint8_t>(c.green()),
                             static_cast<std::uint8_t>(c.blue())});

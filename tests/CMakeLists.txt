@@ -22,7 +22,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_executable(mirab-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp
     test_swmm_data.cpp test_swmm_objects.cpp test_raster.cpp test_calibration.cpp
-    test_deliverables.cpp test_scripting.cpp test_network.cpp)
+    test_deliverables.cpp test_scripting.cpp test_network.cpp test_scenarios.cpp)
 target_link_libraries(mirab-tests PRIVATE
     Mirab::core Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 target_compile_definitions(mirab-tests PRIVATE
@@ -37,7 +37,8 @@ endif()
 
 foreach(group IN ITEMS text json inp model features results settings hash crs import swmm
                      lid lidusage transects hydrographs rules raster elevation
-                     calibration gif layout summary modeljson network geometry query editing)
+                     calibration gif layout summary modeljson network geometry query editing
+                     scenarios)
     add_test(NAME ${group} COMMAND mirab-tests "${group}:")
 endforeach()
 if(MIRAB_BUILD_ENGINES)
@@ -64,6 +65,22 @@ if(MIRAB_BUILD_ENGINES)
     set_tests_properties(cli-calibrate PROPERTIES
         FIXTURES_REQUIRED calib-input
         PASS_REGULAR_EXPRESSION "Pipe roughness = 0[.][89]")
+    # Scenarios of the EPANET demo: list, export, and a batch run in parallel processes.
+    set(scenario_dir "${CMAKE_CURRENT_BINARY_DIR}/cli-scenarios")
+    add_test(NAME cli-scenarios-setup
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/examples/epanet" "${scenario_dir}")
+    set_tests_properties(cli-scenarios-setup PROPERTIES FIXTURES_SETUP scenario-input)
+    add_test(NAME cli-scenarios-list COMMAND mirab-cli scenarios list "${scenario_dir}/mirab-demo.inp")
+    set_tests_properties(cli-scenarios-list PROPERTIES FIXTURES_REQUIRED scenario-input
+        PASS_REGULAR_EXPRESSION "Growth with upsizing  [(]based on Demand growth[)]")
+    add_test(NAME cli-scenarios-export
+        COMMAND mirab-cli scenarios export "${scenario_dir}/mirab-demo.inp" --scenario "Pipe upsizing"
+                --out "${scenario_dir}/upsized.inp")
+    set_tests_properties(cli-scenarios-export PROPERTIES FIXTURES_REQUIRED scenario-input)
+    add_test(NAME cli-scenarios-batch
+        COMMAND mirab-cli batch "${scenario_dir}/mirab-demo.inp" --all --jobs 2)
+    set_tests_properties(cli-scenarios-batch PROPERTIES FIXTURES_REQUIRED scenario-input
+        PASS_REGULAR_EXPRESSION "[[]4/4[]]" FAIL_REGULAR_EXPRESSION "failed" TIMEOUT 120)
 endif()
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)

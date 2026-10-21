@@ -121,14 +121,27 @@ def sidecar_of(inp: PathLike) -> Path:
 
 
 def write_model(source: PathLike, target: PathLike, edits: Sequence[Mapping[str, Any]] = (),
-                cli: Union[Cli, PathLike, None] = None) -> Dict[str, Any]:
+                cli: Union[Cli, PathLike, None] = None, scenario: Optional[str] = None) -> Dict[str, Any]:
     """Writes ``source`` with ``edits`` applied to ``target`` and copies its settings file.
 
+    With ``scenario``, the edits apply to that scenario's model: written to
+    ``target`` when it is another file, or recorded as changes of the scenario
+    in the settings file when ``target`` is ``source``.
     Returns the summary printed by ``mirab-cli model set --json``.
     """
     c = resolve_cli(cli)
     src, dst = Path(source), Path(target)
-    if edits:
+    if scenario:
+        same = src.resolve() == dst.resolve()
+        if edits:
+            args: List[Any] = ["model", "set", src, "--scenario", scenario, "--edits", "-", "--json"]
+            summary = c.json(args if same else args + ["--out", dst], input=json.dumps({"edits": list(edits)}))
+        elif not same:
+            c.json(["scenarios", "export", src, "--scenario", scenario, "--out", dst, "--json"])
+            summary = {"path": str(dst), "applied": 0, "changed": 0, "written": True, "issues": []}
+        else:
+            summary = {"path": str(dst), "applied": 0, "changed": 0, "written": False, "issues": []}
+    elif edits:
         summary = c.json(["model", "set", src, "--edits", "-", "--out", dst, "--json"],
                          input=json.dumps({"edits": list(edits)}))
     else:
@@ -337,20 +350,28 @@ class Project:
         print(result.results.node.series("Pressure", "J1"))
     """
 
-    def __init__(self, path: PathLike, data: Dict[str, Any], cli: Cli) -> None:
+    def __init__(self, path: PathLike, data: Dict[str, Any], cli: Cli, scenario: Optional[str] = None) -> None:
         self.path = Path(path)
         self.cli = cli
+        #: Scenario of the project that is read, edited and run (``None``: the base model).
+        self.scenario = scenario
         self._edits: List[Dict[str, Any]] = []
         self._load(data)
 
     @classmethod
-    def open(cls, path: PathLike, cli: Union[Cli, PathLike, None] = None) -> "Project":
-        """Reads a model with ``mirab-cli model get``."""
+    def open(cls, path: PathLike, cli: Union[Cli, PathLike, None] = None,
+             scenario: Optional[str] = None) -> "Project":
+        """Reads a model with ``mirab-cli model get``.
+
+        With ``scenario``, the model is that scenario of the project; saving
+        records the edits as changes of the scenario (the ``.inp`` file stays
+        as it is) and runs use the scenario's engine and results file.
+        """
         c = resolve_cli(cli)
         p = Path(path)
         if not p.is_file():
             raise FileNotFoundError(f"no such model: {p}")
-        return cls(p, c.json(["model", "get", p, "--compact"]), c)
+        return cls(p, c.json(["model", "get", p, "--compact"] + _scenario_args(scenario)), c, scenario)
 
     def _load(self, data: Dict[str, Any]) -> None:
         self.data = data
@@ -364,8 +385,12 @@ class Project:
     def reload(self) -> "Project":
         """Reads the file again; unsaved edits are discarded."""
         self._edits = []
-        self._load(self.cli.json(["model", "get", self.path, "--compact"]))
+        self._load(self.cli.json(["model", "get", self.path, "--compact"] + _scenario_args(self.scenario)))
         return self
+
+    def scenarios(self) -> List[Dict[str, Any]]:
+        """The scenarios of the project (``mirab-cli scenarios list --json``)."""
+        return scenarios(self.path, self.cli)
 
     def __repr__(self) -> str:
         return (f"<Project {self.path.name}: {self.dialect}, {len(self.nodes)} nodes, {len(self.links)} links"
@@ -527,15 +552,18 @@ class Project:
         refers to the new file from then on. The model is read again afterwards.
         """
         target = Path(path) if path is not None else self.path
-        if self._edits or target.resolve() != self.path.resolve():
-            write_model(self.path, target, self._edits, self.cli)
+        moved = target.resolve() != self.path.resolve()
+        if self._edits or moved:
+            write_model(self.path, target, self._edits, self.cli, self.scenario)
+        if moved:
+            self.scenario = None  # the new file holds the scenario's model itself
         self.path = target
         self.reload()
         return target
 
     def write_copy(self, path: PathLike) -> Path:
         """Writes the model with the recorded edits to ``path``; the project is unchanged."""
-        write_model(self.path, path, self._edits, self.cli)
+        write_model(self.path, path, self._edits, self.cli, self.scenario)
         return Path(path)
 
     # -- runs ----------------------------------------------------------------------
@@ -570,7 +598,9 @@ class Project:
                     except OSError:
                         pass
 
-        sim = Simulation(run_args(inp, engine, out, report, msx, live, frame_interval), self.cli, cleanup)
+        # A scratch copy already holds the scenario's model.
+        scenario = self.scenario if scratch is None else None
+        sim = Simulation(run_args(inp, engine, out, report, msx, live, frame_interval, scenario), self.cli, cleanup)
         if tmpdir is not None:
             sim._tmpdir = tmpdir  # type: ignore[attr-defined]
         return sim
@@ -657,10 +687,21 @@ def _is_number(text: str) -> bool:
         return False
 
 
-def open_project(path: PathLike, cli: Union[Cli, PathLike, None] = None) -> Project:
+def _scenario_args(scenario: Optional[str]) -> List[Any]:
+    return ["--scenario", scenario] if scenario else []
+
+
+def scenarios(path: PathLike, cli: Union[Cli, PathLike, None] = None) -> List[Dict[str, Any]]:
+    """The scenarios stored with a model: name, parent, description, number of
+    changes and conflicts, engine and results file (empty when not run)."""
+    return resolve_cli(cli).json(["scenarios", "list", Path(path), "--json"])
+
+
+def open_project(path: PathLike, cli: Union[Cli, PathLike, None] = None,
+                 scenario: Optional[str] = None) -> Project:
     """Same as :meth:`Project.open`."""
-    return Project.open(path, cli)
+    return Project.open(path, cli, scenario)
 
 
 __all__ = ["Element", "ElementCollection", "Project", "column_key", "edit", "format_value", "open_project",
-           "option", "rows", "sidecar_of", "write_model", "CliError"]
+           "option", "rows", "scenarios", "sidecar_of", "write_model", "CliError"]

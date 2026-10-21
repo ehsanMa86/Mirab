@@ -344,6 +344,16 @@ void PropertyPanel::addRow(const QString& name, const QString& value, const QStr
     v->setData(TailRole, tail);
     v->setData(ChoicesRole, choices);
     v->setToolTip(tip);
+    // Values the active scenario changes stand out, with the base value in the tooltip.
+    QString baseValue;
+    if (!section.isEmpty() && doc_->baseValue(section.toStdString(), row, column, tail, &baseValue))
+    {
+        const QColor changed(255, 236, 196);
+        n->setBackground(changed);
+        v->setBackground(changed);
+        v->setToolTip(tr("Changed in scenario %1. Base model: %2").arg(doc_->activeScenario(), baseValue) +
+                      (tip.isEmpty() ? QString() : "\n\n" + tip));
+    }
     Qt::ItemFlags flags = Qt::ItemIsSelectable;
     if (enabled)
         flags |= Qt::ItemIsEnabled;
@@ -617,6 +627,23 @@ void PropertyPanel::showMultiple()
                 v->setFont(f);
                 v->setForeground(QColor(130, 140, 152));
                 v->setToolTip(tr("The selected elements have different values. A new value applies to all of them."));
+            }
+            // In a scenario, mark values it changes for any of the selected elements.
+            int changed = 0;
+            QString base;
+            for (const auto* r : all)
+                changed += doc_->baseValue(er.section, r->row, static_cast<int>(c), tail, &base) ? 1 : 0;
+            if (changed > 0)
+            {
+                const QColor tint(255, 236, 196);
+                table_->item(table_->rowCount() - 1, 0)->setBackground(tint);
+                QTableWidgetItem* v = table_->item(table_->rowCount() - 1, 1);
+                v->setBackground(tint);
+                v->setToolTip(v->toolTip() + (v->toolTip().isEmpty() ? QString() : "\n\n") +
+                              tr("Changed in scenario %1 for %2 of the %3 selected elements.")
+                                  .arg(doc_->activeScenario())
+                                  .arg(changed)
+                                  .arg(all.size()));
             }
             if (tail)
                 break;

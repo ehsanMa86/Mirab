@@ -10,6 +10,7 @@
 - **Input file tab.** The `.inp` text exactly as the engines read it. Edit it and press *Apply changes*; the change can be undone as one step.
 - **Report, pattern and curve tabs.** They open next to the map and close with the cross on the tab.
 - **Project panel** (left). It shows a summary of the model and a search box. Below them is a tree with the simulation options, every element by type, the patterns, curves and time series and, for SWMM models, the named objects (pollutants, land uses, aquifers, ...). Double-click an element to zoom to it, a pattern, curve or object to edit it, or *Simulation options* to open the options dialog. Ctrl+click and Shift+click select several elements. Right-click for more.
+- **Scenarios panel** (left, behind *Project*). It lists the base model and its scenarios; see [Scenarios](#scenarios).
 - **Properties panel** (right). It shows the selected element, the shared properties of several selected elements, or the simulation options when nothing is selected. Click a value to edit it, and type in the filter box to find a property quickly.
 - **Messages and Time series** (bottom). The Messages tab shows compatibility notes and the run log. The Time series tab plots the selected element over time.
 
@@ -217,11 +218,53 @@ The *Reports* menu and tool bar button open report tabs. Each report follows new
 | System flow | EPANET: water supplied by reservoirs, consumed by demands and stored in tanks. SWMM: runoff, outfall discharge and flooding. |
 | Energy report | EPANET pumps: utilization, average efficiency, energy per volume pumped, average and peak power, energy and cost per day. |
 | Calibration | Every observed series against the simulation: a goodness-of-fit table and, for the selected series, a time-series chart and a 1:1 scatter plot. See [Calibration](#calibration). |
+| Scenario comparison | Results of the base model and its scenarios side by side; see [Comparing scenarios](#comparing-scenarios). |
 | Status report | The engine's own report file. |
 
 *Reports > Fire flow analysis* opens the fire-flow capacity analysis of the resilience tools.
 
 ![Profile plot](images/report-profile.png)
+
+## Scenarios
+
+A scenario is an alternative of the model: larger pipes, more demand, another storm, another pump schedule. Mirab keeps the `.inp` file as the base model and stores each scenario as a list of changes in the settings file next to it (`<model>.inp.mirab.json`), so the input file stays the one the engines and other programs read.
+
+![Scenarios panel with an active scenario; the changed diameter is highlighted in Properties](images/scenarios.jpg)
+
+**Creating scenarios.** Open the *Scenarios* panel (left, behind *Project*, or *Project > Scenarios panel*). *New scenario* asks for a name, a description and the scenario it is *based on*: the base model, or another scenario whose changes it inherits (for example "Growth with upsizing" based on "Demand growth"). Each scenario can also use another engine or another EPANET-MSX file. *Duplicate*, *Properties* and *Delete* work on the selected scenario; deleting a scenario that others are based on keeps their models, as they take over its changes.
+
+**Editing a scenario.** Double-click a scenario (or *Activate*) to make it the active one. While a scenario is active:
+
+- the map, the Properties panel, the editors and the *Input file* tab show the scenario's model,
+- every edit, wherever it is made, is recorded as a change of that scenario and the base model stays as it is,
+- the map shows a banner, the status bar and the window title name the scenario, and values that differ from the base model are highlighted in *Properties*, with the base value in their tooltip,
+- the engine selector chooses the scenario's engine,
+- *Run* saves the results as `<model>.<scenario>.anr` (and `.rpt`), so each scenario keeps its own results; switching scenarios switches the results shown.
+
+The lower half of the panel lists the changes of the active scenario: the element or option, the property, and the parent value and the scenario value. Double-click a change to select its element; *Revert* removes the selected changes. Undo and redo work as usual: undoing an edit made in another scenario (or in the base model) first switches to it. Edits of several selected elements, deletions, splits and reversed links are recorded like any other edit; the selection stays when you switch scenarios, for the elements that exist in both. With several elements selected, a highlighted value is changed by the scenario for at least one of them. Choose *Base model* and *Edit the base model* to change the input file itself; scenarios follow, because they store differences only.
+
+**When the base model changes.** Changes find their rows by element ID (and the row number among rows of the same element, for patterns or demand categories) and by option name, not by line number, so adding or reordering elements in the base model does not disturb them. A change whose element was removed from the base model, or whose base value was edited after the scenario changed it, is a *conflict*: it is marked with a warning in the change list, with the reason in its tooltip. The scenario's value wins over an edited base value; a change whose element is gone is skipped until you revert it.
+
+**Running several scenarios.** *Simulation > Run scenarios* (or the run button of the panel) runs the checked scenarios, each in its own solver process, several at the same time (*Simultaneous runs*). Each row shows its progress; results are saved next to the project. The dialog works on the models as they are in the window, saved or not.
+
+### Comparing scenarios
+
+*Reports > Scenario comparison* (or the chart button of the Scenarios panel) compares the scenarios that have results. The first checked scenario is the reference; the others are compared with it.
+
+![Scenario comparison report](images/scenario-comparison.jpg)
+
+- **Key figures:** EPANET: minimum and mean junction pressure, maximum velocity, demand volume and pump energy. SWMM: peak node flooding, flooding volume, peak outfall flow, outfall volume, peak runoff and the largest link capacity used. Volumes and energy add up the reporting periods. Changes from the reference are given as values and percentages.
+- **Table:** one result of every node, link or subcatchment in each scenario, at the time shown on the map or as its maximum, minimum or average over time, with the difference from the reference and the change in percent. Sort by any column; *Only elements that change* hides the rest. Selecting a row selects the element and plots it.
+- **Chart:** the time series of one element in every scenario on one chart.
+- **Export CSV** writes the key figures and the table.
+
+**Difference map.** *Difference* on the map bar colors the map by the change from another scenario's results: the active scenario minus the chosen one, at the time shown, for the results chosen on the map bar (for links, the change in magnitude). Blue is a decrease, red an increase and grey (within 5 % of the largest change) about the same. Print layouts, report documents and animations show the map as it is colored, so they show the difference too.
+
+![Change in pressure from "Demand growth" when the mains are also enlarged](images/scenario-difference.jpg)
+
+**Command line and Python.** `mirab-cli scenarios list model.inp` lists the scenarios, `mirab-cli scenarios export model.inp --scenario NAME --out alt.inp` writes a scenario's input file, `mirab-cli run model.inp --scenario NAME` runs one, and `mirab-cli batch model.inp [--scenarios "Base,A,B" | --all] [--jobs N]` runs several in parallel processes. `--scenario` also works with `info`, `check`, `model get`, `calibrate`, `export` and the resilience analyses; `model set --scenario NAME` records its edits as changes of the scenario. See [cli.md](cli.md#scenarios). In Python, `mirab.Project.open("model.inp", scenario="NAME")`, `mirab.run(..., scenario="NAME")` and `mirab.scenarios("model.inp")` do the same ([python.md](python.md#scenarios)).
+
+The examples have scenarios: pipe upsizing, demand growth and both together for `epanet/mirab-demo.inp`; a 10-year storm and a 10-year storm with a larger trunk sewer for `swmm/mirab-urban.inp`, whose base model carries the 2-year storm.
 
 ## Printing and exporting
 
@@ -247,7 +290,7 @@ Basemap tiles are downloaded at the resolution of the output before the file is 
 - **Project summary**: title, file, model type, engine, units, element counts, simulation duration and time steps, demand model and coordinate system.
 - **Simulation status**: engine, reporting periods, SWMM continuity errors (runoff, flow routing and quality routing, rated good up to 1 %, acceptable up to 10 %) and the engine's messages.
 - **Map**: the current map view with its legend, scale bar and north arrow.
-- **Reports**: any of the report tabs, with their statistics, charts and tables. The calibration report adds the goodness-of-fit table and charts when the project has observed data. Long tables are cut after the number of rows you choose; export the report as CSV for all rows.
+- **Reports**: any of the report tabs, with their statistics, charts and tables. The calibration report adds the goodness-of-fit table and charts when the project has observed data; the scenario comparison adds the key figures of each scenario, the element table and the chart. Long tables are cut after the number of rows you choose; export the report as CSV for all rows.
 
 *Export PDF* lays the document out on A4 or Letter pages with page numbers; charts and the network are vector graphics. *Export HTML* writes one self-contained web page (charts and the map are embedded images) that opens in any browser and can be e-mailed as a single file.
 
@@ -454,9 +497,12 @@ mirab-cli calibrate model.inp [--config calib.json] [--engine ID] [--jobs N] [--
 | `--select-region X1,Y1,X2,Y2` | Selects the elements inside a rectangle of map coordinates. |
 | `--select-query EXPR` | Selects the elements that match a query expression; with `--open-tool select-query`, fills the dialog with it. |
 | `--trace KIND` | Traces from the selection: `downstream`, `upstream`, `connected` or `path`. |
-| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, `calibration-run` (starts the calibration) or `select-query`. |
+| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, `calibration-run` (starts the calibration), `select-query` or `run-scenarios`. |
+| `--scenario NAME` | Activates a scenario of the project. |
+| `--map-difference NAME` | Colors the map by the change from a scenario's results (`Base` for the base model); exports show it too. |
+| `--period N` | Shows the results at reporting period N (0 is the first). |
 | `--install-engine swmm5plus` | Installs SWMM5+ without opening a window (also a manifest URL or file). |
-| `--screenshot FILE.png` | Saves a picture of the window and quits; with `--run` (run first), `--report KIND` (open a report: tables, timeseries, profile, frequency, variability, systemflow, energy, calibration, status) and `--delay MS`. With `--run`, `--run-for MS` takes the picture while the simulation runs, and `--pause-after MS` or `--stop-after MS` pause or stop it first. |
+| `--screenshot FILE.png` | Saves a picture of the window and quits; with `--run` (run first), `--report KIND` (open a report: tables, timeseries, profile, frequency, variability, systemflow, energy, calibration, scenarios, status) and `--delay MS`. With `--run`, `--run-for MS` takes the picture while the simulation runs, and `--pause-after MS` or `--stop-after MS` pause or stop it first. |
 | `--export-layout FILE` | Saves a print layout as PDF (`.pdf`) or a 200 dpi image (`.png`) and quits. `--layout-chart KIND` uses the template with that report below the map. |
 | `--export-report FILE` | Saves the report document as PDF (`.pdf`) or HTML (`.html`) and quits. |
 | `--export-animation FILE` | Saves the results animation as GIF (`.gif`) or numbered PNG images (`.png`) and quits. |

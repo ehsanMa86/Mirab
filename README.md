@@ -28,6 +28,7 @@ Mirab runs on Windows, macOS and Linux. It needs no Python, no QGIS and no other
 - **Import GIS and CAD data** from shapefiles, DXF drawings and CSV tables, with field mapping, endpoint snapping and reprojection.
 - **Explore results** with map coloring, flow arrows, an animated time slider, hover read-outs and time-series charts.
 - **Report** with network tables (sortable, with filters such as `Pressure < 20`), multi-element time series, profile plots, frequency and variability plots, system flow balances, pump energy audits and the engine's status report; every report exports CSV.
+- **Compare alternatives** with scenarios: pipe upsizing, demand growth or a larger storm are stored as changes to the base model, edited anywhere in the interface, run several at a time and compared in a report and on a difference map.
 - **Edit patterns, curves and time series** in tabs with live charts.
 - **Evaluate resilience** with native implementations of the Todini index, water service availability, network topology (bridges and articulation points), pipe criticality and fire-flow capacity.
 - **Exchange data** as GeoPackage or GeoJSON for QGIS and other GIS tools, and as WNTR JSON for the Python water community. "Open in QGIS" exports and launches QGIS in one step.
@@ -49,6 +50,7 @@ mirab-cli engines
 mirab-cli run examples/epanet/mirab-demo.inp --engine epanet-2.3-owa
 mirab-cli run examples/epanet/mirab-demo.inp --engine epanet-msx-2.0-owa23 --msx examples/msx/mirab-demo.msx
 mirab-cli results examples/epanet/mirab-demo.anr --table node --variable Pressure --element J5
+mirab-cli batch examples/epanet/mirab-demo.inp --all --jobs 4
 mirab-cli resilience fireflow examples/epanet/mirab-demo.inp --flow 30 --residual 14
 mirab-cli export gpkg examples/swmm/mirab-urban.inp --out urban.gpkg --crs EPSG:32614
 mirab-cli model set examples/epanet/mirab-demo.inp --id J1 --column Elevation --value 21 --out j1.inp

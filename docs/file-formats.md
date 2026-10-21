@@ -9,6 +9,7 @@
 | `model.inp.mirab.json` | Mirab settings that engines do not read |
 | `model.anr` | results of the last run |
 | `model.rpt` | the engine's text report |
+| `model.<scenario>.anr`, `.rpt` | results and report of a scenario (the name with characters other than letters, digits, `-` and `_` replaced by `-`) |
 | `model.gpkg` | GeoPackage written by "Open in QGIS" |
 | `model-calibration/` | log (`evaluations.csv`), best values (`best.json`) and calibrated model of the last calibration |
 
@@ -35,7 +36,43 @@
 }
 ```
 
+Scenarios, when the project has any, are stored under `scenarios` (see [Scenarios](#scenarios)) and the calibration set-up under `calibration`. Members a version of Mirab does not know are ignored when the file is read.
+
 Paths are relative to the `.inp` file. `basemap` is a built-in provider (`osm`, `esri-imagery`, ...) or `custom:<name>`; `mapService` describes a custom one (`type` `xyz`, `wms` or `wmts`; WMTS also has `matrixSet`, `style` and `format`). Raster `style` is `hillshade`, `color`, `hillshade-color` or `image`; `verticalUnit` is metres per elevation unit and is left out when the file's own units are used. An optional `calibration` member holds the observed-data files, how their columns link to results, and the calibration parameters and objective; its layout is described in the [user guide](user-guide.md#from-the-command-line).
+
+### Scenarios
+
+Each scenario is stored as its differences from its parent: the base model (the `.inp` file) or the scenario named by `parent`. The scenarios are an addition to format version 1; files without them read as before, and older versions of Mirab ignore them.
+
+```json
+"scenarios": [
+  {"name": "Demand growth", "description": "30 percent more demand",
+   "changes": [{"op": "set", "section": "OPTIONS", "key": "DEMAND MULTIPLIER", "column": 2, "from": "1.0", "to": "1.3"}]},
+  {"name": "Growth with upsizing", "parent": "Demand growth", "engine": "epanet-2.3-owa",
+   "changes": [
+     {"op": "set", "section": "PIPES", "key": "P5", "column": 4, "from": "100", "to": "150"},
+     {"op": "add", "section": "DEMANDS", "key": "J8", "row": 1, "to": ["J8", "2.5", "PAT2"]},
+     {"op": "remove", "section": "PIPES", "key": "P12", "from": ["P12", "J8", "J9", "300", "100", "120", "0", "Open"]},
+     {"op": "row", "section": "PATTERNS", "key": "PAT1", "row": 3, "from": ["PAT1", "1.4", "1.3"], "to": ["PAT1", "1.5"]},
+     {"op": "text", "section": "TITLE", "from": ["Demo network"], "to": ["Demo network, alternative B"]}]}
+]
+```
+
+| Member | Meaning |
+|---|---|
+| `name` | unique; not `Base`, no commas, quotes or semicolons |
+| `description` | optional text |
+| `parent` | optional: the scenario this one is based on; its changes apply first |
+| `engine`, `useMsx`, `msxFile` | optional: engine, EPANET-MSX use and MSX file (relative to the `.inp`) when they differ from the parent |
+| `changes` | the differences, applied in order |
+
+A change finds its row by `section` (upper case, without brackets), `key` and `row`, never by line number:
+
+- `key` is the first value of the row (element, pattern, curve or object ID). In option sections (`[OPTIONS]`, `[TIMES]`, `[REPORT]`, ...) it is the option name in upper case with its words (`DEMAND MULTIPLIER`); EPANET `[ENERGY]` rows for a pump use `PUMP <id> <parameter>` and `[REACTIONS]` rows the first two words; EPANET `[CONTROLS]` and `[TAGS]` use the first two words; SWMM `[INFLOWS]`, `[DWF]`, `[TREATMENT]`, `[BUILDUP]`, `[WASHOFF]`, `[LID_USAGE]` and `[TAGS]` use the first two values; rows of a control rule use the rule's name, and the `NC`, `X1` and `GR` rows of a SWMM transect its name.
+- `row` is the ordinal among the rows of the section with that key, from 0 (left out when 0).
+- `op` is `set` (one value: `column` counts from 0 over the row's values, `from` and `to` are strings), `row` (all values, when their number changes), `add` (a new row, inserted after the last row with the key), `remove`, or `text` (all lines of a free-text section such as `[TITLE]`).
+
+`from` holds the parent's value when the change was recorded. When it no longer matches, the change is reported as a conflict and the scenario's value is used; a change whose row no longer exists is reported and skipped, and so is an added row of an element ([DEMANDS], [COORDINATES], ...) that no longer exists.
 
 ## Results format (`.anr`)
 
@@ -44,7 +81,7 @@ Little-endian binary:
 1. 16 bytes: the ASCII text `MIRAB-RESULTS` padded with zero bytes,
 2. `uint32` format version (currently 1),
 3. `uint32` length of the header in bytes,
-4. the header, UTF-8 JSON:
+4. the header, UTF-8 JSON (results of a scenario have `"scenario"` in `metadata`):
    ```json
    {"engineId": "...", "engineName": "...", "title": "...", "flowUnits": "LPS", "unitSystem": "SI",
     "reportStart": 0, "reportStep": 3600, "times": [0, 3600, ...],

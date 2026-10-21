@@ -48,6 +48,8 @@ set(APP_SOURCES
     ReportExport.cpp ReportExport.h
     Reports.cpp Reports.h
     RulesEditor.cpp RulesEditor.h
+    ScenarioCompare.cpp ScenarioCompare.h
+    ScenarioPanel.cpp ScenarioPanel.h
     SchemaWidgets.cpp SchemaWidgets.h
     SelectionTools.cpp SelectionTools.h
     SolverProcess.cpp SolverProcess.h

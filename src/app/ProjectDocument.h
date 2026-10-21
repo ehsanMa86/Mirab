@@ -27,6 +27,7 @@
 #include "mirab/core/Model.h"
 #include "mirab/core/ProjectSettings.h"
 #include "mirab/core/Results.h"
+#include "mirab/core/Scenario.h"
 
 #include <QList>
 #include <QObject>
@@ -34,6 +35,7 @@
 #include <QUndoStack>
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <unordered_set>
 
@@ -60,9 +62,11 @@ public:
     void newProject(core::Dialect dialect, const QString& flowUnits);
     /// Throws std::exception on read errors.
     void open(const QString& path);
-    /// Throws std::exception on write errors.
+    /// Writes the base model and the settings (with the scenarios). Throws
+    /// std::exception on write errors.
     void save(const QString& path);
 
+    /// The model shown and edited: the base model, or the active scenario's model.
     const core::Model& model() const { return model_; }
     core::ProjectSettings& settings() { return settings_; }
     const core::ProjectSettings& settings() const { return settings_; }
@@ -127,6 +131,53 @@ public:
     /// Restores a full input text (used by undo commands).
     void restoreText(const std::string& text);
 
+    // Scenarios: alternatives of the model stored as changes in the settings.
+    // While one is active, model() is the scenario's model and every edit is
+    // recorded as a change of that scenario; the base model stays unchanged.
+    const std::vector<core::Scenario>& scenarios() const { return settings_.scenarios; }
+    /// Name of the active scenario, empty for the base model.
+    QString activeScenario() const { return active_; }
+    bool isScenarioActive() const { return !active_.isEmpty(); }
+    /// Shows and edits a scenario (empty: the base model). Its results replace the shown ones.
+    bool setActiveScenario(const QString& name, QString* error = nullptr);
+    const core::Model& baseModel() const { return active_.isEmpty() ? model_ : base_; }
+    /// Changes of the active scenario that no longer apply cleanly to the base model.
+    const std::vector<core::ScenarioConflict>& conflicts() const { return conflicts_; }
+    bool addScenario(core::Scenario scenario, QString* error = nullptr);
+    bool renameScenario(const QString& from, const QString& to, QString* error = nullptr);
+    /// Removes a scenario. Scenarios based on it keep their models and are
+    /// based on its parent from then on.
+    void removeScenario(const QString& name);
+    /// Sets the description, the parent and the engine of a scenario. A new
+    /// parent keeps the scenario's model as it is (its changes are recomputed).
+    bool updateScenario(const QString& name, const core::Scenario& properties, QString* error = nullptr);
+    /// Model of any scenario (empty: the base model).
+    core::Model scenarioModel(const QString& name, std::vector<core::ScenarioConflict>* conflicts = nullptr) const;
+    /// Removes changes of the active scenario by index (undoable).
+    void revertChanges(std::vector<int> indices);
+    /// When a scenario is active and changes the value at a row and column of
+    /// model(): true, with the base model's value in @p base. @p tail compares
+    /// the rest of the row from @p column on.
+    bool baseValue(const std::string& section, int row, int column, bool tail, QString* base) const;
+    /// Restores the changes (scenario) or the text (base model) recorded by an undo command.
+    void restoreState(const QString& scenario, const std::string& state);
+
+    /// Engine, MSX use and MSX file of a scenario (empty: the base model) after inheritance.
+    core::ScenarioEngine engineChoice(const QString& scenario) const;
+    core::ScenarioEngine engineChoice() const { return engineChoice(active_); }
+    /// Sets the engine of the active scenario, or of the base model.
+    void setEngineChoice(const std::string& engineId, bool useMsx);
+
+    /// Results file of a scenario (empty: the base model): <project>.<scenario>.anr
+    QString resultsPath(const QString& scenario) const { return runBase(scenario) + ".anr"; }
+    /// Path of a scenario's results and report files without the extension.
+    QString runBase(const QString& scenario) const;
+    /// Results of a scenario: those shown, kept from this session, or read from its results file.
+    std::shared_ptr<const core::ResultSet> resultsFor(const QString& scenario);
+    /// Forgets the kept results of a scenario after its results file was written;
+    /// the active scenario's results are read again.
+    void reloadResults(const QString& scenario);
+
 signals:
     void modelChanged();
     void modelReset();
@@ -138,9 +189,25 @@ signals:
     void liveStateChanged();
     void periodChanged(int period);
     void titleChanged();
+    /// Scenarios were added, removed, renamed or changed.
+    void scenariosChanged();
+    void activeScenarioChanged();
 
 private:
+    bool commit(core::Model working, const QString& description);
+    void recomputeScenario();
+    void scenarioStructureChanged();
+    void showResults(std::shared_ptr<const core::ResultSet> r);
+    const core::SectionKeys& keysOf(const core::Model& m, const std::string& section, bool base) const;
+
     core::Model model_;
+    core::Model base_; ///< the base model while a scenario is active
+    QString active_;
+    core::InpDocument parentDoc_; ///< the active scenario's parent model, for recording changes
+    std::vector<core::ScenarioConflict> conflicts_;
+    std::vector<core::ScenarioChange> orphans_; ///< changes of the active scenario that did not apply
+    std::map<QString, std::shared_ptr<const core::ResultSet>> kept_;
+    mutable std::map<std::string, core::SectionKeys> workKeys_, baseKeys_;
     core::ProjectSettings settings_;
     QString path_;
     QUndoStack undo_;

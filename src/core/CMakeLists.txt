@@ -45,6 +45,7 @@ add_library(mirab_core STATIC
     src/Raster.cpp
     src/Results.cpp
     src/Schema.cpp
+    src/Scenario.cpp
     src/SwmmObjects.cpp
     src/Text.cpp
     src/Units.cpp)

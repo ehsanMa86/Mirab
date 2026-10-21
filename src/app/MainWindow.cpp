@@ -43,6 +43,7 @@
 #include "RasterLayers.h"
 #include "ReportExport.h"
 #include "Reports.h"
+#include "ScenarioPanel.h"
 #include "SchemaWidgets.h"
 #include "SolverProcess.h"
 #include "SwmmEditors.h"
@@ -168,6 +169,23 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
         updateStartPage();
     });
     connect(doc_, &ProjectDocument::selectionChanged, this, &MainWindow::updateSelectionActions);
+    connect(doc_, &ProjectDocument::activeScenarioChanged, this, [this] {
+        // A run of the previous scenario must not deliver its results into this one.
+        if (solver_->isRunning())
+        {
+            discardRun_ = true;
+            solver_->cancel();
+        }
+        const QString name = doc_->activeScenario();
+        scenarioLabel_->setText(name.isEmpty() ? QString() : tr("Scenario: %1").arg(name));
+        scenarioLabel_->setVisible(!name.isEmpty());
+        rebuildEngineChoices();
+        updateCompatibility();
+        updateTitle();
+    });
+    connect(scenarios_, &ScenarioPanel::runRequested, this, &MainWindow::runScenarios);
+    connect(scenarios_, &ScenarioPanel::compareRequested, this, [this] { openReport("scenarios"); });
+    connect(scenarios_, &ScenarioPanel::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
     connect(map_, &MapView::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
     connect(map_, &MapView::cursorMoved, this, [this](const QPointF& w) {
         QString text = QString("X %1   Y %2").arg(w.x(), 0, 'f', 2).arg(w.y(), 0, 'f', 2);
@@ -445,6 +463,7 @@ void MainWindow::createDocks()
     browser_ = new ProjectBrowser(doc_, this);
     props_ = new PropertyPanel(doc_, this);
     results_ = new ResultsPanel(doc_, this);
+    scenarios_ = new ScenarioPanel(doc_, &registry_, this);
     messages_ = new QListWidget(this);
     messages_->setWordWrap(true);
     messages_->setIconSize(QSize(16, 16));
@@ -452,6 +471,9 @@ void MainWindow::createDocks()
     browser_->setMinimumWidth(260);
     props_->setMinimumWidth(340);
     auto* dBrowser = dock(tr("Project"), "projectDock", browser_, Qt::LeftDockWidgetArea);
+    auto* dScenarios = dock(tr("Scenarios"), "scenariosDock", scenarios_, Qt::LeftDockWidgetArea);
+    tabifyDockWidget(dBrowser, dScenarios);
+    dBrowser->raise();
     auto* dProps = dock(tr("Properties"), "propertiesDock", props_, Qt::RightDockWidgetArea);
     auto* dResults = dock(tr("Time series"), "resultsDock", results_, Qt::BottomDockWidgetArea);
     auto* dMessages = dock(tr("Messages"), "messagesDock", messages_, Qt::BottomDockWidgetArea);
@@ -663,6 +685,12 @@ void MainWindow::createMenus()
         openDataEditor(doc_->model().dialect() == Dialect::Swmm ? "CONTROLS" : "RULES", {});
     });
     project->addAction(tr("Choose &MSX file..."), this, &MainWindow::chooseMsxFile);
+    project->addSeparator();
+    project->addAction(icons::get("scenarios"), tr("New &scenario..."), this, [this] {
+        showDock("scenariosDock");
+        scenarios_->newScenario();
+    });
+    project->addAction(icons::get("scenarios"), tr("Scenarios &panel"), this, [this] { showDock("scenariosDock"); });
     project->addAction(icons::get("globe"), tr("&Coordinate system..."), this, &MainWindow::chooseCoordinateSystem);
     project->addAction(tr("C&heck compatibility"), this, [this] {
         updateCompatibility();
@@ -681,6 +709,8 @@ void MainWindow::createMenus()
     sim->addAction(runAct_);
     sim->addAction(pauseAct_);
     sim->addAction(cancelAct_);
+    sim->addSeparator();
+    sim->addAction(icons::get("scenarios"), tr("Run s&cenarios..."), this, &MainWindow::runScenarios);
     sim->addSeparator();
     sim->addAction(tr("&Load results..."), this, &MainWindow::loadResultsDialog);
     sim->addAction(tr("C&lear results"), doc_, &ProjectDocument::clearResults);
@@ -811,13 +841,11 @@ void MainWindow::createToolBar()
     mainBar_->addAction(cancelAct_);
 
     connect(engineCombo_, qOverload<int>(&QComboBox::currentIndexChanged), this, [this] {
-        doc_->settings().engineId = engineCombo_->currentData().toString().toStdString();
-        doc_->markSettingsChanged();
+        doc_->setEngineChoice(engineCombo_->currentData().toString().toStdString(), doc_->engineChoice().useMsx);
         updateCompatibility();
     });
     connect(msxCheck_, &QCheckBox::toggled, this, [this](bool on) {
-        doc_->settings().useMsx = on;
-        doc_->markSettingsChanged();
+        doc_->setEngineChoice(engineCombo_->currentData().toString().toStdString(), on);
         if (on && msxPath().isEmpty())
             chooseMsxFile();
         const int idx = tabs_->indexOf(msxEditor_);
@@ -852,6 +880,14 @@ void MainWindow::createStatusBar()
     runState_->setStyleSheet(QString("color: %1; font-weight: 600;").arg(theme::kWarning.name()));
     selectionLabel_ = new QLabel(this);
     selectionLabel_->setVisible(false);
+    scenarioLabel_ = new QLabel(this);
+    scenarioLabel_->setVisible(false);
+    scenarioLabel_->setStyleSheet(QString("QLabel { background: rgb(255, 244, 220); color: %1; border: 1px solid %2; "
+                                          "border-radius: 4px; padding: 1px 8px; font-weight: 600; }")
+                                      .arg(theme::kText.name(), theme::kWarning.name()));
+    scenarioLabel_->setToolTip(tr("Edits are recorded in this scenario. Choose the base model in the Scenarios panel "
+                                  "to edit the input file itself."));
+    statusBar()->addPermanentWidget(scenarioLabel_);
     statusBar()->addPermanentWidget(runState_);
     statusBar()->addPermanentWidget(selectionLabel_);
     statusBar()->addPermanentWidget(progress_);
@@ -951,7 +987,7 @@ void MainWindow::rebuildForDialect()
     const int msxTab = tabs_->indexOf(msxEditor_);
     if (msxTab >= 0)
         tabs_->removeTab(msxTab);
-    if (d == Dialect::Epanet && doc_->settings().useMsx && !msxPath().isEmpty())
+    if (d == Dialect::Epanet && doc_->engineChoice().useMsx && !msxPath().isEmpty())
     {
         msxEditor_->load(msxPath());
         decorateTab(tabs_->addTab(msxEditor_, icons::get("report"), tr("MSX file")));
@@ -974,7 +1010,7 @@ void MainWindow::rebuildEngineChoices()
     engineCombo_->blockSignals(true);
     msxCheck_->blockSignals(true);
     engineCombo_->clear();
-    std::string wanted = doc_->settings().engineId;
+    std::string wanted = doc_->engineChoice().engineId;
     if (const auto* desc = registry_.descriptor(wanted); desc && desc->multiSpecies)
         wanted = desc->baseEngineId;
     if (wanted.empty() || !registry_.descriptor(wanted) || registry_.descriptor(wanted)->dialect != d)
@@ -998,7 +1034,7 @@ void MainWindow::rebuildEngineChoices()
             select = idx;
     }
     engineCombo_->setCurrentIndex(select);
-    msxCheck_->setChecked(d == Dialect::Epanet && doc_->settings().useMsx);
+    msxCheck_->setChecked(d == Dialect::Epanet && doc_->engineChoice().useMsx);
     engineCombo_->blockSignals(false);
     msxCheck_->blockSignals(false);
 }
@@ -1024,7 +1060,7 @@ const engine::EngineDescriptor* MainWindow::currentEngine() const
 
 QString MainWindow::msxPath() const
 {
-    const std::string rel = doc_->settings().msxFile;
+    const std::string rel = doc_->engineChoice().msxFile;
     if (rel.empty())
         return {};
     const QFileInfo fi(QString::fromStdString(rel));
@@ -1035,8 +1071,7 @@ QString MainWindow::msxPath() const
 
 QString MainWindow::runBase() const
 {
-    return doc_->path().isEmpty() ? QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation)).filePath("untitled")
-                                  : QFileInfo(doc_->path()).dir().filePath(QFileInfo(doc_->path()).completeBaseName());
+    return doc_->runBase(doc_->activeScenario());
 }
 
 void MainWindow::updateCompatibility()
@@ -1118,7 +1153,10 @@ bool MainWindow::editModel(const QString& description, const std::function<bool(
 // ---------------------------------------------------------------------------
 void MainWindow::updateTitle()
 {
-    setWindowTitle(QString("%1%2 - Mirab").arg(doc_->displayName(), doc_->isModified() ? "*" : ""));
+    const QString scenario = doc_->activeScenario();
+    setWindowTitle(QString("%1%2%3 - Mirab")
+                       .arg(doc_->displayName(), scenario.isEmpty() ? QString() : tr(" [scenario: %1]").arg(scenario),
+                            doc_->isModified() ? "*" : ""));
     setWindowModified(doc_->isModified());
 }
 
@@ -1333,8 +1371,7 @@ QString MainWindow::writeRunInput(QString* error)
     // Run from a copy next to the project so relative file references keep working.
     QString dir = doc_->path().isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::TempLocation)
                                          : QFileInfo(doc_->path()).absolutePath();
-    const QString base = doc_->path().isEmpty() ? QString("untitled") : QFileInfo(doc_->path()).completeBaseName();
-    const QString file = QDir(dir).filePath("." + base + ".mirab-run.inp");
+    const QString file = QDir(dir).filePath("." + QFileInfo(runBase()).fileName() + ".mirab-run.inp");
     QFile f(file);
     if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
     {
@@ -1693,14 +1730,13 @@ void MainWindow::chooseMsxFile()
     const QString f = QFileDialog::getOpenFileName(this, tr("EPANET-MSX file"), start, tr("MSX files (*.msx);;All files (*)"));
     if (f.isEmpty())
     {
-        if (doc_->settings().msxFile.empty())
+        if (doc_->engineChoice().msxFile.empty())
             msxCheck_->setChecked(false);
         return;
     }
     doc_->settings().msxFile = doc_->path().isEmpty() ? f.toStdString()
                                                       : QFileInfo(doc_->path()).dir().relativeFilePath(f).toStdString();
-    doc_->settings().useMsx = true;
-    doc_->markSettingsChanged();
+    doc_->setEngineChoice(engineCombo_->currentData().toString().toStdString(), true);
     msxCheck_->blockSignals(true);
     msxCheck_->setChecked(true);
     msxCheck_->blockSignals(false);
@@ -2111,8 +2147,55 @@ void MainWindow::openTool(const QString& name)
         showRasterLayers();
     else if (name == "map-service")
         addMapService();
+    else if (name == "run-scenarios")
+        runScenarios();
     else
         openCalibrationTool(name);
+}
+
+bool MainWindow::activateScenario(const QString& name)
+{
+    QString error;
+    if (!doc_->setActiveScenario(name, &error))
+    {
+        message("error", error);
+        return false;
+    }
+    showDock("scenariosDock");
+    return true;
+}
+
+bool MainWindow::showMapDifference(const QString& scenario)
+{
+    tabs_->setCurrentWidget(mapPage_);
+    return mapPage_->showDifference(scenario);
+}
+
+void MainWindow::runScenarios()
+{
+    if (inpEditor_->hasPendingEdits() && !inpEditor_->apply())
+    {
+        QMessageBox::warning(this, tr("Run scenarios"), tr("The input text has errors."));
+        return;
+    }
+    if (msxEditor_->isModified())
+        msxEditor_->save();
+    if (runDialog_)
+    {
+        runDialog_->raise();
+        runDialog_->activateWindow();
+        return;
+    }
+    runDialog_ = new ScenarioRunDialog(doc_, &registry_, this);
+    runDialog_->setAttribute(Qt::WA_DeleteOnClose);
+    connect(runDialog_, &ScenarioRunDialog::scenarioFinished, this, [this](const QString& name, bool ok) {
+        const QString label = name.isEmpty() ? tr("Base model") : name;
+        if (ok)
+            message("info", tr("%1: simulation finished; results in %2").arg(label, doc_->resultsPath(name)));
+        else
+            message("warning", tr("%1: the simulation did not finish.").arg(label));
+    });
+    runDialog_->show();
 }
 
 // ---------------------------------------------------------------------------

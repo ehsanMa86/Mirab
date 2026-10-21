@@ -20,5 +20,35 @@
     "objective": [{"metric": "NSE", "weight": 1}],
     "budget": 40,
     "seed": 1
-  }
+  },
+  "scenarios": [
+    {
+      "name": "Pipe upsizing",
+      "description": "Larger mains toward the south-east corner of the grid",
+      "changes": [
+        {"op": "set", "section": "PIPES", "key": "P2", "column": 4, "from": "150", "to": "200"},
+        {"op": "set", "section": "PIPES", "key": "P5", "column": 4, "from": "100", "to": "150"},
+        {"op": "set", "section": "PIPES", "key": "P9", "column": 4, "from": "100", "to": "150"},
+        {"op": "set", "section": "PIPES", "key": "P10", "column": 4, "from": "100", "to": "150"}
+      ]
+    },
+    {
+      "name": "Demand growth",
+      "description": "30 percent more demand at the planning horizon",
+      "changes": [
+        {"op": "set", "section": "OPTIONS", "key": "DEMAND MULTIPLIER", "column": 2, "from": "1.0", "to": "1.3"}
+      ]
+    },
+    {
+      "name": "Growth with upsizing",
+      "description": "The planning horizon demand on the upsized network",
+      "parent": "Demand growth",
+      "changes": [
+        {"op": "set", "section": "PIPES", "key": "P2", "column": 4, "from": "150", "to": "200"},
+        {"op": "set", "section": "PIPES", "key": "P5", "column": 4, "from": "100", "to": "150"},
+        {"op": "set", "section": "PIPES", "key": "P9", "column": 4, "from": "100", "to": "150"},
+        {"op": "set", "section": "PIPES", "key": "P10", "column": 4, "from": "100", "to": "150"}
+      ]
+    }
+  ]
 }

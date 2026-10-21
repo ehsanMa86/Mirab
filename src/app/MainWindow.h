@@ -55,6 +55,8 @@ class MsxEditor;
 class ProjectBrowser;
 class PropertyPanel;
 class ResultsPanel;
+class ScenarioPanel;
+class ScenarioRunDialog;
 class SolverProcess;
 class StartPage;
 
@@ -85,6 +87,14 @@ public:
     /// Opens a report tab by name (tables, timeseries, profile, frequency,
     /// variability, systemflow, energy, calibration, status); used by menus and automation.
     void openReport(const QString& kind);
+    /// Shows and edits a scenario (empty: the base model).
+    bool activateScenario(const QString& name);
+    /// Colors the map by the change from another scenario's results (empty: the base model).
+    bool showMapDifference(const QString& scenario);
+    /// Opens the dialog that runs several scenarios.
+    void runScenarios();
+    /// Shows the results at a reporting period (automation).
+    void showPeriod(int period) { doc_->setPeriod(period); }
     /// Opens the import dialog for a shapefile, DXF drawing or CSV table.
     void importFile(const QString& path);
     /// Opens the editor of a pattern, curve or time series ([PATTERNS], [CURVES], [TIMESERIES]),
@@ -94,7 +104,8 @@ public:
     /// Opens the simulation options dialog, optionally at a page (see OptionsDialog::showPage).
     void showSimulationOptions(const QString& page = {});
     /// Opens a tool dialog: "elevations", "raster-layers", "map-service", "observed-data",
-    /// "calibration" or "calibration-run" (the calibration dialog with the run started).
+    /// "calibration", "calibration-run" (the calibration dialog with the run started) or
+    /// "run-scenarios".
     void openTool(const QString& name);
 
     // Deliverables. An empty path asks the user; a path exports without
@@ -191,6 +202,9 @@ private:
     StartPage* start_ = nullptr;
     PropertyPanel* props_ = nullptr;
     ResultsPanel* results_ = nullptr;
+    ScenarioPanel* scenarios_ = nullptr;
+    QPointer<ScenarioRunDialog> runDialog_;
+    QLabel* scenarioLabel_ = nullptr;
     ProjectBrowser* browser_ = nullptr;
     InpEditor* inpEditor_ = nullptr;
     MsxEditor* msxEditor_ = nullptr;

@@ -72,7 +72,7 @@ int main(int argc, char* argv[])
         "(the published release for this computer), a manifest URL or a local manifest file.",
         "source");
     const QCommandLineOption reportOpt("report", "With --screenshot: open a report tab (tables, timeseries, profile, "
-                                                 "frequency, variability, systemflow, energy, calibration, status) first.",
+                                                 "frequency, variability, systemflow, energy, calibration, scenarios, status) first.",
                                        "kind");
     const QCommandLineOption delayOpt("delay", "With --screenshot: milliseconds to wait before the picture (default 700).",
                                       "ms");
@@ -106,8 +106,17 @@ int main(int argc, char* argv[])
     const QCommandLineOption toolOpt("open-tool", "Open a tool dialog after the file: elevations (from a DEM), "
                                                   "raster-layers, map-service, observed-data, calibration, "
                                                   "calibration-run (starts the calibration; use --delay to "
-                                                  "picture its progress) or select-query.",
+                                                  "picture its progress), select-query or run-scenarios.",
                                      "name");
+    const QCommandLineOption scenarioOpt("scenario", "Activate a scenario of the project after opening it.", "name");
+    const QCommandLineOption differenceOpt("map-difference",
+                                           "Color the map by the change from the results of a scenario (\"Base\" for "
+                                           "the base model).",
+                                           "name");
+    const QCommandLineOption periodOpt("period", "Show the results at a reporting period (0 is the first).", "n");
+    parser.addOption(scenarioOpt);
+    parser.addOption(differenceOpt);
+    parser.addOption(periodOpt);
     parser.addOption(toolOpt);
     parser.addOption(importOpt);
     parser.addOption(dataOpt);
@@ -189,6 +198,15 @@ int main(int argc, char* argv[])
     const QStringList files = parser.positionalArguments();
     if (!files.isEmpty())
         window.openFile(files.first());
+    if (parser.isSet(scenarioOpt))
+        window.activateScenario(parser.value(scenarioOpt));
+    if (parser.isSet(periodOpt))
+        window.showPeriod(parser.value(periodOpt).toInt());
+    if (parser.isSet(differenceOpt))
+    {
+        const QString from = parser.value(differenceOpt);
+        window.showMapDifference(from.compare("base", Qt::CaseInsensitive) == 0 ? QString() : from);
+    }
     if (parser.isSet(selectOpt))
         window.selectElements(parser.value(selectOpt).split(',', Qt::SkipEmptyParts));
     if (parser.isSet(regionOpt))

@@ -29,6 +29,7 @@
 #include "Icons.h"
 #include "RasterLayers.h"
 #include "ObservedData.h"
+#include "ScenarioCompare.h"
 #include "Theme.h"
 #include "mirab/core/Network.h"
 #include "mirab/core/Query.h"
@@ -1637,6 +1638,8 @@ QList<ReportInfo> availableReports(core::Dialect dialect)
         list.append({"energy", QObject::tr("Energy report"), "energy", QObject::tr("Pump energy use and cost")});
     list.append({"calibration", QObject::tr("Calibration"), "calibration",
                  QObject::tr("Simulated against observed data, with goodness of fit")});
+    list.append({"scenarios", QObject::tr("Scenario comparison"), "compare",
+                 QObject::tr("Results of the base model and its scenarios side by side")});
     list.append({"status", QObject::tr("Status report"), "report", QObject::tr("The engine's report file")});
     return list;
 }
@@ -1664,7 +1667,7 @@ ReportSnapshot reportSnapshot(const QString& kind, ProjectDocument* doc, const Q
     {
         report->snapshot(s);
     }
-    else if (page)
+    else if (page && !scenarioComparisonSnapshot(page, s))
     {
         // Reports built elsewhere (calibration): their notes, first table and charts.
         for (const auto* label : page->findChildren<QLabel*>())
@@ -1731,6 +1734,8 @@ QWidget* createReport(const QString& kind, ProjectDocument* doc, const QString& 
         return new StatusReport(doc, reportFile, parent);
     if (kind == "calibration")
         return createCalibrationReport(doc, parent);
+    if (kind == "scenarios")
+        return createScenarioComparison(doc, parent);
     return nullptr;
 }
 

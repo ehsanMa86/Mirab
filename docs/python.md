@@ -123,6 +123,24 @@ print(sim.result)
 
 `mirab.run("model.inp", ...)` runs a file without opening a project.
 
+## Scenarios
+
+Scenarios stored with a project ([user guide](user-guide.md#scenarios)) can be read, edited and run:
+
+```python
+mirab.scenarios("model.inp")             # name, parent, changes, conflicts, engine, results
+p = mirab.Project.open("model.inp", scenario="Pipe upsizing")
+p.links["P5"].diameter                   # the scenario's value
+p.links["P7"].diameter = 200
+p.save()                                 # recorded as a change of the scenario; the .inp is unchanged
+result = p.run()                         # the scenario's engine; results in model.Pipe-upsizing.anr
+mirab.run("model.inp", scenario="Demand growth")
+```
+
+`p.save("alt.inp")` writes the scenario's model (with the edits) as a plain input file and
+reopens that file as the base model. `mirab-cli batch` runs several scenarios at once
+([cli.md](cli.md#scenarios)).
+
 ## Results
 
 ```python

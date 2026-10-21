@@ -87,6 +87,7 @@ ProjectSettings ProjectSettings::loadFor(const std::filesystem::path& inpFile)
         }
         if (v.get("calibration").isObject())
             s.calibration = v.get("calibration");
+        s.scenarios = scenariosFromJson(v.get("scenarios"));
     }
     catch (const json::ParseError&)
     {
@@ -142,6 +143,8 @@ void ProjectSettings::saveFor(const std::filesystem::path& inpFile) const
     }
     if (calibration.isObject())
         v.set("calibration", calibration);
+    if (!scenarios.empty())
+        v.set("scenarios", scenariosToJson(scenarios));
     std::ofstream out(sidecarPath(inpFile), std::ios::binary | std::ios::trunc);
     if (!out)
         throw std::runtime_error("cannot write " + sidecarPath(inpFile).u8string());

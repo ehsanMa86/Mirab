@@ -35,6 +35,9 @@ documents; the [Python package](python.md) is built on them.
 | `resilience ...` | the analysis results ([resilience.md](resilience.md)) |
 | `elevations <model>` | the planned changes of each node |
 | `calibrate metrics <model>` | goodness of fit of each observed series |
+| `scenarios list <model>` | the scenarios of the project ([below](#scenarios)) |
+| `scenarios export <model>` | the file written and the conflicts |
+| `batch <model>` | the outcome of each run |
 | `export ...`, `import wntr ...` | the file written and notes |
 
 ## Engines and checks
@@ -250,6 +253,49 @@ mirab-cli elevations model.inp --dem dem.tif --json [--out model.inp]
 `export geojson|gpkg|wntr ... --json` prints `{"format", "path", "notes"}`; `import wntr ...
 --json` prints `{"path", "nodes", "links", "notes"}`.
 
+## Scenarios
+
+Scenarios are alternatives of a model stored as changes in the project sidecar (member
+`scenarios`, see [file-formats.md](file-formats.md#scenarios) and the
+[user guide](user-guide.md#scenarios)). `--scenario NAME` applies one before a command:
+`info`, `check`, `model get`, `model set`, `run`, `calibrate`, `export` and the resilience analyses
+accept it (`Base` is the base model). A scenario's results go to `model.<scenario>.anr` and
+`.rpt`, the name with characters other than letters, digits, `-` and `_` replaced by `-`.
+
+```sh
+mirab-cli scenarios list model.inp --json
+mirab-cli scenarios export model.inp --scenario "Pipe upsizing" --out upsized.inp
+mirab-cli run model.inp --scenario "Pipe upsizing" --json
+mirab-cli batch model.inp --all --jobs 4 --json          # the base model and every scenario
+mirab-cli batch model.inp --scenarios "Base,Pipe upsizing" --engine epanet-2.2-epa
+mirab-cli model set model.inp --scenario "Pipe upsizing" --id P7 --column Diameter --value 200
+```
+
+`scenarios list --json` prints one object per scenario; `conflicts` counts the changes that no
+longer apply cleanly to the base model and `results` is empty until the scenario has been run:
+
+```json
+[{"name": "Growth with upsizing", "parent": "Demand growth", "description": "...",
+  "changes": 4, "conflicts": 0, "engine": "", "results": "/data/model.Growth-with-upsizing.anr"}]
+```
+
+`batch --json` runs the scenarios in separate `mirab-cli run` processes, `--jobs` at a time
+(default: up to 4), and prints:
+
+```json
+{"model": "/data/model.inp", "failed": 0,
+ "runs": [{"scenario": "", "success": true, "seconds": 0.21, "results": "/data/model.anr",
+           "report": "/data/model.rpt"},
+          {"scenario": "Pipe upsizing", "success": true, "seconds": 0.23,
+           "results": "/data/model.Pipe-upsizing.anr", "report": "/data/model.Pipe-upsizing.rpt"}]}
+```
+
+A failed run also has `log`, the output of its process. `scenarios export --json` prints `scenario`,
+`path` and `conflicts` (each with `scenario`, `section`, `key`, `missing` and `message`).
+`run --json` adds `scenario`, and `model get` adds `scenario` to the model document.
+`model set --scenario` records the edits as changes of the scenario in the sidecar and leaves the
+input file as it is; with `--out` it writes the scenario's edited model to that file instead.
+
 ## Calibration
 
 The observed data and the calibration set-up live in the project sidecar
@@ -259,6 +305,7 @@ The observed data and the calibration set-up live in the project sidecar
 ```sh
 mirab-cli calibrate metrics model.inp --json            # compare the saved results
 mirab-cli calibrate model.inp --jobs 4 --budget 100     # search the parameters
+mirab-cli calibrate model.inp --scenario "Pipe upsizing" # calibrate a scenario's model
 ```
 
 `calibrate metrics --json` prints one entry per observed series:

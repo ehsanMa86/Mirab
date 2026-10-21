@@ -39,7 +39,7 @@ from ._cli import Cli, CliError, CliNotFoundError, default_cli, find_cli, set_cl
 from .analysis import (check, criticality, elevations, engines, export, fireflow, import_wntr, info, service,
                        todini, topology)
 from .batch import Case, CaseResult, run_batch
-from .project import Element, ElementCollection, Project, edit, open_project, option, rows
+from .project import Element, ElementCollection, Project, edit, open_project, option, rows, scenarios
 from .results import Results, Table, Variable, has_numpy, load_results
 from .simulation import Event, FrameEvent, RunResult, Simulation, decode_frame, run
 
@@ -50,5 +50,5 @@ __all__ = [
     "FrameEvent", "Project", "Results", "RunResult", "Simulation", "Table", "Variable", "check",
     "criticality", "decode_frame", "default_cli", "edit", "elevations", "engines", "export", "find_cli",
     "fireflow", "has_numpy", "import_wntr", "info", "load_results", "open_project", "option", "rows", "run",
-    "run_batch", "service", "set_cli", "todini", "topology", "__version__",
+    "run_batch", "scenarios", "service", "set_cli", "todini", "topology", "__version__",
 ]

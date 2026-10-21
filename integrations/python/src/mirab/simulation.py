@@ -344,9 +344,12 @@ ProgressCallback = Callable[[float, str], Any]
 
 def run_args(inp: PathLike, engine: Optional[str] = None, out: Optional[PathLike] = None,
              report: Optional[PathLike] = None, msx: Optional[PathLike] = None,
-             live: bool = False, frame_interval: Optional[float] = None) -> List[Any]:
+             live: bool = False, frame_interval: Optional[float] = None,
+             scenario: Optional[str] = None) -> List[Any]:
     """Arguments of ``mirab-cli run`` (without ``--machine``)."""
     args: List[Any] = ["run", os.fspath(inp)]
+    if scenario:
+        args += ["--scenario", scenario]
     if engine:
         args += ["--engine", engine]
     if msx:
@@ -378,11 +381,14 @@ def run(inp: PathLike, engine: Optional[str] = None, out: Optional[PathLike] = N
         report: Optional[PathLike] = None, msx: Optional[PathLike] = None,
         callback: Optional[EventCallback] = None, progress: Optional[ProgressCallback] = None,
         live: Optional[bool] = None, frame_interval: Optional[float] = None,
-        cli: Union[Cli, PathLike, None] = None, check: bool = False) -> RunResult:
+        cli: Union[Cli, PathLike, None] = None, check: bool = False,
+        scenario: Optional[str] = None) -> RunResult:
     """Runs a model file with mirab-cli.
 
     Args:
         inp: the ``.inp`` file.
+        scenario: run this scenario of the project (see :func:`mirab.scenarios`);
+            its results go to ``<model>.<scenario>.anr`` unless ``out`` is given.
         engine: engine ID (``epanet-2.3-owa``, ``swmm-5.2-epa``, ...); the
             project's engine by default.
         out: results file (default: next to the model with ``.anr``).
@@ -394,7 +400,7 @@ def run(inp: PathLike, engine: Optional[str] = None, out: Optional[PathLike] = N
         check: raise :class:`CliError` when the run fails.
     """
     live = callback is not None if live is None else live
-    sim = Simulation(run_args(inp, engine, out, report, msx, live, frame_interval), cli)
+    sim = Simulation(run_args(inp, engine, out, report, msx, live, frame_interval, scenario), cli)
     result = drive(sim, callback, progress)
     return result.raise_for_status() if check else result
 

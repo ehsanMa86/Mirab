@@ -33,6 +33,7 @@
 #include "mirab/core/ProjectSettings.h"
 #include "mirab/core/Raster.h"
 #include "mirab/core/Results.h"
+#include "mirab/core/Scenario.h"
 #include "mirab/core/SwmmObjects.h"
 #include "mirab/core/Text.h"
 #include "mirab/engine/Compatibility.h"
@@ -114,7 +115,7 @@ const std::vector<std::string> kValueOptions = {
     "period", "crs", "required-pressure", "threshold", "links", "nodes", "flow", "residual",
     "time", "max-flow", "minimum-pressure", "dem", "mode", "swmm", "dem-units", "decimals",
     "frame-interval", "section", "id", "column", "value", "row", "option", "edits", "format",
-    "category"};
+    "category", "scenario", "scenarios", "jobs"};
 
 Args parseArgs(const std::vector<std::string>& argv, std::size_t from)
 {
@@ -336,11 +337,35 @@ fs::path pathArg(const std::string& s)
     return fs::u8path(s);
 }
 
-core::Model loadModel(const Args& a)
+/// Loads the model of the first argument; with --scenario, that scenario of it.
+/// Conflicts of the scenario go to @p conflicts, or to standard error.
+core::Model loadModel(const Args& a, std::vector<core::ScenarioConflict>* conflicts = nullptr)
 {
     if (a.positional.empty())
         throw std::runtime_error("missing input file");
-    return core::Model::fromFile(pathArg(a.positional[0]));
+    const fs::path inp = pathArg(a.positional[0]);
+    core::Model model = core::Model::fromFile(inp);
+    const std::string scenario = a.opt("scenario");
+    if (scenario.empty() || text::iequals(scenario, "base"))
+        return model;
+    const auto settings = core::ProjectSettings::loadFor(inp);
+    std::vector<core::ScenarioConflict> found;
+    model = core::scenarioModel(model, settings.scenarios, scenario, &found);
+    if (conflicts)
+        *conflicts = std::move(found);
+    else
+    {
+        for (const auto& c : found)
+            std::cerr << "warning: scenario " << c.scenario << ": " << c.message << "\n";
+    }
+    return model;
+}
+
+/// Name of the scenario chosen with --scenario, empty for the base model.
+std::string scenarioArg(const Args& a)
+{
+    const std::string s = a.opt("scenario");
+    return text::iequals(s, "base") ? std::string() : s;
 }
 
 /// Accepts short names for engines whose identifiers are long.
@@ -355,10 +380,12 @@ std::string engineFor(const Args& a, const core::Model& model, const fs::path& i
                       const engine::EngineRegistry& registry, bool* useMsx = nullptr)
 {
     const auto settings = core::ProjectSettings::loadFor(inp);
-    std::string id = canonicalEngineId(a.opt("engine", settings.engineId));
+    const auto chosen = core::scenarioEngine(settings.scenarios, scenarioArg(a),
+                                             {settings.engineId, settings.useMsx, settings.msxFile});
+    std::string id = canonicalEngineId(a.opt("engine", chosen.engineId));
     if (id.empty())
         id = engine::EngineRegistry::defaultEngineId(model.dialect());
-    const bool msx = a.has("msx") || (settings.useMsx && !settings.msxFile.empty());
+    const bool msx = a.has("msx") || (chosen.useMsx && !chosen.msxFile.empty());
     if (useMsx)
         *useMsx = msx;
     if (msx)
@@ -689,11 +716,19 @@ int cmdRun(const Args& a)
     if (out.machine())
         watchStdinForCommands();
     const fs::path inp = pathArg(a.positional.empty() ? std::string() : a.positional[0]);
-    const auto model = loadModel(a);
+    std::vector<core::ScenarioConflict> conflicts;
+    const auto model = loadModel(a, &conflicts);
     engine::EngineRegistry registry;
     bool useMsx = false;
     const std::string id = engineFor(a, model, inp, registry, &useMsx);
     const auto settings = core::ProjectSettings::loadFor(inp);
+    const std::string scenario = scenarioArg(a);
+    const auto chosen = core::scenarioEngine(settings.scenarios, scenario,
+                                             {settings.engineId, settings.useMsx, settings.msxFile});
+    // A scenario's results and report go beside the project's: <name>.<scenario>.anr
+    const fs::path outBase =
+        scenario.empty() ? fs::path(inp).replace_extension()
+                         : inp.parent_path() / (inp.stem().u8string() + "." + core::scenarioFileStem(scenario));
 
     std::string error;
     auto eng = registry.create(id, &error);
@@ -707,14 +742,19 @@ int cmdRun(const Args& a)
         out.log(i.level == engine::Support::Unsupported ? "error" : "warning", i.message);
     if (!compat.runnable())
         throw std::runtime_error("the project uses features that " + d.name + " cannot run");
+    if (!scenario.empty())
+        out.log("info", "Scenario: " + scenario);
+    for (const auto& c : conflicts)
+        out.log("warning", "scenario " + c.scenario + ": " + c.message);
 
     std::vector<std::string> notes;
     const std::string prepared = engine::prepareInput(model, d, &notes);
     fs::path runInput = inp;
     fs::path scratchInput;
-    if (!notes.empty())
+    if (!notes.empty() || !scenario.empty())
     {
-        scratchInput = inp.parent_path() / ("." + inp.stem().u8string() + ".mirab-run.inp");
+        // Next to the project, so that file references relative to it keep working.
+        scratchInput = inp.parent_path() / ("." + outBase.filename().u8string() + ".mirab-run.inp");
         std::ofstream f(scratchInput, std::ios::binary | std::ios::trunc);
         f << prepared;
         runInput = scratchInput;
@@ -727,14 +767,14 @@ int cmdRun(const Args& a)
     if (d.multiSpecies)
     {
         std::string msx = a.opt("msx");
-        if (msx.empty() && !settings.msxFile.empty())
-            msx = (inp.parent_path() / fs::u8path(settings.msxFile)).u8string();
+        if (msx.empty() && !chosen.msxFile.empty())
+            msx = (inp.parent_path() / fs::u8path(chosen.msxFile)).u8string();
         if (msx.empty())
             throw std::runtime_error("EPANET-MSX needs an .msx file (use --msx)");
         req.msxInput = pathArg(msx);
     }
-    fs::path results = a.has("out") ? pathArg(a.opt("out")) : fs::path(inp).replace_extension(".anr");
-    req.reportFile = a.has("report") ? pathArg(a.opt("report")) : fs::path(inp).replace_extension(".rpt");
+    fs::path results = a.has("out") ? pathArg(a.opt("out")) : fs::path(outBase.u8string() + ".anr");
+    req.reportFile = a.has("report") ? pathArg(a.opt("report")) : fs::path(outBase.u8string() + ".rpt");
     req.workDir = a.has("workdir") ? pathArg(a.opt("workdir"))
                                    : fs::temp_directory_path() /
                                          ("mirab-" + std::to_string(std::chrono::steady_clock::now()
@@ -774,11 +814,15 @@ int cmdRun(const Args& a)
     done.set("code", outcome.code);
     done.set("message", outcome.message);
     done.set("engine", d.id);
+    if (!scenario.empty())
+        done.set("scenario", scenario);
     done.set("seconds", seconds);
     if (outcome.success)
     {
         outcome.results.metadata["input"] = inp.filename().u8string();
         outcome.results.metadata["mirabVersion"] = MIRAB_VERSION_STRING;
+        if (!scenario.empty())
+            outcome.results.metadata["scenario"] = scenario;
         outcome.results.save(results);
         done.set("results", results.u8string());
         done.set("report", req.reportFile.u8string());
@@ -804,6 +848,246 @@ int cmdRun(const Args& a)
                       << "\n";
     }
     return outcome.success ? 0 : (outcome.cancelled ? 3 : 1);
+}
+
+// ---------------------------------------------------------------------------
+// Scenarios
+// ---------------------------------------------------------------------------
+int cmdScenarios(const Args& a)
+{
+    if (a.positional.size() < 2)
+        throw std::runtime_error("usage: mirab-cli scenarios list|export <model.inp> [--scenario NAME --out FILE]");
+    const std::string sub = a.positional[0];
+    const fs::path inp = pathArg(a.positional[1]);
+    const core::Model base = core::Model::fromFile(inp);
+    const auto settings = core::ProjectSettings::loadFor(inp);
+    if (sub == "list")
+    {
+        Value list = Value::array();
+        for (const auto& s : settings.scenarios)
+        {
+            std::vector<core::ScenarioConflict> conflicts;
+            std::string error;
+            try
+            {
+                core::scenarioModel(base, settings.scenarios, s.name, &conflicts);
+            }
+            catch (const std::exception& e)
+            {
+                error = e.what();
+            }
+            const auto engine = core::scenarioEngine(settings.scenarios, s.name,
+                                                     {settings.engineId, settings.useMsx, settings.msxFile});
+            const fs::path results =
+                inp.parent_path() / (inp.stem().u8string() + "." + core::scenarioFileStem(s.name) + ".anr");
+            Value v = Value::object();
+            v.set("name", s.name);
+            v.set("parent", s.parent);
+            v.set("description", s.description);
+            v.set("changes", static_cast<int>(s.changes.size()));
+            v.set("conflicts", static_cast<int>(conflicts.size()));
+            v.set("engine", engine.engineId);
+            v.set("results", fs::exists(results) ? results.u8string() : std::string());
+            if (!error.empty())
+                v.set("error", error);
+            list.push(v);
+        }
+        if (a.flag("json"))
+        {
+            std::cout << list.dump(2) << "\n";
+            return 0;
+        }
+        if (settings.scenarios.empty())
+        {
+            std::cout << "No scenarios in " << core::ProjectSettings::sidecarPath(inp).u8string() << "\n";
+            return 0;
+        }
+        for (const auto& v : list.items())
+        {
+            std::cout << v.get("name").asString();
+            if (!v.get("parent").asString().empty())
+                std::cout << "  (based on " << v.get("parent").asString() << ")";
+            std::cout << "\n  " << v.get("changes").asNumber() << " change(s)";
+            if (v.get("conflicts").asNumber() > 0)
+                std::cout << ", " << v.get("conflicts").asNumber() << " conflict(s)";
+            if (!v.get("engine").asString().empty())
+                std::cout << ", engine " << v.get("engine").asString();
+            std::cout << (v.get("results").asString().empty() ? std::string(", not run")
+                                                              : ", results " + v.get("results").asString())
+                      << "\n";
+            if (!v.get("description").asString().empty())
+                std::cout << "  " << v.get("description").asString() << "\n";
+            if (!v.get("error").asString().empty())
+                std::cout << "  error: " << v.get("error").asString() << "\n";
+        }
+        return 0;
+    }
+    if (sub == "export")
+    {
+        if (!a.has("scenario") || !a.has("out"))
+            throw std::runtime_error("usage: mirab-cli scenarios export <model.inp> --scenario NAME --out FILE");
+        std::vector<core::ScenarioConflict> conflicts;
+        const core::Model m = core::scenarioModel(base, settings.scenarios, scenarioArg(a), &conflicts);
+        for (const auto& c : conflicts)
+            std::cerr << "warning: scenario " << c.scenario << ": " << c.message << "\n";
+        m.save(pathArg(a.opt("out")));
+        if (a.flag("json"))
+        {
+            Value v = Value::object();
+            v.set("scenario", scenarioArg(a));
+            v.set("path", a.opt("out"));
+            Value list = Value::array();
+            for (const auto& c : conflicts)
+            {
+                Value k = Value::object();
+                k.set("scenario", c.scenario);
+                k.set("section", c.section);
+                k.set("key", c.key);
+                k.set("missing", c.missing);
+                k.set("message", c.message);
+                list.push(k);
+            }
+            v.set("conflicts", list);
+            std::cout << v.dump(2) << "\n";
+        }
+        else
+        {
+            std::cout << "Wrote " << a.opt("out") << "\n";
+        }
+        return 0;
+    }
+    throw std::runtime_error("unknown scenarios command " + sub + " (list or export)");
+}
+
+// ---------------------------------------------------------------------------
+// Batch runs: one solver process per scenario, several at a time
+// ---------------------------------------------------------------------------
+int cmdBatch(const Args& a)
+{
+    if (a.positional.empty())
+        throw std::runtime_error("usage: mirab-cli batch <model.inp> [--scenarios A,B|--all] [--jobs N]");
+    const fs::path inp = fs::absolute(pathArg(a.positional[0]));
+    const core::Model base = core::Model::fromFile(inp);
+    const auto settings = core::ProjectSettings::loadFor(inp);
+    std::vector<std::string> names; // "" is the base model
+    if (a.has("scenarios") && !a.flag("all"))
+    {
+        for (const auto& n : splitList(a.opt("scenarios")))
+        {
+            const bool isBase = text::iequals(n, "base") || text::iequals(n, "base model");
+            if (!isBase && !core::findScenario(settings.scenarios, n))
+                throw std::runtime_error("no scenario named \"" + n + "\" (see mirab-cli scenarios list)");
+            names.push_back(isBase ? std::string() : n);
+        }
+    }
+    else
+    {
+        names.push_back({});
+        for (const auto& s : settings.scenarios)
+            names.push_back(s.name);
+    }
+    const unsigned cores = std::max(1u, std::thread::hardware_concurrency());
+    const int jobs = std::max(1, static_cast<int>(a.num("jobs", std::min(4u, cores))));
+    const fs::path program = cli::programPath();
+    if (program.empty())
+        throw std::runtime_error("cannot find the mirab-cli program");
+    const bool asJson = a.flag("json");
+    const auto stamp = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    auto label = [](const std::string& n) { return n.empty() ? std::string("Base model") : n; };
+    auto stemOf = [&](const std::string& n) {
+        return inp.parent_path() /
+               (inp.stem().u8string() + (n.empty() ? std::string() : "." + core::scenarioFileStem(n)));
+    };
+
+    struct Job
+    {
+        int code = -1;
+        double seconds = 0;
+        std::string log;
+    };
+    std::vector<Job> done(names.size());
+    std::atomic<std::size_t> next{0};
+    std::mutex print;
+    std::size_t finished = 0;
+    if (!asJson)
+        std::cout << "Running " << names.size() << " simulation(s), "
+                  << std::min(static_cast<std::size_t>(jobs), names.size()) << " at a time.\n";
+    auto worker = [&] {
+        for (std::size_t i = next++; i < names.size(); i = next++)
+        {
+            const std::string& name = names[i];
+            const fs::path log = fs::temp_directory_path() / ("mirab-batch-" + stamp + "-" + std::to_string(i) + ".log");
+            std::vector<std::string> args = {"run", inp.u8string()};
+            if (!name.empty())
+                args.insert(args.end(), {"--scenario", name});
+            if (a.has("engine"))
+                args.insert(args.end(), {"--engine", a.opt("engine")});
+            const auto started = std::chrono::steady_clock::now();
+            std::string error;
+            Job& j = done[i];
+            j.code = cli::runChildProcess(program, args, log, &error);
+            j.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
+            {
+                std::ifstream in(log, std::ios::binary);
+                std::ostringstream text;
+                text << in.rdbuf();
+                j.log = error.empty() ? text.str() : error;
+            }
+            std::error_code ec;
+            fs::remove(log, ec);
+            std::lock_guard<std::mutex> lock(print);
+            ++finished;
+            if (asJson)
+                continue;
+            std::cout << "[" << finished << "/" << names.size() << "] " << label(name) << ": "
+                      << (j.code == 0 ? "finished" : "failed") << " in " << text::formatDouble(j.seconds, 3)
+                      << " s\n";
+            std::istringstream lines(j.log);
+            std::string line;
+            while (std::getline(lines, line))
+            {
+                if (!line.empty() && line.back() == '\r')
+                    line.pop_back();
+                if (j.code != 0 || line.rfind("Results:", 0) == 0 || line.rfind("warning", 0) == 0)
+                    std::cout << "    " << line << "\n";
+            }
+            std::cout << std::flush;
+        }
+    };
+    std::vector<std::thread> threads;
+    for (int t = 0; t < std::min<int>(jobs, static_cast<int>(names.size())); ++t)
+        threads.emplace_back(worker);
+    for (auto& t : threads)
+        t.join();
+
+    int failed = 0;
+    Value runs = Value::array();
+    for (std::size_t i = 0; i < names.size(); ++i)
+    {
+        failed += done[i].code != 0 ? 1 : 0;
+        Value v = Value::object();
+        v.set("scenario", names[i]);
+        v.set("success", done[i].code == 0);
+        v.set("seconds", done[i].seconds);
+        v.set("results", done[i].code == 0 ? stemOf(names[i]).u8string() + ".anr" : std::string());
+        v.set("report", stemOf(names[i]).u8string() + ".rpt");
+        if (done[i].code != 0)
+            v.set("log", done[i].log);
+        runs.push(v);
+    }
+    if (asJson)
+    {
+        Value out = Value::object();
+        out.set("model", inp.u8string());
+        out.set("runs", runs);
+        out.set("failed", failed);
+        std::cout << out.dump(2) << "\n";
+    }
+    else if (failed)
+    {
+        std::cout << failed << " of " << names.size() << " simulation(s) failed.\n";
+    }
+    return failed ? 1 : 0;
 }
 
 Value variablesJson(const std::vector<core::Variable>& vars)
@@ -1551,6 +1835,8 @@ int cmdModel(const Args& a)
     {
         Value v = core::modelToJson(model);
         v.set("path", rest.positional[0]);
+        if (!scenarioArg(a).empty())
+            v.set("scenario", scenarioArg(a));
         const std::string text = v.dump(a.flag("compact") ? -1 : 2);
         if (a.has("out"))
         {
@@ -1615,14 +1901,32 @@ int cmdModel(const Args& a)
         throw std::runtime_error(
             "nothing to change: use --id/--column/--value, --option/--value or --edits FILE");
     const auto summary = core::applyEdits(model, edits);
-    const fs::path out = pathArg(a.opt("out", rest.positional[0]));
+    const std::string scenario = scenarioArg(a);
+    const fs::path inp = pathArg(rest.positional[0]);
+    // With --scenario the edits become changes of that scenario in the
+    // sidecar (the input file is unchanged), unless --out writes its model.
+    const bool intoScenario = !scenario.empty() && !a.has("out");
+    const fs::path out = intoScenario ? core::ProjectSettings::sidecarPath(inp) : pathArg(a.opt("out", rest.positional[0]));
     const bool write = summary.changed > 0 || a.has("out");
-    if (write)
+    if (write && intoScenario)
+    {
+        auto settings = core::ProjectSettings::loadFor(inp);
+        core::Scenario* s = core::findScenario(settings.scenarios, scenario);
+        const core::Model base = core::Model::fromFile(inp);
+        const auto parent = core::scenarioDocument(base.document(), base.dialect(), settings.scenarios, s->parent);
+        s->changes = core::diffDocuments(parent, model.document(), model.dialect());
+        settings.saveFor(inp);
+    }
+    else if (write)
+    {
         model.save(out);
+    }
     if (a.flag("json"))
     {
         Value v = Value::object();
         v.set("path", out.u8string());
+        if (!scenario.empty())
+            v.set("scenario", scenario);
         v.set("applied", summary.applied);
         v.set("changed", summary.changed);
         v.set("written", write);
@@ -1654,14 +1958,17 @@ Usage:
   mirab-cli engines where [--json]
   mirab-cli info <model.inp> [--json]
   mirab-cli check <model.inp> [--engine ID] [--msx file.msx] [--json]
-  mirab-cli model get <model.inp> [--out FILE.json] [--compact]
-  mirab-cli model set <model.inp> [--id ID --column NAME --value V [--section S]
+  mirab-cli model get <model.inp> [--scenario NAME] [--out FILE.json] [--compact]
+  mirab-cli model set <model.inp> [--scenario NAME] [--id ID --column NAME --value V [--section S]
                   [--row N] [--category node|link|subcatchment|gage|KIND]]
                   [--option KEY --value V [--section S]] [--edits FILE.json|-]
                   [--out model.inp] [--json]
-  mirab-cli run <model.inp> [--engine ID] [--msx file.msx] [--out results.anr]
+  mirab-cli run <model.inp> [--scenario NAME] [--engine ID] [--msx file.msx] [--out results.anr]
                   [--report file.rpt] [--workdir DIR] [--json | --machine [--live]
                   [--frame-interval SECONDS]]
+  mirab-cli scenarios list <model.inp> [--json]
+  mirab-cli scenarios export <model.inp> --scenario NAME --out FILE [--json]
+  mirab-cli batch <model.inp> [--scenarios NAME,NAME|--all] [--jobs N] [--engine ID] [--json]
   mirab-cli results <results.anr|.out> [--json] [--table node|link|subcatchment|system]
                   [--variable NAME[,NAME...]] [--element ID[,ID...]] [--period N]
                   [--format csv|json|npy|anr] [--out FILE] [--compact]
@@ -1685,6 +1992,11 @@ Engines: epanet-2.2-epa, epanet-2.3-owa, epanet-msx-2.0-epa22, epanet-msx-2.0-ow
          swmm-5.2-epa, swmm5plus-1.0 (when installed). Run "mirab-cli engines".
 Pressures and flows are in the units of the model. Calibration settings live in the
 project sidecar (model.inp.mirab.json) or a --config file; see docs/user-guide.md.
+--scenario NAME works with info, check, model, run, calibrate, export and the
+analyses: the scenario's changes (from the sidecar) are applied to the model
+first. A scenario's results are written to model.<scenario>.anr and .rpt.
+"batch" runs the base model ("Base") and the scenarios in separate processes,
+--jobs at a time (default: up to 4).
 With --machine, events are written as JSON lines and standard input accepts
 "cancel", "pause" and "resume"; --live adds the results of each reporting
 period while the run is in progress (at most one every --frame-interval
@@ -1752,6 +2064,10 @@ int runMain(int argc, char** argv)
             return cmdRun(a);
         if (cmd == "results")
             return cmdResults(a);
+        if (cmd == "scenarios")
+            return cmdScenarios(a);
+        if (cmd == "batch")
+            return cmdBatch(a);
         if (cmd == "resilience")
             return cmdResilience(a);
         if (cmd == "export")

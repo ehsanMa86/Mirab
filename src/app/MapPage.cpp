@@ -289,6 +289,38 @@ MapPage::MapPage(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(
     labels->setChecked(QSettings().value("map/labels", true).toBool());
     arrows->setChecked(QSettings().value("map/arrows", true).toBool());
     legend->setChecked(QSettings().value("map/legend", true).toBool());
+    difference_ = barButton("compare", tr("Color the map by the change from another scenario's results"), bar_, true);
+    difference_->setPopupMode(QToolButton::InstantPopup);
+    difference_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    difference_->setText(tr("Difference"));
+    difference_->setMenu(new QMenu(difference_));
+    connect(difference_->menu(), &QMenu::aboutToShow, this, [this] {
+        QMenu* menu = difference_->menu();
+        menu->clear();
+        QAction* off = menu->addAction(tr("Off: show the results"), this, &MapPage::hideDifference);
+        off->setCheckable(true);
+        off->setChecked(!differenceOn_);
+        menu->addSeparator();
+        QStringList names = {QString()};
+        for (const auto& s : doc_->scenarios())
+            names << QString::fromStdString(s.name);
+        for (const QString& n : names)
+        {
+            if (n == doc_->activeScenario())
+                continue;
+            QAction* a = menu->addAction(icons::get(n.isEmpty() ? "project" : "scenarios"),
+                                         n.isEmpty() ? tr("Change from the base model") : tr("Change from %1").arg(n),
+                                         this, [this, n] { showDifference(n); });
+            a->setCheckable(true);
+            a->setChecked(differenceOn_ && differenceFrom_ == n);
+            a->setEnabled(doc_->hasResults() && doc_->resultsFor(n) != nullptr);
+        }
+        if (names.size() == 1)
+            menu->addAction(tr("Create scenarios to compare them here"))->setEnabled(false);
+        else if (!doc_->hasResults())
+            menu->addAction(tr("Run this scenario first"))->setEnabled(false);
+    });
+    bl->addWidget(difference_);
     bl->addWidget(basemap_);
     bl->addWidget(labels);
     bl->addWidget(arrows);
@@ -329,6 +361,13 @@ MapPage::MapPage(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(
     connect(zout, &QToolButton::clicked, this, [this] { map_->zoomBy(1 / 1.5); });
     connect(zfit, &QToolButton::clicked, map_, &MapView::fitToWindow);
 
+    banner_ = new QLabel(map_);
+    banner_->setObjectName("scenarioBanner");
+    banner_->setStyleSheet(QString("QLabel#scenarioBanner { background: rgba(255, 244, 220, 240); color: %1; "
+                                   "border: 1px solid %2; border-radius: 6px; padding: 5px 12px; }")
+                               .arg(theme::kText.name(), theme::kWarning.name()));
+    banner_->hide();
+
     start_ = new StartPage(map_);
     start_->hide();
 
@@ -365,6 +404,10 @@ MapPage::MapPage(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(
     connect(linkVar_, &QComboBox::currentTextChanged, map_, &MapView::setLinkVariable);
     connect(areaVar_, &QComboBox::currentTextChanged, map_, &MapView::setAreaVariable);
     connect(doc_, &ProjectDocument::resultsChanged, this, &MapPage::resultsChanged);
+    connect(doc_, &ProjectDocument::resultsChanged, this, &MapPage::refreshDifference);
+    connect(doc_, &ProjectDocument::activeScenarioChanged, this, &MapPage::refreshDifference);
+    connect(doc_, &ProjectDocument::activeScenarioChanged, this, &MapPage::updateBanner);
+    connect(doc_, &ProjectDocument::scenariosChanged, this, &MapPage::updateBanner);
     connect(doc_, &ProjectDocument::liveResultsUpdated, this, &MapPage::updateTimeControls);
     connect(doc_, &ProjectDocument::liveStateChanged, this, &MapPage::updateTimeLabel);
     connect(doc_, &ProjectDocument::modelReset, this, [this] {
@@ -409,6 +452,50 @@ void MapPage::refreshBasemapMenu()
     basemap_->setText(current.isEmpty() ? tr("Basemap") : MapView::basemapLabel(current));
 }
 
+bool MapPage::showDifference(const QString& scenario)
+{
+    auto reference = scenario == doc_->activeScenario() ? nullptr : doc_->resultsFor(scenario);
+    if (!reference || !doc_->hasResults())
+    {
+        hideDifference();
+        return false;
+    }
+    differenceOn_ = true;
+    differenceFrom_ = scenario;
+    map_->setDifference(reference, scenario.isEmpty() ? tr("the base model") : scenario);
+    difference_->setText(scenario.isEmpty() ? tr("Change from base") : tr("Change from %1").arg(scenario));
+    difference_->setChecked(true);
+    return true;
+}
+
+void MapPage::hideDifference()
+{
+    differenceOn_ = false;
+    differenceFrom_.clear();
+    map_->setDifference(nullptr, {});
+    difference_->setText(tr("Difference"));
+    difference_->setChecked(false);
+}
+
+void MapPage::refreshDifference()
+{
+    // The reference follows its scenario's latest results.
+    if (differenceOn_)
+        showDifference(differenceFrom_);
+}
+
+void MapPage::updateBanner()
+{
+    const QString name = doc_->activeScenario();
+    banner_->setVisible(!name.isEmpty() && !start_->isVisible());
+    if (name.isEmpty())
+        return;
+    banner_->setText(tr("<b>Scenario: %1</b> &nbsp;·&nbsp; edits are recorded in this scenario; the base model "
+                        "stays as it is")
+                         .arg(name.toHtmlEscaped()));
+    placeOverlays();
+}
+
 void MapPage::setStartVisible(bool on)
 {
     start_->setVisible(on);
@@ -430,6 +517,10 @@ void MapPage::placeOverlays()
     start_->setGeometry(map_->rect());
     zoomBox_->adjustSize();
     zoomBox_->move(map_->width() - zoomBox_->width() - 12, 12);
+    banner_->adjustSize();
+    banner_->move((map_->width() - banner_->width()) / 2, map_->height() - banner_->height() - 14);
+    banner_->setVisible(doc_->isScenarioActive() && !start_->isVisible());
+    banner_->raise();
 }
 
 void MapPage::resultsChanged()

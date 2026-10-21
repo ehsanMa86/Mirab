@@ -73,6 +73,10 @@ public:
     void setStartVisible(bool on);
     /// Basemap menu: rebuilt when the coordinate system changes.
     void refreshBasemapMenu();
+    /// Colors the map by the difference between the shown results and those
+    /// of another scenario (empty: the base model).
+    bool showDifference(const QString& scenario);
+    void hideDifference();
 
 signals:
     void coordinateSystemRequested();
@@ -87,6 +91,8 @@ private:
     void updateTimeControls();
     void updateTimeLabel();
     void placeOverlays();
+    void refreshDifference();
+    void updateBanner();
 
     ProjectDocument* doc_;
     MapView* map_;
@@ -104,7 +110,11 @@ private:
     QLabel* noteLabel_;
     QTimer* timer_;
     QToolButton* basemap_;
+    QToolButton* difference_;
     QWidget* zoomBox_;
+    QLabel* banner_;
+    bool differenceOn_ = false;
+    QString differenceFrom_;
 };
 
 } // namespace mirab::app

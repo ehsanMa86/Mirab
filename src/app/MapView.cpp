@@ -65,6 +65,10 @@ constexpr double kPi = 3.14159265358979323846;
 const QColor kRamp[] = {QColor(43, 103, 199), QColor(0, 166, 214), QColor(46, 178, 96), QColor(242, 188, 26),
                         QColor(224, 64, 48)};
 
+// Blue below zero, grey around it, red above: the difference ramp.
+const QColor kDiverging[] = {QColor(33, 102, 172), QColor(120, 175, 214), QColor(214, 218, 224),
+                             QColor(240, 150, 110), QColor(190, 40, 45)};
+
 double segDistance(const QPointF& p, const QPointF& a, const QPointF& b)
 {
     const QPointF ab = b - a;
@@ -461,6 +465,42 @@ void MapView::setShowLegend(bool on)
     update();
 }
 
+void MapView::setDifference(std::shared_ptr<const core::ResultSet> reference, const QString& label)
+{
+    reference_ = std::move(reference);
+    referenceLabel_ = label;
+    recomputeRanges();
+    update();
+}
+
+const QColor* MapView::ramp() const
+{
+    return reference_ ? kDiverging : kRamp;
+}
+
+std::optional<double> MapView::referenceValue(const char* table, int variable, int element, int period) const
+{
+    const auto* r = doc_->results();
+    const auto* t = r ? r->table(table) : nullptr;
+    const auto* rt = reference_ ? reference_->table(table) : nullptr;
+    if (!t || !rt || variable < 0 || variable >= t->variableCount() || period >= r->periodCount())
+        return std::nullopt;
+    const int rv = rt->variableIndex(t->variables[static_cast<std::size_t>(variable)].name);
+    const int re = rt->elementIndex(t->ids[static_cast<std::size_t>(element)]);
+    if (rv < 0 || re < 0 || reference_->times.empty())
+        return std::nullopt;
+    // The reference period at the same simulation time.
+    const auto& times = reference_->times;
+    const double time = r->times[static_cast<std::size_t>(period)];
+    const auto it = std::lower_bound(times.begin(), times.end(), time - 0.5);
+    if (it == times.end() || std::fabs(*it - time) > 0.5)
+        return std::nullopt;
+    const double v = rt->value(static_cast<int>(it - times.begin()), rv, re);
+    if (std::isnan(v))
+        return std::nullopt;
+    return v;
+}
+
 void MapView::setNodeVariable(const QString& name)
 {
     nodeVar_ = name;
@@ -554,6 +594,15 @@ void MapView::extendRanges(int fromPeriod)
                 continue;
             if (magnitude)
                 v = std::fabs(v);
+            if (reference_)
+            {
+                const auto ref = referenceValue(rangeTable_, rangeVar_, e, p);
+                if (!ref)
+                    continue;
+                // A range symmetric around zero, so that grey means "no change".
+                v = std::fabs(v - (magnitude ? std::fabs(*ref) : *ref));
+                lo = std::min(lo, -v);
+            }
             lo = std::min(lo, v);
             hi = std::max(hi, v);
         }
@@ -566,18 +615,50 @@ void MapView::extendRanges(int fromPeriod)
         hi = lo + 1.0;
     rangeMin_ = lo;
     rangeMax_ = hi;
+    if (reference_ && hi - lo > 1e-12)
+    {
+        const double m = std::max(std::fabs(lo), std::fabs(hi));
+        rangeMin_ = -m;
+        rangeMax_ = m;
+    }
     const auto& v = t->variables[static_cast<std::size_t>(rangeVar_)];
     legendTitle_ = QString::fromStdString(v.name) + (v.unit.empty() ? QString() : " (" + QString::fromStdString(v.unit) + ")");
+    if (reference_)
+        legendTitle_ = tr("Change in %1 from %2").arg(legendTitle_, referenceLabel_);
+}
+
+double MapView::classEdge(int i) const
+{
+    // Differences: a narrow grey class around zero, so that small changes show.
+    static const double diverging[] = {-1.0, -0.5, -0.05, 0.05, 0.5, 1.0};
+    if (reference_)
+        return rangeMax_ * diverging[i];
+    return rangeMin_ + (rangeMax_ - rangeMin_) * i / 5.0;
 }
 
 QColor MapView::colorFor(double value) const
 {
-    const double t = std::clamp((value - rangeMin_) / (rangeMax_ - rangeMin_), 0.0, 1.0);
-    const int idx = std::min(4, static_cast<int>(t * 5.0));
-    return kRamp[idx];
+    int idx = 0;
+    while (idx < 4 && value > classEdge(idx + 1))
+        ++idx;
+    return ramp()[idx];
 }
 
 std::optional<double> MapView::resultValue(const char* table, int variable, const std::string& id) const
+{
+    const auto v = rawValue(table, variable, id);
+    if (!v || !reference_)
+        return v;
+    const auto* t = doc_->results()->table(table);
+    const auto ref = referenceValue(table, variable, t->elementIndex(id), currentPeriod());
+    if (!ref)
+        return std::nullopt;
+    if (std::strcmp(table, "link") == 0)
+        return std::fabs(*v) - std::fabs(*ref); // links are colored by magnitude
+    return *v - *ref;
+}
+
+std::optional<double> MapView::rawValue(const char* table, int variable, const std::string& id) const
 {
     const auto* r = doc_->results();
     if (!r || variable < 0)
@@ -851,9 +932,9 @@ void MapView::waitForBasemap(const QRectF& target, const RenderOptions& options,
     }
 }
 
-QVector<QColor> MapView::rampColors()
+QVector<QColor> MapView::rampColors() const
 {
-    return QVector<QColor>(std::begin(kRamp), std::end(kRamp));
+    return QVector<QColor>(ramp(), ramp() + 5);
 }
 
 MapView::Legend MapView::legend() const
@@ -864,9 +945,9 @@ MapView::Legend MapView::legend() const
         return l;
     for (int i = 0; i < 5; ++i)
     {
-        const double lo = rangeMin_ + (rangeMax_ - rangeMin_) * i / 5.0;
-        const double hi = rangeMin_ + (rangeMax_ - rangeMin_) * (i + 1) / 5.0;
-        l.classes.append({kRamp[i], QString::fromStdString(text::formatDouble(lo, 3)) + "  –  " +
+        const double lo = classEdge(i);
+        const double hi = classEdge(i + 1);
+        l.classes.append({ramp()[i], QString::fromStdString(text::formatDouble(lo, 3)) + "  –  " +
                                         QString::fromStdString(text::formatDouble(hi, 3))});
     }
     return l;
@@ -1114,7 +1195,7 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
             continue;
         QColor c = ink;
         if (auto v = resultValue("link", linkVarIndex_, l.id))
-            c = colorFor(std::fabs(*v));
+            c = colorFor(reference_ ? *v : std::fabs(*v));
         const bool selected = highlights_ && doc_->isSelected(Category::Link, l.id);
         const bool hovered = hover.category == Category::Link && hover.id.toStdString() == l.id;
         p.setBrush(Qt::NoBrush);
@@ -1130,7 +1211,7 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
         // Flow direction arrow at the middle of the longest segment.
         if (flowVar >= 0)
         {
-            if (auto f = resultValue("link", flowVar, l.id); f && std::fabs(*f) > 1e-9)
+            if (auto f = rawValue("link", flowVar, l.id); f && std::fabs(*f) > 1e-9)
             {
                 int best = 0;
                 double bestLen = 0;
@@ -1515,8 +1596,8 @@ void MapView::drawLegend(QPainter& p, const QRectF& area)
     int textW = fmb.horizontalAdvance(legendTitle_);
     for (int i = 0; i < 5; ++i)
     {
-        const double lo = rangeMin_ + (rangeMax_ - rangeMin_) * i / 5.0;
-        const double hi = rangeMin_ + (rangeMax_ - rangeMin_) * (i + 1) / 5.0;
+        const double lo = classEdge(i);
+        const double hi = classEdge(i + 1);
         rows << QString::fromStdString(text::formatDouble(lo, 3)) + "  –  " + QString::fromStdString(text::formatDouble(hi, 3));
         textW = std::max(textW, fm.horizontalAdvance(rows.last()) + 30);
     }
@@ -1534,7 +1615,7 @@ void MapView::drawLegend(QPainter& p, const QRectF& area)
     {
         const double y = box.top() + 14 + fmb.height() + (4 - i) * rowH;
         p.setPen(Qt::NoPen);
-        p.setBrush(kRamp[i]);
+        p.setBrush(ramp()[i]);
         p.drawRoundedRect(QRectF(box.left() + 12, y + 3, 18, rowH - 7), 3, 3);
         p.setPen(theme::kText);
         p.drawText(QPointF(box.left() + 38, y + fm.ascent() + 1), rows[i]);
