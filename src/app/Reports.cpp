@@ -30,6 +30,8 @@
 #include "RasterLayers.h"
 #include "ObservedData.h"
 #include "Theme.h"
+#include "mirab/core/Network.h"
+#include "mirab/core/Query.h"
 #include "mirab/core/Text.h"
 #include "mirab/core/Units.h"
 
@@ -118,32 +120,6 @@ std::optional<double> elementNumber(const core::Model& m, Category c, const std:
         }
     }
     return std::nullopt;
-}
-
-/// Length column of every link, read in one pass over the link sections
-/// (looking links up one by one is slow on large networks).
-std::unordered_map<std::string, double> linkLengths(const core::Model& m)
-{
-    std::unordered_map<std::string, double> out;
-    for (const auto& def : core::sectionDefs(m.dialect()))
-    {
-        if (def.keyCategory != Category::Link)
-            continue;
-        std::size_t column = 0;
-        for (std::size_t i = 1; i < def.columns.size() && column == 0; ++i)
-            if (text::toUpper(def.columns[i].name) == "LENGTH")
-                column = i;
-        const auto* section = m.document().find(def.name);
-        if (column == 0 || !section)
-            continue;
-        for (const auto& tokens : section->allRowTokens())
-        {
-            if (tokens.size() > column)
-                if (const auto v = text::toDouble(tokens[column]))
-                    out.emplace(tokens[0], *v);
-        }
-    }
-    return out;
 }
 
 /// Header bar shared by every report: title, description and actions.
@@ -265,7 +241,8 @@ public:
         QHBoxLayout* actions = nullptr;
         layout_->addWidget(reportHeader(tr("Network tables"),
                                         tr("Properties and results of every element at the selected time. Click a "
-                                           "column to sort; filter with expressions such as Pressure < 20."),
+                                           "column to sort; filter with expressions such as Pressure < 20 or "
+                                           "Diameter >= 300 AND Roughness < 100."),
                                         this, &actions));
         auto* exportBtn = actionButton("export", tr("Export CSV"), this);
         auto* copyBtn = actionButton("table", tr("Copy"), this);
@@ -329,27 +306,23 @@ protected:
     {
     public:
         using QSortFilterProxyModel::QSortFilterProxyModel;
-        int column = -1;
-        QString op;
-        double value = 0;
+        std::optional<core::Query> query;
+        QHash<QString, int> columns; ///< upper-case column name (without units) -> column
         bool filterAcceptsRow(int row, const QModelIndex& parent) const override
         {
-            if (column < 0)
+            if (!query || query->empty())
                 return true;
-            const QVariant v = sourceModel()->index(row, column, parent).data(Qt::UserRole);
-            bool ok = false;
-            const double d = v.toDouble(&ok);
-            if (!ok)
-                return false;
-            if (op == "<")
-                return d < value;
-            if (op == "<=")
-                return d <= value;
-            if (op == ">")
-                return d > value;
-            if (op == ">=")
-                return d >= value;
-            return std::fabs(d - value) < 1e-9 * std::max(1.0, std::fabs(value));
+            return query->matches([&](const std::string& name) -> std::optional<std::string> {
+                const int c = columns.value(QString::fromStdString(name).trimmed().toUpper(), -1);
+                if (c < 0)
+                    return std::nullopt;
+                const QVariant v = sourceModel()->index(row, c, parent).data(Qt::UserRole);
+                if (!v.isValid())
+                    return std::nullopt;
+                if (v.typeId() == QMetaType::Double)
+                    return QString::number(v.toDouble(), 'g', 17).toStdString();
+                return v.toString().toStdString();
+            });
         }
         void refilter() { invalidateRowsFilter(); }
     };
@@ -489,30 +462,35 @@ protected:
 
     void applyFilter()
     {
-        static const QRegularExpression re(R"(^\s*(.+?)\s*(<=|>=|<|>|=)\s*(-?[0-9.]+(?:[eE][-+]?[0-9]+)?)\s*$)");
-        const auto mt = re.match(filter_->text());
-        proxy_->column = -1;
-        filter_->setStyleSheet({});
-        if (mt.hasMatch())
+        proxy_->columns.clear();
+        for (int c = 0; c < model_->columnCount(); ++c)
         {
-            const QString name = mt.captured(1).trimmed();
-            for (int c = 0; c < model_->columnCount(); ++c)
-            {
-                const QString h = model_->headerData(c, Qt::Horizontal).toString();
-                if (h.compare(name, Qt::CaseInsensitive) == 0 || h.section(" (", 0, 0).compare(name, Qt::CaseInsensitive) == 0)
-                {
-                    proxy_->column = c;
-                    proxy_->op = mt.captured(2);
-                    proxy_->value = mt.captured(3).toDouble();
-                    break;
-                }
-            }
-            if (proxy_->column < 0)
-                filter_->setStyleSheet("border-color: #c84b4b;");
+            const QString h = model_->headerData(c, Qt::Horizontal).toString();
+            for (const QString& name : {h.toUpper(), h.section(" (", 0, 0).toUpper()})
+                if (!proxy_->columns.contains(name))
+                    proxy_->columns.insert(name, c);
         }
-        else if (!filter_->text().trimmed().isEmpty())
+        proxy_->columns.insert("KIND", proxy_->columns.value("TYPE", 1));
+        std::string err;
+        proxy_->query = core::Query::parse(filter_->text().toStdString(), &err);
+        filter_->setStyleSheet({});
+        filter_->setToolTip({});
+        bool known = proxy_->query.has_value();
+        if (proxy_->query)
+        {
+            for (const auto& f : proxy_->query->fields())
+                known = known && proxy_->columns.contains(QString::fromStdString(f).trimmed().toUpper());
+            if (!known)
+                filter_->setToolTip(tr("The table has no column of that name."));
+        }
+        else
+        {
+            filter_->setToolTip(QString::fromStdString(err));
+        }
+        if (!known)
         {
             filter_->setStyleSheet("border-color: #c84b4b;");
+            proxy_->query.reset();
         }
         proxy_->refilter();
         count_->setText(tr("%1 of %2 rows").arg(proxy_->rowCount()).arg(model_->rowCount()));
@@ -795,13 +773,30 @@ public:
         watch(true);
         fillNodes();
         chart_->clear(tr("Choose two nodes and press Draw profile."));
-        // Start with a useful profile: from the first node to the farthest connected one.
-        if (from_->count() > 1)
+        // Start along the selected nodes (first to last picked) or, without
+        // them, from the first node to the farthest connected one.
+        QStringList picked;
+        for (const auto& s : doc_->selectedElements())
+            if (s.category == Category::Node)
+                picked << s.id;
+        if (picked.size() >= 2)
+        {
+            setPath(picked.first(), picked.last());
+        }
+        else if (from_->count() > 1)
         {
             to_->setCurrentText(QString());
             computePath();
             refresh();
         }
+    }
+
+    void setPath(const QString& from, const QString& to)
+    {
+        from_->setCurrentText(from);
+        to_->setCurrentText(to);
+        computePath();
+        refresh();
     }
 
 protected:
@@ -831,77 +826,28 @@ protected:
         nodes_.clear();
         distances_.clear();
         const std::string a = from_->currentText().trimmed().toStdString();
-        std::string b = to_->currentText().trimmed().toStdString();
+        const std::string b = to_->currentText().trimmed().toStdString();
         const bool farthest = b.empty();
         if (!m.findNode(a) || (!farthest && !m.findNode(b)))
         {
             path_->setText(tr("Unknown node."));
             return;
         }
-        // Dijkstra over link lengths (geometric length when no length is given).
-        std::map<std::string, std::vector<std::pair<std::string, double>>> adj;
-        const auto lengths = linkLengths(m);
-        for (const auto& l : m.links())
-        {
-            const auto* n1 = m.findNode(l.from);
-            const auto* n2 = m.findNode(l.to);
-            const auto known = lengths.find(l.id);
-            double len = known != lengths.end() ? known->second : 0.0;
-            if (len <= 0 && n1 && n2)
-                len = std::hypot(n1->pos.x - n2->pos.x, n1->pos.y - n2->pos.y);
-            len = std::max(len, 1e-6);
-            adj[l.from].push_back({l.to, len});
-            adj[l.to].push_back({l.from, len});
-        }
-        std::map<std::string, double> dist;
-        std::map<std::string, std::string> prev;
-        using Item = std::pair<double, std::string>;
-        std::priority_queue<Item, std::vector<Item>, std::greater<>> q;
-        dist[a] = 0;
-        q.push({0, a});
-        while (!q.empty())
-        {
-            const auto [d, u] = q.top();
-            q.pop();
-            if (d > dist[u])
-                continue;
-            if (!farthest && u == b)
-                break;
-            for (const auto& [v, w] : adj[u])
-            {
-                if (!dist.count(v) || d + w < dist[v])
-                {
-                    dist[v] = d + w;
-                    prev[v] = u;
-                    q.push({d + w, v});
-                }
-            }
-        }
-        if (farthest)
-        {
-            double best = -1;
-            for (const auto& [node, d] : dist)
-            {
-                if (d > best)
-                {
-                    best = d;
-                    b = node;
-                }
-            }
-            to_->setCurrentText(QString::fromStdString(b));
-        }
-        if (!dist.count(b) || b == a)
+        // Shortest path by link length (drawn length when no length is given).
+        const auto graph = core::NetworkGraph::build(m);
+        const auto path = core::shortestPath(graph, graph.nodeIndex(a), farthest ? -1 : graph.nodeIndex(b));
+        if (!path.found())
         {
             path_->setText(tr("The two nodes are not connected."));
             return;
         }
-        for (std::string at = b;; at = prev[at])
+        for (std::size_t i = 0; i < path.nodes.size(); ++i)
         {
-            nodes_.insert(nodes_.begin(), at);
-            distances_.insert(distances_.begin(), dist[at]);
-            if (at == a)
-                break;
+            nodes_.push_back(graph.nodeId(path.nodes[i]));
+            distances_.push_back(path.distances[i]);
         }
+        if (farthest)
+            to_->setCurrentText(QString::fromStdString(nodes_.back()));
         path_->setText(tr("Path of %1 nodes, length %2").arg(nodes_.size()).arg(num(distances_.back(), 6)));
     }
 
@@ -1754,6 +1700,15 @@ ReportSnapshot reportSnapshot(const QString& kind, ProjectDocument* doc, const Q
                               [](const ChartWidget::Data& d) { return d.timeAxis; });
     }
     return s;
+}
+
+bool showProfilePath(QWidget* report, const QString& fromNode, const QString& toNode)
+{
+    auto* profile = dynamic_cast<ProfileReport*>(report);
+    if (!profile)
+        return false;
+    profile->setPath(fromNode, toNode);
+    return true;
 }
 
 QWidget* createReport(const QString& kind, ProjectDocument* doc, const QString& reportFile, QWidget* parent)

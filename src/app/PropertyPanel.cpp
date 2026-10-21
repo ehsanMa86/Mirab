@@ -41,7 +41,9 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <cmath>
+#include <optional>
 #include <map>
 #include <set>
 
@@ -61,6 +63,34 @@ enum Role
     ChoicesRole,
     OptionRole
 };
+
+/// RowRole of a value shared by the selected elements (edited on all of them).
+constexpr int kAllSelected = -2;
+
+QString kindOfElement(const core::Model& m, const Selection& s)
+{
+    if (s.category == Category::Node)
+        if (const auto* n = m.findNode(s.id.toStdString()))
+            return QString::fromStdString(n->kind);
+    if (s.category == Category::Link)
+        if (const auto* l = m.findLink(s.id.toStdString()))
+            return QString::fromStdString(l->kind);
+    if (s.category == Category::Area)
+        return "Subcatchment";
+    if (s.category == Category::Gage)
+        return "RainGage";
+    return {};
+}
+
+QString kindLabel(const QString& kind, int count)
+{
+    if (kind == "RainGage")
+        return count == 1 ? QObject::tr("rain gage") : QObject::tr("rain gages");
+    if (kind == "Storage")
+        return count == 1 ? QObject::tr("storage unit") : QObject::tr("storage units");
+    const QString lower = kind.toLower();
+    return count == 1 ? lower : lower + "s";
+}
 
 class ChoiceDelegate : public QStyledItemDelegate
 {
@@ -271,6 +301,8 @@ void PropertyPanel::rebuild()
     const Selection& sel = doc_->selection();
     if (sel.isEmpty())
         showOptions();
+    else if (doc_->selectionCount() > 1)
+        showMultiple();
     else
         showElement(sel);
     populateAddMenu();
@@ -441,6 +473,157 @@ void PropertyPanel::showElement(const Selection& sel)
     }
 }
 
+void PropertyPanel::showMultiple()
+{
+    const auto& model = doc_->model();
+    const auto& items = doc_->selectedElements();
+    const int count = static_cast<int>(items.size());
+    // Count the element types in the order they first appear.
+    QStringList kinds;
+    QHash<QString, int> perKind;
+    for (const auto& s : items)
+    {
+        const QString k = kindOfElement(model, s);
+        if (!perKind.contains(k))
+            kinds << k;
+        ++perKind[k];
+    }
+    QStringList parts;
+    for (const auto& k : kinds)
+        parts << QString::number(perKind[k]) + " " + kindLabel(k, perKind[k]);
+    title_->setText(tr("%n selected", nullptr, count));
+    subtitle_->setText(parts.join(", "));
+    subtitle_->setToolTip(parts.join(", "));
+    icon_->setPixmap(icons::element(kinds.size() == 1 ? kinds.first() : QString("Junction")).pixmap(28, 28));
+    const bool uniform = kinds.size() == 1 && std::all_of(items.begin(), items.end(), [&](const Selection& s) {
+                             return s.category == items.first().category;
+                         });
+    if (!uniform)
+    {
+        addHeader(tr("Selection"), true);
+        for (const auto& k : kinds)
+        {
+            const QString label = kindLabel(k, 2);
+            addRow(label.left(1).toUpper() + label.mid(1), QString::number(perKind[k]), {}, {}, {}, -1, -1, false,
+                   {}, true, false);
+        }
+        addHeader(tr("Edit one element type at a time"), false,
+                  tr("Select elements of one type to edit their shared properties together."));
+        return;
+    }
+
+    const Category cat = items.first().category;
+    std::vector<std::string> ids;
+    ids.reserve(items.size());
+    for (const auto& s : items)
+        ids.push_back(s.id.toStdString());
+    const auto rows = model.rowsForMany(cat, ids);
+    const Selection& current = doc_->selection();
+    const auto currentRows = rows.find(current.id.toStdString());
+    if (currentRows == rows.end())
+        return;
+    const auto units = model.units();
+    const QString mixed = tr("(mixed)");
+    std::set<std::string> shown;
+    for (const auto& er : currentRows->second)
+    {
+        if (!er.def || er.def->multiRowPerKey || !shown.insert(er.section).second)
+            continue;
+        // Rows of this section for every element (the first one each has).
+        std::vector<const core::ElementRow*> all;
+        for (const auto& id : ids)
+        {
+            const core::ElementRow* found = nullptr;
+            if (const auto it = rows.find(id); it != rows.end())
+            {
+                for (const auto& r : it->second)
+                {
+                    if (r.section == er.section)
+                    {
+                        found = &r;
+                        break;
+                    }
+                }
+            }
+            if (!found)
+                break;
+            all.push_back(found);
+        }
+        if (all.size() != ids.size())
+            continue; // not every selected element has this data
+        QString why;
+        const bool supported = sectionSupported(er.section, er.tokens, &why);
+        addHeader(er.def->description.empty() ? "[" + QString::fromStdString(er.section) + "]"
+                                              : QString::fromStdString(er.def->description),
+                  supported, why.isEmpty() ? "[" + QString::fromStdString(er.section) + "]" : why);
+        const core::RowLayout layout = er.def->layout(er.tokens);
+        const std::size_t ncols = layout.repeatFrom >= 0 ? std::max(layout.columns.size(), er.tokens.size())
+                                                         : layout.columns.size();
+        for (std::size_t c = 1; c < ncols; ++c)
+        {
+            const core::ColumnDef* colDef = layout.column(c);
+            if (!colDef)
+                break;
+            const bool tail = layout.variadic && c + 1 == layout.columns.size();
+            const std::string name = layout.columnName(c);
+            // End nodes are not edited together (every link would join the same nodes).
+            if (static_cast<int>(c) == er.def->fromColumn || static_cast<int>(c) == er.def->toColumn)
+                continue;
+            auto valueOf = [&](const core::ElementRow& r) -> std::optional<QString> {
+                // A different row variant (cross-section shape, ...) has other columns.
+                if (r.def->layout(r.tokens).columnName(c) != name)
+                    return std::nullopt;
+                if (c >= r.tokens.size())
+                    return QString();
+                if (tail)
+                {
+                    std::vector<std::string> rest(r.tokens.begin() + static_cast<std::ptrdiff_t>(c), r.tokens.end());
+                    return QString::fromStdString(text::join(rest, " "));
+                }
+                QString v = QString::fromStdString(text::unquote(r.tokens[c]));
+                return v == "\"\"" ? QString() : v;
+            };
+            bool comparable = true, same = true;
+            std::optional<QString> first;
+            for (const auto* r : all)
+            {
+                const auto v = valueOf(*r);
+                if (!v)
+                {
+                    comparable = false;
+                    break;
+                }
+                if (!first)
+                    first = v;
+                else if (*v != *first)
+                    same = false;
+            }
+            if (!comparable)
+                break;
+            const QString unit =
+                colDef->quantity.empty() ? QString() : QString::fromStdString(units.label(colDef->quantity));
+            QStringList choices;
+            for (const auto& ch : colDef->choices)
+                choices << QString::fromStdString(ch);
+            choices << referenceChoices(model, *colDef);
+            addRow(QString::fromStdString(name), same ? first.value_or(QString()) : mixed, unit,
+                   supported ? QString::fromStdString(colDef->help) : why, QString::fromStdString(er.section),
+                   kAllSelected, static_cast<int>(c), tail, choices, supported);
+            if (!same)
+            {
+                QTableWidgetItem* v = table_->item(table_->rowCount() - 1, 1);
+                QFont f = v->font();
+                f.setItalic(true);
+                v->setFont(f);
+                v->setForeground(QColor(130, 140, 152));
+                v->setToolTip(tr("The selected elements have different values. A new value applies to all of them."));
+            }
+            if (tail)
+                break;
+        }
+    }
+}
+
 void PropertyPanel::showOptions()
 {
     const auto& model = doc_->model();
@@ -485,6 +668,11 @@ void PropertyPanel::commit(QTableWidgetItem* item)
 {
     if (populating_ || item->column() != 1)
         return;
+    if (item->data(RowRole).toInt() == kAllSelected)
+    {
+        commitMultiple(item);
+        return;
+    }
     const QString section = item->data(SectionRole).toString();
     const int row = item->data(RowRole).toInt();
     const int column = item->data(ColumnRole).toInt();
@@ -533,13 +721,74 @@ void PropertyPanel::commit(QTableWidgetItem* item)
     }
 }
 
+void PropertyPanel::commitMultiple(QTableWidgetItem* item)
+{
+    const QString text = item->text().trimmed();
+    if (text == tr("(mixed)"))
+        return;
+    const std::string sec = item->data(SectionRole).toString().toStdString();
+    const int column = item->data(ColumnRole).toInt();
+    const bool tail = item->data(TailRole).toBool();
+    const std::string value = text.toStdString();
+    const auto& items = doc_->selectedElements();
+    if (items.isEmpty())
+        return;
+    const Category cat = items.first().category;
+    std::vector<std::string> ids;
+    for (const auto& s : items)
+        ids.push_back(s.id.toStdString());
+    QString err;
+    const bool ok = doc_->edit(
+        tr("Edit %1 of %n elements", nullptr, static_cast<int>(ids.size())).arg(table_->item(item->row(), 0)->text()),
+        [&](core::Model& m, std::string*) {
+            const auto rows = m.rowsForMany(cat, ids);
+            auto* s = m.document().find(sec);
+            if (!s)
+                return false;
+            for (const auto& id : ids)
+            {
+                const auto it = rows.find(id);
+                if (it == rows.end())
+                    continue;
+                for (const auto& r : it->second)
+                {
+                    if (r.section != sec)
+                        continue;
+                    if (tail)
+                    {
+                        auto tokens = r.tokens;
+                        tokens.resize(std::min<std::size_t>(tokens.size(), static_cast<std::size_t>(column)));
+                        while (tokens.size() < static_cast<std::size_t>(column))
+                            tokens.push_back("*");
+                        for (const auto& t : text::splitInpLine(value).tokens)
+                            tokens.push_back(t);
+                        s->setRowTokens(r.row, tokens);
+                    }
+                    else
+                    {
+                        m.setToken(sec, r.row, column, value, false);
+                    }
+                    break;
+                }
+            }
+            m.rebuild();
+            return true;
+        },
+        &err);
+    if (!ok)
+    {
+        emit statusMessage(err.isEmpty() ? tr("The value was not accepted.") : err);
+        QMetaObject::invokeMethod(this, &PropertyPanel::rebuild, Qt::QueuedConnection);
+    }
+}
+
 void PropertyPanel::populateAddMenu()
 {
     QMenu* menu = addButton_->menu();
     menu->clear();
     const Selection sel = doc_->selection();
-    addButton_->setEnabled(!sel.isEmpty());
-    if (sel.isEmpty())
+    addButton_->setEnabled(!sel.isEmpty() && doc_->selectionCount() == 1);
+    if (sel.isEmpty() || doc_->selectionCount() != 1)
         return;
     const auto& model = doc_->model();
     const std::string id = sel.id.toStdString();

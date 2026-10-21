@@ -26,8 +26,11 @@
 
 #include "Basemap.h"
 #include "RasterLayers.h"
-#include "mirab/core/Elevation.h"
 #include "Theme.h"
+#include "mirab/core/Crs.h"
+#include "mirab/core/Editing.h"
+#include "mirab/core/Elevation.h"
+#include "mirab/core/Geometry.h"
 #include "mirab/core/Text.h"
 
 #include <QElapsedTimer>
@@ -74,14 +77,7 @@ double segDistance(const QPointF& p, const QPointF& a, const QPointF& b)
 
 bool insidePolygon(const std::vector<Point>& poly, const Point& p)
 {
-    bool in = false;
-    for (std::size_t i = 0, j = poly.size() - 1; i < poly.size(); j = i++)
-    {
-        if (((poly[i].y > p.y) != (poly[j].y > p.y)) &&
-            (p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x))
-            in = !in;
-    }
-    return in;
+    return core::pointInPolygon(poly, p);
 }
 
 double haversineMeters(double lon1, double lat1, double lon2, double lat2)
@@ -254,6 +250,9 @@ void MapView::setTool(Tool tool, const QString& kind)
     case Tool::Select:
         setCursor(Qt::ArrowCursor);
         break;
+    case Tool::SplitLink:
+        setCursor(Qt::PointingHandCursor);
+        break;
     default:
         setCursor(Qt::CrossCursor);
         break;
@@ -267,6 +266,17 @@ void MapView::setTool(Tool tool, const QString& kind)
                                .arg(kind.isEmpty() ? tr("rain gage") : kind.toLower()));
     else if (tool == Tool::ZoomWindow)
         emit statusMessage(tr("Drag a rectangle to zoom into."));
+    else if (tool == Tool::SelectPolygon)
+        emit statusMessage(tr("Click the corners of the area to select, or drag around it; double-click or press "
+                              "Enter to finish. Shift adds to the selection, Ctrl removes from it."));
+    else if (tool == Tool::MeasureLength)
+        emit statusMessage(tr("Click points along the line to measure; double-click or press Enter to finish. "
+                              "Right-click or Esc to stop measuring."));
+    else if (tool == Tool::MeasureArea)
+        emit statusMessage(tr("Click the corners of the area to measure; double-click or press Enter to finish. "
+                              "Right-click or Esc to stop measuring."));
+    else if (tool == Tool::SplitLink)
+        emit statusMessage(tr("Click a pipe or conduit where it should be split. Right-click or Esc to finish."));
     update();
 }
 
@@ -277,6 +287,11 @@ void MapView::cancelPending()
     pendingPolygon_.clear();
     dragging_ = false;
     rubberBand_ = false;
+    selectBand_ = false;
+    lasso_.clear();
+    lassoDragged_ = false;
+    measure_.clear();
+    measureDone_ = false;
     dragNode_.clear();
     update();
 }
@@ -346,44 +361,37 @@ void MapView::zoomBy(double factor)
     update();
 }
 
-void MapView::zoomTo(const Selection& sel)
+void MapView::includeElement(core::Bounds& b, const Selection& sel) const
 {
-    const auto& m = doc_->model();
-    const std::string id = sel.id.toStdString();
-    core::Bounds b;
-    if (sel.category == Category::Node)
-    {
-        if (const auto* n = m.findNode(id); n && n->placed)
-            b.include(n->pos);
-    }
-    else if (sel.category == Category::Link)
-    {
-        if (const auto* l = m.findLink(id))
-        {
-            for (const auto* n : {m.findNode(l->from), m.findNode(l->to)})
-            {
-                if (n && n->placed)
-                    b.include(n->pos);
-            }
-            for (const auto& v : l->vertices)
-                b.include(v);
-        }
-    }
-    else if (sel.category == Category::Area)
-    {
-        if (const auto* a = m.findArea(id))
-        {
-            for (const auto& v : a->polygon)
-                b.include(v);
-        }
-    }
-    else if (sel.category == Category::Gage)
-    {
-        if (const auto* g = m.findGage(id); g && g->placed)
-            b.include(g->pos);
-    }
+    for (const auto& p : core::elementGeometry(doc_->model(), sel.ref()))
+        b.include(p);
+}
+
+void MapView::zoomToBounds(const core::Bounds& b)
+{
     if (!b.valid)
         return;
+    center_ = {(b.minX + b.maxX) / 2.0, (b.minY + b.maxY) / 2.0};
+    const double margin = 60.0;
+    if (b.width() > 0 || b.height() > 0)
+    {
+        const double sx = b.width() > 0 ? std::max(1.0, width() - 2 * margin) / b.width() : 1e9;
+        const double sy = b.height() > 0 ? std::max(1.0, height() - 2 * margin) / b.height() : 1e9;
+        const double needed = std::min(sx, sy);
+        if (scale_ > needed)
+            scale_ = needed;
+    }
+    userMovedView();
+    update();
+}
+
+void MapView::zoomTo(const Selection& sel)
+{
+    core::Bounds b;
+    includeElement(b, sel);
+    if (!b.valid)
+        return;
+    // A single element: keep it in the middle half of the view.
     center_ = {(b.minX + b.maxX) / 2.0, (b.minY + b.maxY) / 2.0};
     const double extent = std::max(b.width(), b.height());
     if (extent > 0)
@@ -394,6 +402,45 @@ void MapView::zoomTo(const Selection& sel)
     }
     userMovedView();
     update();
+}
+
+void MapView::zoomToSelection()
+{
+    const auto& items = doc_->selectedElements();
+    if (items.size() == 1)
+    {
+        zoomTo(items.first());
+        return;
+    }
+    core::Bounds b;
+    for (const auto& s : items)
+        includeElement(b, s);
+    zoomToBounds(b);
+}
+
+void MapView::selectInPolygon(const std::vector<core::Point>& polygon, bool crossing,
+                              Qt::KeyboardModifiers modifiers)
+{
+    QList<Selection> found;
+    for (const auto& e : core::elementsInPolygon(doc_->model(), polygon, crossing))
+        found.append(Selection::of(e));
+    if (modifiers & Qt::ShiftModifier)
+        doc_->addToSelection(found);
+    else if (modifiers & Qt::ControlModifier)
+        doc_->removeFromSelection(found);
+    else
+        doc_->setSelection(found);
+    emit statusMessage(tr("%n element(s) in the area", nullptr, static_cast<int>(found.size())));
+}
+
+void MapView::clickSelect(const Selection& hit, Qt::KeyboardModifiers modifiers)
+{
+    if (modifiers & Qt::ControlModifier)
+        doc_->toggleSelected(hit);
+    else if (modifiers & Qt::ShiftModifier)
+        doc_->addToSelection({hit});
+    else
+        doc_->select(hit);
 }
 
 void MapView::setShowLabels(bool on)
@@ -951,7 +998,6 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
 {
     p.setRenderHint(QPainter::Antialiasing);
     const auto& m = doc_->model();
-    const Selection sel = highlights_ ? doc_->selection() : Selection{};
     const Selection hover = highlights_ ? hover_ : Selection{};
     const bool drag = highlights_ && dragging_ && !dragNode_.isEmpty();
     const QColor ink(78, 92, 112);
@@ -1028,8 +1074,10 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
             fill = colorFor(*v);
             fill.setAlpha(150);
         }
-        const bool selected = sel.category == Category::Area && sel.id.toStdString() == a.id;
+        const bool selected = highlights_ && doc_->isSelected(Category::Area, a.id);
         const bool hovered = hover.category == Category::Area && hover.id.toStdString() == a.id;
+        if (selected)
+            fill = QColor(255, 196, 120, 150);
         p.setPen(QPen(selected ? selColor : QColor(60, 140, 70), selected ? 2.5 : hovered ? 2.0 : 1.2));
         p.setBrush(fill);
         p.drawPolygon(poly);
@@ -1067,7 +1115,7 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
         QColor c = ink;
         if (auto v = resultValue("link", linkVarIndex_, l.id))
             c = colorFor(std::fabs(*v));
-        const bool selected = sel.category == Category::Link && sel.id.toStdString() == l.id;
+        const bool selected = highlights_ && doc_->isSelected(Category::Link, l.id);
         const bool hovered = hover.category == Category::Link && hover.id.toStdString() == l.id;
         p.setBrush(Qt::NoBrush);
         if (selected || hovered)
@@ -1169,6 +1217,64 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
         p.setBrush(QColor(31, 111, 235, 30));
         p.drawRect(QRectF(pressPos_, hoverScreen_).normalized());
     }
+    if (highlights_ && selectBand_ &&
+        (std::fabs(hoverScreen_.x() - pressPos_.x()) >= 4 || std::fabs(hoverScreen_.y() - pressPos_.y()) >= 4))
+    {
+        // Left to right selects what lies inside, right to left what it touches.
+        const bool crossing = hoverScreen_.x() < pressPos_.x();
+        p.setPen(QPen(selColor, 1.3, crossing ? Qt::DashLine : Qt::SolidLine));
+        p.setBrush(crossing ? QColor(46, 178, 96, 30) : QColor(255, 140, 0, 30));
+        p.drawRect(QRectF(pressPos_, hoverScreen_).normalized());
+    }
+    if (highlights_ && tool_ == Tool::SelectPolygon && !lasso_.empty())
+    {
+        QPolygonF poly;
+        for (const auto& v : lasso_)
+            poly << toScreen(v);
+        if (!lassoDragged_)
+            poly << hoverScreen_;
+        p.setPen(QPen(selColor, 1.4, Qt::DashLine));
+        p.setBrush(QColor(255, 140, 0, 30));
+        p.drawPolygon(poly);
+    }
+    if (highlights_ && (tool_ == Tool::MeasureLength || tool_ == Tool::MeasureArea) && !measure_.empty())
+    {
+        QPolygonF line;
+        for (const auto& v : measure_)
+            line << toScreen(v);
+        if (!measureDone_)
+            line << hoverScreen_;
+        const QColor mc(200, 40, 120);
+        p.setPen(QPen(mc, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        if (tool_ == Tool::MeasureArea)
+        {
+            p.setBrush(QColor(200, 40, 120, 35));
+            p.drawPolygon(line);
+        }
+        else
+        {
+            p.setBrush(Qt::NoBrush);
+            p.drawPolyline(line);
+        }
+        p.setBrush(Qt::white);
+        p.setPen(QPen(mc, 1.6));
+        for (const auto& v : measure_)
+            p.drawEllipse(toScreen(v), 3.5, 3.5);
+        drawOverlayText(p, (measureDone_ ? line.last() : hoverScreen_) + QPointF(14, 18), measureText());
+    }
+    if (highlights_ && tool_ == Tool::SplitLink)
+    {
+        QString link;
+        Point at;
+        if (splitTarget(hoverScreen_, link, at))
+        {
+            const QPointF c = toScreen(at);
+            p.setPen(QPen(QColor(200, 40, 120), 2.0));
+            p.setBrush(Qt::white);
+            p.drawEllipse(c, 6, 6);
+            p.drawLine(c + QPointF(-10, 10), c + QPointF(10, -10));
+        }
+    }
 
     // Nodes
     const double r = std::clamp(scale_ * 2.4, 3.2, 6.5);
@@ -1188,7 +1294,7 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
             fill = QColor(120, 120, 200);
         if (auto v = resultValue("node", nodeVarIndex_, n.id))
             fill = colorFor(*v);
-        const bool selected = sel.category == Category::Node && sel.id.toStdString() == n.id;
+        const bool selected = highlights_ && doc_->isSelected(Category::Node, n.id);
         const bool hovered = hover.category == Category::Node && hover.id.toStdString() == n.id;
         if (selected || hovered)
         {
@@ -1235,7 +1341,7 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
         if (!g.placed)
             continue;
         const QPointF c = toScreen(g.pos);
-        const bool selected = sel.category == Category::Gage && sel.id.toStdString() == g.id;
+        const bool selected = highlights_ && doc_->isSelected(Category::Gage, g.id);
         p.setPen(QPen(selected ? selColor : QColor(40, 110, 200), selected ? 2.5 : 1.5));
         p.setBrush(QColor(190, 215, 248));
         QPainterPath cloud;
@@ -1256,6 +1362,142 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
     drawScaleBar(p, area);
     if (base)
         drawAttribution(p, area);
+}
+
+void MapView::drawOverlayText(QPainter& p, const QPointF& at, const QString& text)
+{
+    if (text.isEmpty())
+        return;
+    QFont f = font();
+    p.setFont(f);
+    const QFontMetrics fm(f);
+    const QStringList lines = text.split('\n');
+    int w = 0;
+    for (const auto& l : lines)
+        w = std::max(w, fm.horizontalAdvance(l));
+    QRectF box(at, QSizeF(w + 16, lines.size() * fm.height() + 10));
+    // Keep the box on the map.
+    if (box.right() > width() - 4)
+        box.moveRight(at.x() - 28);
+    if (box.bottom() > height() - 4)
+        box.moveBottom(at.y() - 28);
+    p.setPen(QPen(theme::kBorder, 1));
+    p.setBrush(QColor(255, 255, 255, 235));
+    p.drawRoundedRect(box, 6, 6);
+    p.setPen(theme::kText);
+    for (int i = 0; i < lines.size(); ++i)
+        p.drawText(QPointF(box.left() + 8, box.top() + 5 + fm.ascent() + i * fm.height()), lines[i]);
+}
+
+QString MapView::formatLength(double value, bool metres) const
+{
+    const bool us = doc_->model().units().system == core::UnitSystem::US;
+    if (!metres)
+        return QString::fromStdString(text::formatDouble(value, 6)) + " " + (us ? "ft" : "m");
+    if (us)
+    {
+        const double ft = value / 0.3048;
+        QString t = QString::number(ft, 'f', 1) + " ft";
+        if (ft >= 5280)
+            t += QString("  (%1 mi)").arg(ft / 5280.0, 0, 'f', 3);
+        return t;
+    }
+    QString t = QString::number(value, 'f', 2) + " m";
+    if (value >= 1000)
+        t += QString("  (%1 km)").arg(value / 1000.0, 0, 'f', 3);
+    return t;
+}
+
+QString MapView::formatArea(double value, bool metres) const
+{
+    const bool us = doc_->model().units().system == core::UnitSystem::US;
+    const QString sq = QString(QChar(0x00B2));
+    if (!metres)
+        return QString::fromStdString(text::formatDouble(value, 6)) + " " + (us ? "ft" : "m") + sq;
+    if (us)
+    {
+        const double ft2 = value / (0.3048 * 0.3048);
+        return QString::number(ft2, 'f', 0) + " ft" + sq + QString("  (%1 ac)").arg(ft2 / 43560.0, 0, 'f', 3);
+    }
+    return QString::number(value, 'f', 1) + " m" + sq + QString("  (%1 ha)").arg(value / 10000.0, 0, 'f', 4);
+}
+
+QString MapView::measureText() const
+{
+    if (measure_.empty())
+        return {};
+    std::vector<Point> pts = measure_;
+    if (!measureDone_)
+        pts.push_back(toWorld(hoverScreen_));
+    const auto crs = crs::parse(doc_->settings().crs);
+    const crs::Crs* system = crs && crs->valid() ? &*crs : nullptr;
+    QString t;
+    if (tool_ == Tool::MeasureArea)
+    {
+        const auto m = core::measure(pts, true, system);
+        t = tr("Area %1").arg(formatArea(m.area, m.metres)) + "\n" +
+            tr("Perimeter %1").arg(formatLength(m.length, m.metres));
+    }
+    else
+    {
+        const auto m = core::measure(pts, false, system);
+        t = tr("Length %1").arg(formatLength(m.length, m.metres));
+        if (pts.size() > 2)
+        {
+            const auto last = core::measure({pts[pts.size() - 2], pts.back()}, false, system);
+            t += "\n" + tr("Last segment %1").arg(formatLength(last.length, last.metres));
+        }
+    }
+    if (!system)
+        t += "\n" + tr("Map units: choose a coordinate system for true distances.");
+    return t;
+}
+
+bool MapView::splitTarget(const QPointF& screen, QString& link, Point& at) const
+{
+    const Selection hit = hitTest(screen);
+    if (hit.category != Category::Link)
+        return false;
+    const auto& m = doc_->model();
+    const auto* l = m.findLink(hit.id.toStdString());
+    if (!l || (l->kind != "Pipe" && l->kind != "Conduit"))
+        return false;
+    const auto line = core::linkPolyline(m, *l);
+    if (line.size() < 2)
+        return false;
+    link = hit.id;
+    at = core::locateOnPolyline(line, toWorld(screen)).point;
+    return true;
+}
+
+void MapView::splitAt(const QPointF& screen)
+{
+    QString link;
+    Point at;
+    if (!splitTarget(screen, link, at))
+    {
+        const Selection hit = hitTest(screen);
+        emit statusMessage(hit.category == Category::Link ? tr("Only pipes and conduits can be split.")
+                                                          : tr("Click on a pipe or conduit to split it."));
+        return;
+    }
+    QString err;
+    core::SplitResult result;
+    const std::string id = link.toStdString();
+    if (doc_->edit(tr("Split %1").arg(link),
+                   [&](core::Model& mm, std::string* e) { return core::splitLink(mm, id, at, &result, e); }, &err))
+    {
+        const QString node = QString::fromStdString(result.node);
+        doc_->setSelection({{Category::Link, link}, {Category::Node, node},
+                            {Category::Link, QString::fromStdString(result.link)}},
+                           {Category::Node, node});
+        emit statusMessage(
+            tr("%1 was split at the new node %2; the second part is %3.").arg(link, node, QString::fromStdString(result.link)));
+    }
+    else
+    {
+        emit statusMessage(tr("%1 was not split: %2").arg(link, err));
+    }
 }
 
 void MapView::drawLegend(QPainter& p, const QRectF& area)
@@ -1417,7 +1659,11 @@ void MapView::mousePressEvent(QMouseEvent* e)
         const Selection hit = hitTest(e->position());
         if (!hit.isEmpty())
         {
-            doc_->select(hit);
+            // Right-clicking a selected element keeps the selection for the menu.
+            if (doc_->isSelected(hit))
+                doc_->setCurrent(hit);
+            else
+                doc_->select(hit);
             emit contextMenuForSelection(e->globalPosition().toPoint());
         }
         else
@@ -1437,18 +1683,44 @@ void MapView::mousePressEvent(QMouseEvent* e)
     case Tool::Select:
     {
         const Selection hit = hitTest(e->position());
-        doc_->select(hit);
-        if (hit.category == Category::Node || hit.category == Category::Gage)
+        pressModifiers_ = e->modifiers();
+        if (hit.isEmpty() || hit.category == Category::Area)
+        {
+            // Dragging over an empty part of the map (or inside a subcatchment)
+            // selects with a rectangle; a click selects what is under it.
+            selectBand_ = true;
+            bandClick_ = hit;
+            hoverScreen_ = e->position();
+            break;
+        }
+        clickSelect(hit, e->modifiers());
+        if ((hit.category == Category::Node || hit.category == Category::Gage) &&
+            !(e->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier)))
         {
             dragNode_ = hit.id;
             dragging_ = false;
         }
-        else if (hit.isEmpty())
-        {
-            panning_ = true;
-        }
         break;
     }
+    case Tool::SelectPolygon:
+        pressModifiers_ = e->modifiers();
+        lasso_.push_back(w);
+        lassoDragged_ = false;
+        update();
+        break;
+    case Tool::MeasureLength:
+    case Tool::MeasureArea:
+        if (measureDone_)
+        {
+            measure_.clear();
+            measureDone_ = false;
+        }
+        measure_.push_back(w);
+        update();
+        break;
+    case Tool::SplitLink:
+        splitAt(e->position());
+        break;
     case Tool::ZoomWindow:
         rubberBand_ = true;
         hoverScreen_ = e->position();
@@ -1538,11 +1810,30 @@ void MapView::mouseMoveEvent(QMouseEvent* e)
         update();
         return;
     }
-    if (rubberBand_)
+    if (rubberBand_ || selectBand_)
     {
         update();
         return;
     }
+    if (tool_ == Tool::SelectPolygon && (e->buttons() & Qt::LeftButton) && !lasso_.empty())
+    {
+        // Freehand lasso while the button is held.
+        const QPointF last = toScreen(lasso_.back());
+        if (std::hypot(last.x() - e->position().x(), last.y() - e->position().y()) > 4.0)
+        {
+            lasso_.push_back(toWorld(e->position()));
+            lassoDragged_ = true;
+        }
+        update();
+        return;
+    }
+    if (tool_ == Tool::SelectPolygon || tool_ == Tool::MeasureLength || tool_ == Tool::MeasureArea)
+    {
+        update();
+        return;
+    }
+    if (tool_ == Tool::SplitLink)
+        update();
     if (!dragNode_.isEmpty() && (e->buttons() & Qt::LeftButton))
     {
         if (!dragging_ && (e->pos() - pressPos_).manhattanLength() > 4)
@@ -1608,6 +1899,32 @@ void MapView::mouseMoveEvent(QMouseEvent* e)
 
 void MapView::mouseReleaseEvent(QMouseEvent* e)
 {
+    if (selectBand_)
+    {
+        selectBand_ = false;
+        const QRectF r = QRectF(pressPos_, e->position()).normalized();
+        if (r.width() < 4 && r.height() < 4)
+        {
+            // A click on an empty spot clears the selection (unless adding to it).
+            if (!bandClick_.isEmpty())
+                clickSelect(bandClick_, pressModifiers_);
+            else if (!(pressModifiers_ & (Qt::ShiftModifier | Qt::ControlModifier)))
+                doc_->select({});
+        }
+        else
+        {
+            const Point a = toWorld(r.topLeft()), b = toWorld(r.bottomRight());
+            selectInPolygon({{a.x, a.y}, {b.x, a.y}, {b.x, b.y}, {a.x, b.y}}, e->position().x() < pressPos_.x(),
+                            pressModifiers_);
+        }
+        update();
+        return;
+    }
+    if (tool_ == Tool::SelectPolygon && lassoDragged_)
+    {
+        finishLasso();
+        return;
+    }
     if (rubberBand_)
     {
         rubberBand_ = false;
@@ -1626,8 +1943,6 @@ void MapView::mouseReleaseEvent(QMouseEvent* e)
     {
         panning_ = false;
         setCursor(tool_ == Tool::Pan ? Qt::OpenHandCursor : (tool_ == Tool::Select ? Qt::ArrowCursor : Qt::CrossCursor));
-        if (tool_ == Tool::Select && (e->pos() - pressPos_).manhattanLength() < 3)
-            doc_->select({});
         return;
     }
     if (dragging_ && !dragNode_.isEmpty())
@@ -1648,6 +1963,26 @@ void MapView::mouseDoubleClickEvent(QMouseEvent* e)
     if (tool_ == Tool::AddArea)
     {
         finishArea();
+        return;
+    }
+    if (tool_ == Tool::SelectPolygon)
+    {
+        finishLasso();
+        return;
+    }
+    if (tool_ == Tool::MeasureLength || tool_ == Tool::MeasureArea)
+    {
+        // The double click added a duplicate final point.
+        if (measure_.size() >= 2)
+        {
+            const auto& a = measure_[measure_.size() - 1];
+            const auto& b = measure_[measure_.size() - 2];
+            if (std::hypot(a.x - b.x, a.y - b.y) * scale_ < 4.0)
+                measure_.pop_back();
+        }
+        measureDone_ = true;
+        emit statusMessage(measureText().replace('\n', QStringLiteral("   ")));
+        update();
         return;
     }
     if (tool_ == Tool::Select && !hitTest(e->position()).isEmpty())
@@ -1703,6 +2038,24 @@ void MapView::finishArea()
     update();
 }
 
+void MapView::finishLasso()
+{
+    if (lasso_.size() >= 2)
+    {
+        const auto& a = lasso_[lasso_.size() - 1];
+        const auto& b = lasso_[lasso_.size() - 2];
+        if (std::hypot(a.x - b.x, a.y - b.y) * scale_ < 4.0)
+            lasso_.pop_back();
+    }
+    if (lasso_.size() >= 3)
+        selectInPolygon(lasso_, false, pressModifiers_);
+    else
+        emit statusMessage(tr("An area needs at least three corners."));
+    lasso_.clear();
+    lassoDragged_ = false;
+    update();
+}
+
 void MapView::keyPressEvent(QKeyEvent* e)
 {
     const double panStep = 80.0 / scale_;
@@ -1726,7 +2079,26 @@ void MapView::keyPressEvent(QKeyEvent* e)
             finishArea();
             return;
         }
+        if (tool_ == Tool::SelectPolygon)
+        {
+            finishLasso();
+            return;
+        }
+        if ((tool_ == Tool::MeasureLength || tool_ == Tool::MeasureArea) && !measure_.empty())
+        {
+            measureDone_ = true;
+            emit statusMessage(measureText().replace('\n', QStringLiteral("   ")));
+            update();
+            return;
+        }
         break;
+    case Qt::Key_Backspace:
+        if (tool_ == Tool::SelectPolygon && !lasso_.empty())
+            lasso_.pop_back();
+        else if ((tool_ == Tool::MeasureLength || tool_ == Tool::MeasureArea) && !measure_.empty() && !measureDone_)
+            measure_.pop_back();
+        update();
+        return;
     case Qt::Key_Left:
         center_.x -= panStep;
         break;

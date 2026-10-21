@@ -569,7 +569,38 @@ std::vector<ElementRow> Model::rowsFor(Category category, std::string_view id) c
     return out;
 }
 
-bool Model::setToken(std::string_view section, int row, int column, const std::string& value)
+std::unordered_map<std::string, std::vector<ElementRow>>
+Model::rowsForMany(Category category, const std::vector<std::string>& ids) const
+{
+    std::unordered_map<std::string, std::vector<ElementRow>> out;
+    const std::unordered_set<std::string> wanted(ids.begin(), ids.end());
+    for (const auto& def : sectionDefs(dialect_))
+    {
+        if (def.keyCategory != category)
+            continue;
+        if (def.name == "COORDINATES" || def.name == "VERTICES" || def.name == "POLYGONS" ||
+            def.name == "SYMBOLS")
+            continue;
+        const InpSection* s = doc_.find(def.name);
+        if (!s)
+            continue;
+        auto allRows = s->allRowTokens();
+        const int rows = static_cast<int>(allRows.size());
+        for (int r = 0; r < rows; ++r)
+        {
+            auto& tokens = allRows[static_cast<std::size_t>(r)];
+            if (!tokens.empty() && wanted.count(tokens[0]))
+            {
+                auto& list = out[tokens[0]];
+                list.push_back(ElementRow{def.name, r, &def, std::move(tokens)});
+            }
+        }
+    }
+    return out;
+}
+
+bool Model::setToken(std::string_view section, int row, int column, const std::string& value,
+                     bool rebuildModel)
 {
     InpSection* s = doc_.find(section);
     if (!s || row < 0 || row >= s->rowCount() || column < 0)
@@ -599,7 +630,8 @@ bool Model::setToken(std::string_view section, int row, int column, const std::s
         tokens[static_cast<std::size_t>(column)] = v.empty() ? blank : text::quoteIfNeeded(text::unquote(v));
     }
     s->setRowTokens(row, tokens);
-    rebuild();
+    if (rebuildModel)
+        rebuild();
     return true;
 }
 
@@ -954,31 +986,59 @@ const std::set<std::string>& controlKeywords(Category category)
 
 void Model::removeKeyedRows(Category category, std::string_view id)
 {
+    removeKeyedRows(category, std::unordered_set<std::string>{std::string(id)});
+}
+
+void Model::removeKeyedRows(Category category, const std::unordered_set<std::string>& ids)
+{
+    if (ids.empty())
+        return;
     for (const auto& def : sectionDefs(dialect_))
     {
         InpSection* s = doc_.find(def.name);
         if (!s)
             continue;
-        if (def.name == "TAGS")
-        {
-            const auto allRows = s->allRowTokens();
-            for (int r = static_cast<int>(allRows.size()) - 1; r >= 0; --r)
-            {
-                if (tagMatches(allRows[static_cast<std::size_t>(r)], category, id))
-                    s->removeRow(r);
-            }
-            continue;
-        }
-        if (def.keyCategory != category)
+        const bool tags = def.name == "TAGS";
+        if (!tags && def.keyCategory != category)
             continue;
         const auto allRows = s->allRowTokens();
         for (int r = static_cast<int>(allRows.size()) - 1; r >= 0; --r)
         {
-            auto tokens = allRows[static_cast<std::size_t>(r)];
-            if (!tokens.empty() && tokens[0] == id)
+            const auto& tokens = allRows[static_cast<std::size_t>(r)];
+            if (tags ? tokens.size() >= 2 && ids.count(tokens[1]) && tagMatches(tokens, category, tokens[1])
+                     : !tokens.empty() && ids.count(tokens[0]))
                 s->removeRow(r);
         }
     }
+}
+
+int Model::removeElements(const std::vector<ElementRef>& elements)
+{
+    std::unordered_set<std::string> ids[5];
+    int removed = 0;
+    for (const auto& e : elements)
+    {
+        if (e.category == Category::None || !idInUse(e.category, e.id))
+            continue;
+        if (ids[static_cast<int>(e.category)].insert(e.id).second)
+            ++removed;
+    }
+    // Links attached to removed nodes go too.
+    auto& nodes = ids[static_cast<int>(Category::Node)];
+    if (!nodes.empty())
+    {
+        for (const auto& l : links_)
+        {
+            if (nodes.count(l.from) || nodes.count(l.to))
+                ids[static_cast<int>(Category::Link)].insert(l.id);
+        }
+    }
+    if (removed == 0)
+        return 0;
+    for (int c = 1; c < 5; ++c)
+        removeKeyedRows(static_cast<Category>(c), ids[c]);
+    rebuild();
+    return removed;
 }
 
 bool Model::removeElement(Category category, std::string_view id)

@@ -22,7 +22,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_executable(mirab-tests main.cpp test_core.cpp test_engines.cpp test_import.cpp test_crs.cpp
     test_swmm_data.cpp test_swmm_objects.cpp test_raster.cpp test_calibration.cpp
-    test_deliverables.cpp test_scripting.cpp)
+    test_deliverables.cpp test_scripting.cpp test_network.cpp)
 target_link_libraries(mirab-tests PRIVATE
     Mirab::core Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 target_compile_definitions(mirab-tests PRIVATE
@@ -37,7 +37,7 @@ endif()
 
 foreach(group IN ITEMS text json inp model features results settings hash crs import swmm
                      lid lidusage transects hydrographs rules raster elevation
-                     calibration gif layout summary modeljson)
+                     calibration gif layout summary modeljson network geometry query editing)
     add_test(NAME ${group} COMMAND mirab-tests "${group}:")
 endforeach()
 if(MIRAB_BUILD_ENGINES)
@@ -126,6 +126,23 @@ if(MIRAB_BUILD_GUI AND MIRAB_BUILD_ENGINES)
         COMMAND ${CMAKE_COMMAND} -E copy "${PROJECT_SOURCE_DIR}/examples/epanet/mirab-demo.inp"
                 "${CMAKE_CURRENT_BINARY_DIR}/gui-export.inp")
     set_tests_properties(gui-export-setup PROPERTIES FIXTURES_SETUP gui-export-input)
+endif()
+
+# Selection tools offscreen: rectangle selection with the multi-edit panel, a
+# downstream trace and the select by query dialog.
+if(MIRAB_BUILD_GUI)
+    add_test(NAME gui-select-region
+        COMMAND Mirab "${PROJECT_SOURCE_DIR}/examples/epanet/mirab-demo.inp" --select-region 1500,500,3500,2500
+                --delay 300 --screenshot "${CMAKE_CURRENT_BINARY_DIR}/gui-select-region.png")
+    add_test(NAME gui-select-trace
+        COMMAND Mirab "${PROJECT_SOURCE_DIR}/examples/swmm/mirab-urban.inp" --select J2 --trace downstream
+                --delay 300 --screenshot "${CMAKE_CURRENT_BINARY_DIR}/gui-select-trace.png")
+    add_test(NAME gui-select-query
+        COMMAND Mirab "${PROJECT_SOURCE_DIR}/examples/epanet/mirab-demo.inp" --open-tool select-query
+                --select-query "Diameter <= 150 AND Length >= 300"
+                --delay 300 --screenshot "${CMAKE_CURRENT_BINARY_DIR}/gui-select-query.png")
+    set_tests_properties(gui-select-region gui-select-trace gui-select-query PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
 endif()
 
 # Object editors: open each one offscreen on a model that uses them.

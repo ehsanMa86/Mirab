@@ -49,6 +49,7 @@ set(APP_SOURCES
     Reports.cpp Reports.h
     RulesEditor.cpp RulesEditor.h
     SchemaWidgets.cpp SchemaWidgets.h
+    SelectionTools.cpp SelectionTools.h
     SolverProcess.cpp SolverProcess.h
     SwmmEditors.cpp SwmmEditors.h
     Theme.cpp Theme.h

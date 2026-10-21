@@ -27,6 +27,7 @@
 #include "ProjectDocument.h"
 #include "mirab/engine/Engine.h"
 
+#include <QHash>
 #include <QPlainTextEdit>
 #include <QSyntaxHighlighter>
 #include <QWidget>
@@ -80,6 +81,7 @@ public:
 signals:
     void elementActivated();
     void zoomToRequested(const Selection& sel);
+    void zoomToSelectionRequested();
     void deleteRequested();
     void dataActivated(const QString& section, const QString& id);
     void optionsActivated();
@@ -102,6 +104,8 @@ private:
     QTreeWidget* tree_;
     QLabel* summary_;
     bool syncing_ = false;
+    /// Element items by "category:id".
+    QHash<QString, QTreeWidgetItem*> elementItems_;
 };
 
 class InpHighlighter : public QSyntaxHighlighter

@@ -651,6 +651,96 @@ const QHash<QString, Draw>& table()
              p.drawLine(QPointF(17, 7), QPointF(7, 17));
          }},
         {"crs", [](QPainter& p, const Ink& k) { table().value("globe")(p, k); }},
+        {"lasso",
+         [](QPainter& p, const Ink& k) {
+             p.setPen(QPen(k.accent, 1.5, Qt::DashLine, Qt::RoundCap, Qt::RoundJoin));
+             p.setBrush(Qt::NoBrush);
+             QPainterPath loop;
+             loop.moveTo(5, 9);
+             loop.cubicTo(4, 3, 19, 2, 20, 8);
+             loop.cubicTo(21, 13, 13, 15, 9, 14);
+             loop.cubicTo(5, 13, 5.5, 11, 5, 9);
+             p.drawPath(loop);
+             p.setPen(pen(k.line, 1.5));
+             p.setBrush(Qt::white);
+             p.drawPolygon(QPolygonF({QPointF(11, 11), QPointF(11, 21), QPointF(13.5, 18.5), QPointF(15.5, 22),
+                                      QPointF(17, 21.2), QPointF(15.2, 17.8), QPointF(18.5, 17.8)}));
+         }},
+        {"measure",
+         [](QPainter& p, const Ink& k) {
+             p.setPen(pen(k.line, 1.5));
+             p.setBrush(k.fill);
+             p.save();
+             p.translate(12, 12);
+             p.rotate(-35);
+             p.drawRect(QRectF(-10, -3.5, 20, 7));
+             for (int i = -7; i <= 7; i += 3)
+                 p.drawLine(QPointF(i, -3.5), QPointF(i, i % 2 == 0 ? -0.5 : -1.5));
+             p.restore();
+         }},
+        {"measure-area",
+         [](QPainter& p, const Ink& k) {
+             p.setPen(pen(k.line, 1.5));
+             p.setBrush(k.fill);
+             p.drawPolygon(QPolygonF({QPointF(4, 8), QPointF(14, 4), QPointF(20, 12), QPointF(13, 20), QPointF(5, 17)}));
+             p.setPen(pen(k.accent, 1.5));
+             p.setBrush(Qt::white);
+             for (const QPointF& c : {QPointF(4, 8), QPointF(14, 4), QPointF(20, 12), QPointF(13, 20), QPointF(5, 17)})
+                 p.drawEllipse(c, 1.6, 1.6);
+         }},
+        {"split",
+         [](QPainter& p, const Ink& k) {
+             p.setPen(pen(k.line, 2.2));
+             p.drawLine(QPointF(3, 15), QPointF(10, 12));
+             p.drawLine(QPointF(14, 10.5), QPointF(21, 8));
+             p.setPen(pen(k.accent, 1.5));
+             p.setBrush(Qt::white);
+             p.drawEllipse(QPointF(12, 11.3), 2.6, 2.6);
+             p.setPen(pen(k.line, 1.4));
+             p.drawLine(QPointF(9, 21), QPointF(15, 2.5));
+         }},
+        {"trace-down",
+         [](QPainter& p, const Ink& k) {
+             p.setPen(pen(k.line, 1.6));
+             p.drawLine(QPointF(5, 5), QPointF(12, 12));
+             p.drawLine(QPointF(19, 5), QPointF(12, 12));
+             p.setPen(pen(k.accent, 1.9));
+             p.drawLine(QPointF(12, 12), QPointF(12, 20));
+             arrowHead(p, QPointF(12, 20.5), 90, 4);
+             p.setBrush(Qt::white);
+             p.setPen(pen(k.line, 1.4));
+             p.drawEllipse(QPointF(12, 12), 2.2, 2.2);
+         }},
+        {"trace-up",
+         [](QPainter& p, const Ink& k) {
+             p.setPen(pen(k.line, 1.6));
+             p.drawLine(QPointF(5, 19), QPointF(12, 12));
+             p.drawLine(QPointF(19, 19), QPointF(12, 12));
+             p.setPen(pen(k.accent, 1.9));
+             p.drawLine(QPointF(12, 12), QPointF(12, 4));
+             arrowHead(p, QPointF(12, 3.5), -90, 4);
+             p.setBrush(Qt::white);
+             p.setPen(pen(k.line, 1.4));
+             p.drawEllipse(QPointF(12, 12), 2.2, 2.2);
+         }},
+        {"query",
+         [](QPainter& p, const Ink& k) {
+             p.setPen(pen(k.line, 1.6));
+             p.setBrush(Qt::NoBrush);
+             p.drawPolygon(QPolygonF({QPointF(3.5, 4), QPointF(20.5, 4), QPointF(14, 12), QPointF(14, 19),
+                                      QPointF(10, 21), QPointF(10, 12)}));
+             p.setPen(pen(k.accent, 1.6));
+             p.drawLine(QPointF(7, 7), QPointF(17, 7));
+         }},
+        {"reverse",
+         [](QPainter& p, const Ink& k) {
+             p.setPen(pen(k.line, 1.7));
+             p.drawLine(QPointF(4, 8), QPointF(19, 8));
+             arrowHead(p, QPointF(20, 8), 0, 4);
+             p.setPen(pen(k.accent, 1.7));
+             p.drawLine(QPointF(20, 16), QPointF(5, 16));
+             arrowHead(p, QPointF(4, 16), 180, 4);
+         }},
     };
     return t;
 }

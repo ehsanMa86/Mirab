@@ -28,12 +28,14 @@
 #include "mirab/core/ProjectSettings.h"
 #include "mirab/core/Results.h"
 
+#include <QList>
 #include <QObject>
 #include <QString>
 #include <QUndoStack>
 
 #include <functional>
 #include <memory>
+#include <unordered_set>
 
 namespace mirab::app
 {
@@ -44,6 +46,9 @@ struct Selection
     QString id;
     bool isEmpty() const { return category == core::Category::None || id.isEmpty(); }
     bool operator==(const Selection& o) const { return category == o.category && id == o.id; }
+    bool operator!=(const Selection& o) const { return !(*this == o); }
+    core::ElementRef ref() const { return {category, id.toStdString()}; }
+    static Selection of(const core::ElementRef& e) { return {e.category, QString::fromStdString(e.id)}; }
 };
 
 class ProjectDocument : public QObject
@@ -96,9 +101,28 @@ public:
     /// Shown with partial results, e.g. "Partial results (cancelled at 6:00:00)".
     QString resultsNote() const { return note_; }
 
-    // Selection
+    // Selection: an ordered set of elements, one of which is current (the
+    // element the property panel and the time series show).
+    /// The current element; empty when nothing is selected.
     const Selection& selection() const { return selection_; }
+    /// Every selected element in the order it was picked.
+    const QList<Selection>& selectedElements() const { return selected_; }
+    int selectionCount() const { return static_cast<int>(selected_.size()); }
+    bool isSelected(core::Category category, const std::string& id) const;
+    bool isSelected(const Selection& s) const { return isSelected(s.category, s.id.toStdString()); }
+    /// Selects one element only; an empty selection clears it.
     void select(const Selection& s);
+    /// Replaces the selection. The current element is @p current when it is
+    /// part of @p items, otherwise the first item.
+    void setSelection(const QList<Selection>& items, const Selection& current = {});
+    /// Adds elements; the last one added becomes current.
+    void addToSelection(const QList<Selection>& items);
+    void removeFromSelection(const QList<Selection>& items);
+    /// Adds the element, or removes it when it is already selected.
+    void toggleSelected(const Selection& s);
+    /// Makes a selected element current without changing the selection.
+    void setCurrent(const Selection& s);
+    void clearSelection() { select({}); }
 
     /// Restores a full input text (used by undo commands).
     void restoreText(const std::string& text);
@@ -127,6 +151,12 @@ private:
     bool followLatest_ = true;
     QString note_;
     Selection selection_;
+    QList<Selection> selected_;
+    std::unordered_set<std::string> selectedIds_[5]; ///< per core::Category
+
+    void rebuildSelectionIndex();
+    /// Drops selected elements that no longer exist; returns true when the selection changed.
+    bool pruneSelection();
 };
 
 } // namespace mirab::app

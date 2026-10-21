@@ -25,6 +25,7 @@
 #pragma once
 
 #include "ProjectDocument.h"
+#include "SelectionTools.h"
 #include "mirab/app/PluginInterface.h"
 #include "mirab/engine/EngineRegistry.h"
 
@@ -70,6 +71,17 @@ public:
     /// Stops the running simulation; the results computed so far stay on the map.
     void stopSimulation();
     void selectElement(const QString& id);
+    /// Selects elements by ID (nodes, links, subcatchments and rain gages).
+    void selectElements(const QStringList& ids);
+    /// Selects the elements inside a rectangle given in map coordinates.
+    void selectRegion(const QRectF& world);
+    /// Traces from the selection: "downstream", "upstream", "connected" or
+    /// "path" (shortest path between the first and last selected node).
+    void traceFromSelection(const QString& kind);
+    /// Selects every element that matches a query expression.
+    void selectByQuery(const QString& expression);
+    /// Opens the select by query dialog, optionally with an expression.
+    void showQueryDialog(const QString& expression = {});
     /// Opens a report tab by name (tables, timeseries, profile, frequency,
     /// variability, systemflow, energy, calibration, status); used by menus and automation.
     void openReport(const QString& kind);
@@ -145,6 +157,15 @@ private:
     void showResilience(const QString& page = {});
     void deleteSelection();
     void findElement();
+    void trace(core::TraceDirection direction);
+    void selectShortestPath();
+    void profileAlongSelection();
+    void selectAllOfKind(core::Category category, const QString& kind);
+    void invertSelection();
+    void exportSelectionCsv();
+    void reverseSelectedLinks();
+    void updateSelectionActions();
+    void fillSelectMenu(QMenu* menu);
     void chooseMsxFile();
     void chooseBackdrop();
     void addMapService();
@@ -184,6 +205,7 @@ private:
     QLabel* unitsLabel_ = nullptr;
     QLabel* countsLabel_ = nullptr;
     QLabel* runState_ = nullptr;
+    QLabel* selectionLabel_ = nullptr;
     SolverProcess* solver_ = nullptr;
     QString runInput_;
     bool discardRun_ = false; ///< the project changed during the run
@@ -209,6 +231,23 @@ private:
     QAction* undoAct_ = nullptr;
     QAction* redoAct_ = nullptr;
     QAction* deleteAct_ = nullptr;
+    QAction* lassoAct_ = nullptr;
+    QAction* measureLengthAct_ = nullptr;
+    QAction* measureAreaAct_ = nullptr;
+    QAction* splitAct_ = nullptr;
+    QAction* selectAllAct_ = nullptr;
+    QAction* invertAct_ = nullptr;
+    QAction* queryAct_ = nullptr;
+    QAction* traceDownAct_ = nullptr;
+    QAction* traceUpAct_ = nullptr;
+    QAction* connectedAct_ = nullptr;
+    QAction* pathAct_ = nullptr;
+    QAction* profilePathAct_ = nullptr;
+    QAction* zoomSelectionAct_ = nullptr;
+    QAction* reverseAct_ = nullptr;
+    QAction* exportSelectionAct_ = nullptr;
+    QAction* followFlowsAct_ = nullptr;
+    QAction* stopClosedAct_ = nullptr;
     QList<QAction*> addActions_;
     QList<MirabPlugin*> plugins_;
 };

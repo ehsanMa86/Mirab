@@ -74,4 +74,8 @@ ReportSnapshot reportSnapshot(const QString& kind, ProjectDocument* doc, const Q
 /// used by the status report. Returns nullptr for an unknown kind.
 QWidget* createReport(const QString& kind, ProjectDocument* doc, const QString& reportFile, QWidget* parent);
 
+/// Draws a profile report along the shortest path between two nodes.
+/// Returns false when @p report is not a profile report.
+bool showProfilePath(QWidget* report, const QString& fromNode, const QString& toNode);
+
 } // namespace mirab::app

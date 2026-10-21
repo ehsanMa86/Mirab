@@ -74,6 +74,8 @@ void ProjectDocument::newProject(core::Dialect dialect, const QString& flowUnits
     settingsDirty_ = false;
     clearResults();
     selection_ = {};
+    selected_.clear();
+    rebuildSelectionIndex();
     emit modelReset();
     emit titleChanged();
 }
@@ -89,6 +91,8 @@ void ProjectDocument::open(const QString& path)
     settingsDirty_ = false;
     clearResults();
     selection_ = {};
+    selected_.clear();
+    rebuildSelectionIndex();
     emit modelReset();
     emit titleChanged();
 }
@@ -126,6 +130,8 @@ bool ProjectDocument::edit(const QString& description,
         return true;
     model_ = std::move(working);
     undo_.push(new SnapshotCommand(this, std::move(before), std::move(after), description));
+    if (pruneSelection())
+        emit selectionChanged();
     emit modelChanged();
     return true;
 }
@@ -161,11 +167,8 @@ void ProjectDocument::restoreText(const std::string& text)
 {
     const core::Dialect d = model_.dialect();
     model_ = core::Model(core::InpDocument::parse(text), d);
-    if (!selection_.isEmpty() && !model_.idInUse(selection_.category, selection_.id.toStdString()))
-    {
-        selection_ = {};
+    if (pruneSelection())
         emit selectionChanged();
-    }
     emit modelChanged();
 }
 
@@ -265,9 +268,117 @@ void ProjectDocument::endLiveResults(const QString& note)
     emit liveStateChanged();
 }
 
+bool ProjectDocument::isSelected(core::Category category, const std::string& id) const
+{
+    const int c = static_cast<int>(category);
+    return c > 0 && c < 5 && selectedIds_[c].count(id) > 0;
+}
+
+void ProjectDocument::rebuildSelectionIndex()
+{
+    for (auto& set : selectedIds_)
+        set.clear();
+    for (const auto& s : selected_)
+        selectedIds_[static_cast<int>(s.category)].insert(s.id.toStdString());
+}
+
+bool ProjectDocument::pruneSelection()
+{
+    QList<Selection> kept;
+    for (const auto& s : selected_)
+    {
+        if (model_.idInUse(s.category, s.id.toStdString()))
+            kept.append(s);
+    }
+    if (kept.size() == selected_.size())
+        return false;
+    selected_ = kept;
+    if (!selection_.isEmpty() && !model_.idInUse(selection_.category, selection_.id.toStdString()))
+        selection_ = selected_.isEmpty() ? Selection{} : selected_.last();
+    rebuildSelectionIndex();
+    return true;
+}
+
 void ProjectDocument::select(const Selection& s)
 {
-    if (s == selection_)
+    if (s.isEmpty())
+    {
+        if (selected_.isEmpty() && selection_.isEmpty())
+            return;
+        selected_.clear();
+        selection_ = {};
+    }
+    else
+    {
+        if (selected_.size() == 1 && selected_.first() == s && selection_ == s)
+            return;
+        selected_ = {s};
+        selection_ = s;
+    }
+    rebuildSelectionIndex();
+    emit selectionChanged();
+}
+
+void ProjectDocument::setSelection(const QList<Selection>& items, const Selection& current)
+{
+    QList<Selection> list;
+    std::unordered_set<std::string> seen[5];
+    for (const auto& s : items)
+    {
+        if (!s.isEmpty() && seen[static_cast<int>(s.category)].insert(s.id.toStdString()).second)
+            list.append(s);
+    }
+    Selection cur = list.contains(current) ? current : (list.isEmpty() ? Selection{} : list.first());
+    if (list == selected_ && cur == selection_)
+        return;
+    selected_ = list;
+    selection_ = cur;
+    rebuildSelectionIndex();
+    emit selectionChanged();
+}
+
+void ProjectDocument::addToSelection(const QList<Selection>& items)
+{
+    QList<Selection> list = selected_;
+    Selection last = selection_;
+    for (const auto& s : items)
+    {
+        if (s.isEmpty())
+            continue;
+        if (!isSelected(s))
+            list.append(s);
+        last = s;
+    }
+    setSelection(list, last);
+}
+
+void ProjectDocument::removeFromSelection(const QList<Selection>& items)
+{
+    std::unordered_set<std::string> drop[5];
+    for (const auto& s : items)
+        drop[static_cast<int>(s.category)].insert(s.id.toStdString());
+    QList<Selection> list;
+    for (const auto& s : selected_)
+    {
+        if (!drop[static_cast<int>(s.category)].count(s.id.toStdString()))
+            list.append(s);
+    }
+    setSelection(list, list.contains(selection_) ? selection_ : (list.isEmpty() ? Selection{} : list.last()));
+}
+
+void ProjectDocument::toggleSelected(const Selection& s)
+{
+    if (s.isEmpty())
+        return;
+    if (isSelected(s))
+        removeFromSelection({s});
+    else
+        addToSelection({s});
+}
+
+void ProjectDocument::setCurrent(const Selection& s)
+{
+    if (!isSelected(s) || s == selection_)
         return;
     selection_ = s;
     emit selectionChanged();

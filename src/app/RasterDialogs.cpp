@@ -377,9 +377,12 @@ ElevationDialog::ElevationDialog(ProjectDocument* doc, QWidget* parent) : QDialo
     all_ = new QRadioButton(tr("All nodes"), which);
     missing_ = new QRadioButton(
         swmm ? tr("Only nodes with a zero value") : tr("Only nodes with zero elevation"), which);
-    selected_ = new QRadioButton(tr("Only the selected node"), which);
+    int selectedNodes = 0;
+    for (const auto& sel : doc_->selectedElements())
+        selectedNodes += sel.category == core::Category::Node ? 1 : 0;
+    selected_ = new QRadioButton(tr("Only the selected nodes (%1)").arg(selectedNodes), which);
     all_->setChecked(true);
-    selected_->setEnabled(doc_->selection().category == core::Category::Node);
+    selected_->setEnabled(selectedNodes > 0);
     wl->addWidget(all_);
     wl->addWidget(missing_);
     wl->addWidget(selected_);
@@ -521,7 +524,11 @@ void ElevationDialog::recompute()
               : missing_->isChecked() ? core::ElevationScope::Missing
                                       : core::ElevationScope::Selected;
     if (o.scope == core::ElevationScope::Selected)
-        o.selected = {doc_->selection().id.toStdString()};
+    {
+        for (const auto& sel : doc_->selectedElements())
+            if (sel.category == core::Category::Node)
+                o.selected.push_back(sel.id.toStdString());
+    }
     o.junctions = junctions_->isChecked();
     o.tanks = tanks_->isChecked();
     o.reservoirs = reservoirs_->isChecked();

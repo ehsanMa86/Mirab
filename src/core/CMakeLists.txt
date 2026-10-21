@@ -24,9 +24,11 @@ add_library(mirab_core STATIC
     src/ControlRules.cpp
     src/Calibration.cpp
     src/Crs.cpp
+    src/Editing.cpp
     src/Elevation.cpp
     src/Features.cpp
     src/Gif.cpp
+    src/Geometry.cpp
     src/Hash.cpp
     src/Inflate.cpp
     src/InpDocument.cpp
@@ -34,10 +36,12 @@ add_library(mirab_core STATIC
     src/LiveResults.cpp
     src/Model.cpp
     src/ModelJson.cpp
+    src/Network.cpp
     src/Objects.cpp
     src/Optimizer.cpp
     src/PrintLayout.cpp
     src/ProjectSettings.cpp
+    src/Query.cpp
     src/Raster.cpp
     src/Results.cpp
     src/Schema.cpp

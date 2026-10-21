@@ -5,12 +5,12 @@
 ## The window
 
 - **Start page.** It appears when no project is open, with buttons for a new water network, a new stormwater model and opening a file. It also lists recent projects and the examples. *Help > Start page* shows it again.
-- **Tool bar.** It holds file commands, undo and redo, and the map tools: select, pan and zoom to a rectangle. Next come one button per element type, delete and find, the *Reports* menu, the engine selector and the *Run* button.
+- **Tool bar.** It holds file commands, undo and redo, and the map tools: select, pan, zoom to a rectangle, select with a polygon and measure. Next come one button per element type, split, delete, find and select by query, the *Reports* menu, the engine selector and the *Run* button.
 - **Map tab.** A bar above the map chooses the results that color nodes, links and subcatchments. It also holds the time controls (step, play, slider), the basemap and the label, flow-arrow and legend switches. Zoom buttons float at the top right of the map; a scale bar and the legend sit on the map itself.
 - **Input file tab.** The `.inp` text exactly as the engines read it. Edit it and press *Apply changes*; the change can be undone as one step.
 - **Report, pattern and curve tabs.** They open next to the map and close with the cross on the tab.
-- **Project panel** (left). It shows a summary of the model and a search box. Below them is a tree with the simulation options, every element by type, the patterns, curves and time series and, for SWMM models, the named objects (pollutants, land uses, aquifers, ...). Double-click an element to zoom to it, a pattern, curve or object to edit it, or *Simulation options* to open the options dialog. Right-click for more.
-- **Properties panel** (right). It shows the selected element, or the simulation options when nothing is selected. Click a value to edit it, and type in the filter box to find a property quickly.
+- **Project panel** (left). It shows a summary of the model and a search box. Below them is a tree with the simulation options, every element by type, the patterns, curves and time series and, for SWMM models, the named objects (pollutants, land uses, aquifers, ...). Double-click an element to zoom to it, a pattern, curve or object to edit it, or *Simulation options* to open the options dialog. Ctrl+click and Shift+click select several elements. Right-click for more.
+- **Properties panel** (right). It shows the selected element, the shared properties of several selected elements, or the simulation options when nothing is selected. Click a value to edit it, and type in the filter box to find a property quickly.
 - **Messages and Time series** (bottom). The Messages tab shows compatibility notes and the run log. The Time series tab plots the selected element over time.
 
 Panels can be resized, moved, closed and floated. *View > Panels* shows a closed panel again and *View > Reset layout* restores the default arrangement. Mirab always uses a light theme.
@@ -24,11 +24,48 @@ Panels can be resized, moved, closed and floated. *View > Panels* shows a closed
    - the subcatchment tool takes the outline corners; double-click or press Enter to finish. The nearest node becomes its outlet.
 
    You can also right-click an empty spot of the map and choose *Add here*.
-3. Press `Esc` or right-click to return to the selection tool. Drag nodes to move them. `Delete` removes the selection and any links attached to a removed node.
+3. Press `Esc` or right-click to return to the selection tool. Drag nodes to move them. `Delete` removes the selected elements and any links attached to a removed node, as one step that *Undo* reverses.
 4. Edit values in *Properties*. Renaming the ID updates every reference to it, including controls and rules.
 5. *Add data* attaches extra rows to the selected element, such as demand categories, emitters, FAVAD leakage, water quality sources, losses or cross sections, and for SWMM external and dry weather inflows, RDII, treatment, groundwater, land use coverage, initial buildup and street inlets. Right-click a row of attached data to remove it.
 
 Mirab writes standard EPANET and SWMM input files, so models stay usable in any other tool.
+
+## Selecting, tracing and editing many elements
+
+![A downstream trace on the SWMM example, with the selection in the project tree and the properties panel](images/selection-trace.jpg)
+
+**Selecting on the map.** With the selection tool (`S`):
+
+- click an element to select it; Shift+click adds an element, Ctrl+click adds or removes one;
+- drag over an empty part of the map (or inside a subcatchment) to select with a rectangle. Dragging from left to right selects what lies completely inside; dragging from right to left also selects what the rectangle touches. Shift adds to the selection and Ctrl removes from it;
+- the polygon tool (`L`, *Select > Select with a polygon*) selects what lies inside a polygon: click its corners and double-click or press Enter, or hold the button and drag around the elements. Backspace removes the last corner;
+- the middle mouse button or the pan tool (`H`) pans the map.
+
+Selected elements are drawn in orange and highlighted in the project tree, and the status bar shows how many are selected. *Select* also offers *Select all* (Ctrl+A), all elements of one type, *Invert selection* (Ctrl+I) and *Clear selection* (`Esc` on the map). *Zoom to selection* (Shift+F) fits the map to the selection.
+
+**Select by query** (Ctrl+Shift+F) selects elements whose properties and results meet conditions, such as `Diameter < 200 AND Roughness < 100`, `Pressure < 20`, `Type = PRV`, `ID contains PS` or `NOT (Elevation > 100 OR Status = Closed)`. Operators are `=`, `!=`, `<`, `<=`, `>`, `>=` and `contains`; conditions combine with AND, OR, NOT and parentheses. Text compares without regard to case; quote text with spaces. Field names are the property names shown in *Properties* and the result names at the time shown on the map; when a result has the name of a property (an EPANET junction's `Demand`), write `result.Demand` for the result. The dialog lists the fields, counts the matches as you type, can keep only elements within a distance of the current selection, and replaces, adds to, removes from or narrows the current selection. The same expressions filter the network tables.
+
+![Select by query](images/selection-query.png)
+
+**Tracing.** From the selected nodes, links or subcatchments:
+
+- *Trace downstream* (`D`) and *Trace upstream* (`U`) select everything that water from (or to) the selection passes through. Links are followed in their drawn direction (from node to to node). With results shown and *Select > Trace options > Follow the flow direction of the results* on, links are followed in the direction of their flow at the current time instead, so a trace of a looped EPANET network follows the actual flow paths. This option is on for EPANET models and off for SWMM models, where it honours conduits with negative flow. Upstream traces of SWMM models include the subcatchments that drain to the nodes reached; downstream traces from a subcatchment start at its outlet.
+- *Select connected* selects every element that can be reached from the selection in any direction.
+- *Stop at closed links* (on by default) stops traces at closed pipes, pumps and valves: closed in the input file, or closed at the current time when results are shown.
+- *Select shortest path* selects the shortest path by length between the first and the last selected node, and *Profile along the path* opens the profile plot for it. The profile plot also starts with the first and last selected node when two or more are selected.
+
+**Editing many elements.** When the selected elements are all of one type, *Properties* shows the values they share. Values that differ show as *(mixed)*. A new value applies to every selected element as one step that *Undo* reverses. End nodes are not edited together. *Delete* removes every selected element as one step, and *Edit > Reverse link direction* swaps the end nodes of the selected links (SWMM conduits also swap their inlet and outlet offsets and their entry and exit losses). *Select > Export selection (CSV)* (also in *File > Export*) writes the IDs, types and properties of the selection, and its results at the current time. *Tools > Elevations from DEM* can update only the selected nodes.
+
+![Shared properties of ten selected pipes](images/selection-multi-edit.jpg)
+
+**Splitting a pipe or conduit.** The split tool (`K`, *Edit > Split a pipe or conduit*) splits the pipe or conduit you click at the point closest to the click, as one undoable step:
+
+- a new junction is placed there, and the second part becomes a new link (named after the original, for example `P12_2`) with the same properties and attached data;
+- the length is divided in proportion to the drawn length, and each part keeps the bends that lie on it;
+- EPANET: the junction elevation is interpolated between the end nodes and its demand is zero; the minor loss stays with the first part;
+- SWMM: the junction invert is the conduit invert at that point, taking inlet and outlet offsets into account (depths or elevations, as *LINK_OFFSETS* says); its maximum depth reaches the rim interpolated between the end nodes. The first part keeps its inlet offset, the second its outlet offset. Entry losses and the flap gate stay with the first part and exit losses go to the second; street inlets stay on the original conduit.
+
+**Measuring.** *Tools > Measure distance* (`M`) and *Measure area* (Shift+M) measure on the map: click points, then double-click or press Enter to finish. The length, last segment, area and perimeter are shown next to the cursor in metres and kilometres (hectares) or feet and miles (acres), following the project's units. Projected coordinates are measured in the plane of the coordinate system; geographic coordinates (longitude and latitude) on the WGS 84 ellipsoid. Without a coordinate system, values are in map units.
 
 ## Importing GIS and CAD data
 
@@ -102,7 +139,7 @@ A GeoTIFF chosen with *View > Backdrop image* becomes a raster layer. Other imag
 
 1. Choose the DEM: an elevation layer of the project, or any file with *Browse*. A file from *Browse* can be added to the map at the same time.
 2. Check *Elevation units*. Values are converted to the project's units (metres or feet).
-3. Choose the nodes: all, only those with a zero value, or only the selected node.
+3. Choose the nodes: all, only those with a zero value, or only the selected nodes.
 4. Choose the values:
    - **EPANET:** junction and tank elevations, and optionally the total head of reservoirs.
    - **SWMM:** the ground is the rim of junctions and storage units. Either the invert is set to the ground minus the maximum depth, or the maximum depth is set to the ground minus the invert. Outfalls and dividers are left unchanged.
@@ -172,9 +209,9 @@ The *Reports* menu and tool bar button open report tabs. Each report follows new
 
 | Report | What it shows |
 |---|---|
-| Network tables | Properties and results of every node, link or subcatchment at the current time. Sort by any column and filter with expressions such as `Pressure < 20` or `Diameter >= 300`. Selecting a row selects the element on the map. |
+| Network tables | Properties and results of every node, link or subcatchment at the current time. Sort by any column and filter with expressions such as `Pressure < 20` or `Diameter >= 300 AND Roughness < 100` (the select by query expressions). Selecting a row selects the element on the map. |
 | Time series | One result for several elements on one chart. |
-| Profile plot | Ground or invert elevation and the hydraulic grade along the shortest path between two nodes, with the minimum-maximum range over the simulation. With an elevation layer, the ground from the DEM is drawn along the path; SWMM profiles also show node rims and conduit crowns. |
+| Profile plot | Ground or invert elevation and the hydraulic grade along the shortest path between two nodes (the first and last selected node, when two are selected), with the minimum-maximum range over the simulation. With an elevation layer, the ground from the DEM is drawn along the path; SWMM profiles also show node rims and conduit crowns. |
 | Frequency plot | The distribution of a result over all elements at one time, with minimum, median, mean and maximum. |
 | Variability plot | The minimum, 10th-90th percentile band, median, mean and maximum of a result over all elements (or one type) at every time. |
 | System flow | EPANET: water supplied by reservoirs, consumed by demands and stored in tanks. SWMM: runoff, outfall discharge and flooding. |
@@ -392,6 +429,13 @@ mirab-cli calibrate model.inp [--config calib.json] [--engine ID] [--jobs N] [--
 | `S` | Selection tool |
 | `H` | Pan tool |
 | `Z` | Zoom to a rectangle |
+| `L` | Select with a polygon |
+| `M`, `Shift+M` | Measure a distance, an area |
+| `K` | Split a pipe or conduit |
+| `Shift+F` | Zoom to the selection |
+| `Ctrl+A`, `Ctrl+I` | Select all, invert the selection |
+| `Ctrl+Shift+F` | Select by query |
+| `D`, `U` | Trace downstream, upstream from the selection |
 | `Esc` | Cancel the current tool or clear the selection |
 | `Delete` | Delete the selection |
 | `Ctrl+Z`, `Ctrl+Y` | Undo, redo |
@@ -406,8 +450,11 @@ mirab-cli calibrate model.inp [--config calib.json] [--engine ID] [--jobs N] [--
 | `--import FILE` | Opens the import dialog for a shapefile, DXF drawing or CSV table. |
 | `--show-data SECTION:ID` | Opens the editor of a pattern, curve, time series, named object, LID control, transect or unit hydrograph group, for example `PATTERNS:PAT1`, `POLLUTANTS:TSS` or `LID_CONTROLS:Cell1`; `CONTROLS:` or `RULES:` opens the control rules and `LID_USAGE:S1` the LID usage of subcatchment S1. |
 | `--options-dialog PAGE` | Opens the simulation options dialog at a page: `general`, `dates`, `steps`, `dynwave`, `files`, `report`, `evaporation`, `climate`, `adjustments` (SWMM) or `hydraulics`, `quality`, `times`, `energy`, `report` (EPANET). |
-| `--select ID` | Selects an element. |
-| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, or `calibration-run` (starts the calibration). |
+| `--select ID[,ID...]` | Selects elements. |
+| `--select-region X1,Y1,X2,Y2` | Selects the elements inside a rectangle of map coordinates. |
+| `--select-query EXPR` | Selects the elements that match a query expression; with `--open-tool select-query`, fills the dialog with it. |
+| `--trace KIND` | Traces from the selection: `downstream`, `upstream`, `connected` or `path`. |
+| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, `calibration-run` (starts the calibration) or `select-query`. |
 | `--install-engine swmm5plus` | Installs SWMM5+ without opening a window (also a manifest URL or file). |
 | `--screenshot FILE.png` | Saves a picture of the window and quits; with `--run` (run first), `--report KIND` (open a report: tables, timeseries, profile, frequency, variability, systemflow, energy, calibration, status) and `--delay MS`. With `--run`, `--run-for MS` takes the picture while the simulation runs, and `--pause-after MS` or `--stop-after MS` pause or stop it first. |
 | `--export-layout FILE` | Saves a print layout as PDF (`.pdf`) or a 200 dpi image (`.png`) and quits. `--layout-chart KIND` uses the template with that report below the map. |

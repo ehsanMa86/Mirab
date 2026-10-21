@@ -51,12 +51,15 @@ signals:
 private:
     void rebuild();
     void showElement(const Selection& sel);
+    /// Several selected elements: shared properties of one element type.
+    void showMultiple();
     void showOptions();
     void addRow(const QString& name, const QString& value, const QString& unit, const QString& tip,
                 const QString& section, int row, int column, bool tail, const QStringList& choices,
                 bool enabled, bool editable = true);
     void addHeader(const QString& text, bool enabled, const QString& tip = {});
     void commit(QTableWidgetItem* item);
+    void commitMultiple(QTableWidgetItem* item);
     void populateAddMenu();
     void applyFilter();
     bool sectionSupported(const std::string& section, const std::vector<std::string>& tokens, QString* why) const;

@@ -251,20 +251,35 @@ ProjectBrowser::ProjectBrowser(ProjectDocument* doc, QWidget* parent) : QWidget(
     tree_->setIndentation(14);
     tree_->setAnimated(true);
     tree_->setContextMenuPolicy(Qt::CustomContextMenu);
+    tree_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     layout->addWidget(tree_, 1);
     connect(filter_, &QLineEdit::textChanged, this, &ProjectBrowser::applyFilter);
-    connect(tree_, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* item) {
-        if (syncing_ || !item || item->data(0, CategoryRole).isNull())
+    connect(tree_, &QTreeWidget::itemSelectionChanged, this, [this] {
+        if (syncing_)
             return;
-        const int cat = item->data(0, CategoryRole).toInt();
-        if (cat == kOptionsCategory)
+        // Elements selected in the tree (Ctrl and Shift extend the selection).
+        auto isElement = [](const QTreeWidgetItem* it) {
+            return it && !it->data(0, CategoryRole).isNull() && it->data(0, DataSectionRole).isNull() &&
+                   it->data(0, CategoryRole).toInt() != kOptionsCategory;
+        };
+        QList<Selection> list;
+        for (auto* it : tree_->selectedItems())
         {
-            doc_->select({});
+            if (isElement(it))
+                list.append({static_cast<Category>(it->data(0, CategoryRole).toInt()), it->text(0)});
+        }
+        QTreeWidgetItem* current = tree_->currentItem();
+        if (list.isEmpty())
+        {
+            if (current && !current->data(0, CategoryRole).isNull() &&
+                current->data(0, CategoryRole).toInt() == kOptionsCategory)
+                doc_->select({});
             return;
         }
-        if (!item->data(0, DataSectionRole).isNull())
-            return;
-        doc_->select({static_cast<Category>(cat), item->text(0)});
+        Selection cur;
+        if (isElement(current) && current->isSelected())
+            cur = {static_cast<Category>(current->data(0, CategoryRole).toInt()), current->text(0)};
+        doc_->setSelection(list, cur);
     });
     connect(tree_, &QTreeWidget::itemDoubleClicked, this, [this](QTreeWidgetItem* item) {
         if (!item || item->data(0, CategoryRole).isNull())
@@ -276,7 +291,7 @@ ProjectBrowser::ProjectBrowser(ProjectDocument* doc, QWidget* parent) : QWidget(
         }
         if (item->data(0, CategoryRole).toInt() != kOptionsCategory)
         {
-            emit zoomToRequested(doc_->selection());
+            emit zoomToRequested({static_cast<Category>(item->data(0, CategoryRole).toInt()), item->text(0)});
             emit elementActivated();
         }
         else
@@ -405,8 +420,16 @@ void ProjectBrowser::showContextMenu(const QPoint& pos)
     }
     else if (item->data(0, CategoryRole).toInt() != kOptionsCategory)
     {
-        tree_->setCurrentItem(item);
-        menu.addAction(icons::get("zoom-fit"), tr("Zoom to"), this, [this] { emit zoomToRequested(doc_->selection()); });
+        const Selection clicked{static_cast<Category>(item->data(0, CategoryRole).toInt()), item->text(0)};
+        if (doc_->isSelected(clicked))
+            doc_->setCurrent(clicked);
+        else
+            doc_->select(clicked);
+        if (doc_->selectionCount() > 1)
+            menu.addAction(icons::get("zoom-fit"), tr("Zoom to selection"), this,
+                           &ProjectBrowser::zoomToSelectionRequested);
+        else
+            menu.addAction(icons::get("zoom-fit"), tr("Zoom to"), this, [this] { emit zoomToRequested(doc_->selection()); });
         menu.addAction(icons::get("properties"), tr("Properties"), this, &ProjectBrowser::elementActivated);
         if (item->data(0, CategoryRole).toInt() == static_cast<int>(Category::Area))
             menu.addAction(icons::get("layers"), tr("LID usage..."), this,
@@ -433,6 +456,7 @@ void ProjectBrowser::rebuild()
     for (int i = 0; i < tree_->topLevelItemCount(); ++i)
         collect(tree_->topLevelItem(i));
     tree_->clear();
+    elementItems_.clear();
     const auto& m = doc_->model();
     const bool swmm = m.dialect() == core::Dialect::Swmm;
 
@@ -462,6 +486,7 @@ void ProjectBrowser::rebuild()
             }
             auto* leaf = new QTreeWidgetItem(sub, {QString::fromStdString(id)});
             leaf->setData(0, CategoryRole, static_cast<int>(cat));
+            elementItems_.insert(QString::number(static_cast<int>(cat)) + ":" + leaf->text(0), leaf);
         }
         for (auto* sub : kinds)
         {
@@ -612,22 +637,29 @@ void ProjectBrowser::syncSelection()
 {
     const Selection& sel = doc_->selection();
     syncing_ = true;
+    auto key = [](const Selection& s) { return QString::number(static_cast<int>(s.category)) + ":" + s.id; };
     if (sel.isEmpty())
     {
-        tree_->setCurrentItem(tree_->topLevelItemCount() > 0 ? tree_->topLevelItem(0) : nullptr);
+        tree_->clearSelection();
+        tree_->setCurrentItem(tree_->topLevelItemCount() > 0 ? tree_->topLevelItem(0) : nullptr,
+                              0, QItemSelectionModel::NoUpdate);
     }
     else
     {
-        const auto found = tree_->findItems(sel.id, Qt::MatchExactly | Qt::MatchRecursive);
-        for (auto* item : found)
+        QItemSelection selection;
+        for (const auto& s : doc_->selectedElements())
         {
-            if (!item->data(0, CategoryRole).isNull() && item->data(0, DataSectionRole).isNull() &&
-                item->data(0, CategoryRole).toInt() == static_cast<int>(sel.category))
+            if (auto* item = elementItems_.value(key(s)))
             {
-                tree_->setCurrentItem(item);
-                tree_->scrollToItem(item);
-                break;
+                const QModelIndex index = tree_->indexFromItem(item);
+                selection.select(index, index);
             }
+        }
+        tree_->selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect);
+        if (auto* item = elementItems_.value(key(sel)))
+        {
+            tree_->setCurrentItem(item, 0, QItemSelectionModel::NoUpdate);
+            tree_->scrollToItem(item);
         }
     }
     syncing_ = false;

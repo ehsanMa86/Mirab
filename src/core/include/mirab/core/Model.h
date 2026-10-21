@@ -32,6 +32,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace mirab::core
@@ -102,6 +103,19 @@ struct ElementRow
     std::vector<std::string> tokens;
 };
 
+/// Reference to a drawn element: a node, link, subcatchment or rain gage.
+struct ElementRef
+{
+    Category category = Category::None;
+    std::string id;
+    bool operator==(const ElementRef& o) const { return category == o.category && id == o.id; }
+    bool operator!=(const ElementRef& o) const { return !(*this == o); }
+    bool operator<(const ElementRef& o) const
+    {
+        return category != o.category ? category < o.category : id < o.id;
+    }
+};
+
 struct ModelIssue
 {
     enum class Severity
@@ -164,7 +178,14 @@ public:
 
     // Element data
     std::vector<ElementRow> rowsFor(Category category, std::string_view id) const;
-    bool setToken(std::string_view section, int row, int column, const std::string& value);
+    /// rowsFor() of many elements of one category in a single pass over the
+    /// sections; elements without rows are absent from the map.
+    std::unordered_map<std::string, std::vector<ElementRow>>
+    rowsForMany(Category category, const std::vector<std::string>& ids) const;
+    /// Sets one token of a data row. With @p rebuildModel false, call
+    /// rebuild() after the last of several changes.
+    bool setToken(std::string_view section, int row, int column, const std::string& value,
+                  bool rebuildModel = true);
 
     // Editing
     bool idInUse(Category category, std::string_view id) const;
@@ -181,6 +202,9 @@ public:
     /// Removes the element and every row keyed by it. Removing a node also
     /// removes the links connected to it.
     bool removeElement(Category category, std::string_view id);
+    /// Removes several elements at once (as removeElement() does for each);
+    /// returns the number of elements removed.
+    int removeElements(const std::vector<ElementRef>& elements);
     bool renameElement(Category category, std::string_view oldId, std::string_view newId,
                        std::string* error = nullptr);
 
@@ -221,6 +245,7 @@ public:
 
 private:
     void removeKeyedRows(Category category, std::string_view id);
+    void removeKeyedRows(Category category, const std::unordered_set<std::string>& ids);
     void appendReferenceIssues(std::vector<ModelIssue>& issues) const;
     std::string coordinateSection(Category category) const;
 

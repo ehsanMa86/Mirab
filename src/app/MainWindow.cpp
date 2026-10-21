@@ -48,6 +48,8 @@
 #include "SwmmEditors.h"
 #include "Theme.h"
 #include "mirab/MirabConfig.h"
+#include "mirab/core/Editing.h"
+#include "mirab/core/Query.h"
 #include "mirab/core/Text.h"
 #include "mirab/engine/Compatibility.h"
 #include "mirab/interop/Interop.h"
@@ -156,14 +158,16 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
         updateStatusInfo();
         map_->setCoordinateSystem(QString::fromStdString(doc_->settings().crs));
         mapPage_->refreshBasemapMenu();
+        // EPANET traces follow the flows by default, SWMM traces the conduit direction.
+        followFlowsAct_->setChecked(doc_->model().dialect() != Dialect::Swmm);
+        updateSelectionActions();
     });
     connect(doc_, &ProjectDocument::modelChanged, this, [this] {
         updateCompatibility();
         updateStatusInfo();
         updateStartPage();
     });
-    connect(doc_, &ProjectDocument::selectionChanged, this,
-            [this] { deleteAct_->setEnabled(!doc_->selection().isEmpty()); });
+    connect(doc_, &ProjectDocument::selectionChanged, this, &MainWindow::updateSelectionActions);
     connect(map_, &MapView::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 8000); });
     connect(map_, &MapView::cursorMoved, this, [this](const QPointF& w) {
         QString text = QString("X %1   Y %2").arg(w.x(), 0, 'f', 2).arg(w.y(), 0, 'f', 2);
@@ -177,15 +181,35 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
     connect(map_, &MapView::elementActivated, this, [this] { showDock("propertiesDock"); });
     connect(map_, &MapView::contextMenuForSelection, this, [this](const QPoint& pos) {
         QMenu menu(this);
+        const bool many = doc_->selectionCount() > 1;
         menu.addAction(icons::get("properties"), tr("Properties"), this, [this] { showDock("propertiesDock"); });
         menu.addAction(icons::get("chart"), tr("Plot over time"), this, [this] { openReport("timeseries"); });
-        menu.addAction(icons::get("zoom-fit"), tr("Zoom to"), this, [this] { map_->zoomTo(doc_->selection()); });
-        if (doc_->selection().category == Category::Area)
+        if (many)
+            menu.addAction(zoomSelectionAct_);
+        else
+            menu.addAction(icons::get("zoom-fit"), tr("Zoom to"), this, [this] { map_->zoomTo(doc_->selection()); });
+        if (doc_->selection().category == Category::Area && !many)
             menu.addAction(icons::get("layers"), tr("LID usage..."), this,
                            [this] { openDataEditor("LID_USAGE", doc_->selection().id); });
-        menu.addAction(icons::get("table"), tr("Copy ID"), this,
-                       [this] { QApplication::clipboard()->setText(doc_->selection().id); });
+        menu.addAction(icons::get("table"), many ? tr("Copy IDs") : tr("Copy ID"), this, [this] {
+            QStringList ids;
+            for (const auto& s : doc_->selectedElements())
+                ids << s.id;
+            QApplication::clipboard()->setText(ids.join('\n'));
+        });
         menu.addSeparator();
+        menu.addAction(traceDownAct_);
+        menu.addAction(traceUpAct_);
+        menu.addAction(connectedAct_);
+        if (pathAct_->isEnabled())
+        {
+            menu.addAction(pathAct_);
+            menu.addAction(profilePathAct_);
+        }
+        menu.addSeparator();
+        if (reverseAct_->isEnabled())
+            menu.addAction(reverseAct_);
+        menu.addAction(exportSelectionAct_);
         menu.addAction(deleteAct_);
         menu.exec(pos);
     });
@@ -233,6 +257,7 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
     });
     connect(browser_, &ProjectBrowser::elementActivated, this, [this] { showDock("propertiesDock"); });
     connect(browser_, &ProjectBrowser::zoomToRequested, map_, &MapView::zoomTo);
+    connect(browser_, &ProjectBrowser::zoomToSelectionRequested, map_, &MapView::zoomToSelection);
     connect(browser_, &ProjectBrowser::deleteRequested, this, &MainWindow::deleteSelection);
     connect(browser_, &ProjectBrowser::dataActivated, this, &MainWindow::openDataEditor);
     connect(browser_, &ProjectBrowser::optionsActivated, this, [this] { showSimulationOptions(); });
@@ -307,12 +332,77 @@ void MainWindow::createActions()
     zoomWindowAct_->setCheckable(true);
     zoomWindowAct_->setShortcut(Qt::Key_Z);
     zoomWindowAct_->setToolTip(tr("Drag a rectangle to zoom into (Z)"));
+    selectAct_->setToolTip(tr("Select and move elements (S). Ctrl+click adds or removes an element, Shift+click "
+                              "adds one, and dragging over an empty spot selects with a rectangle."));
+    lassoAct_ = new QAction(icons::get("lasso"), tr("Select with a polygon"), this);
+    lassoAct_->setShortcut(Qt::Key_L);
+    lassoAct_->setToolTip(tr("Select the elements inside a polygon: click its corners or drag around them (L)"));
+    measureLengthAct_ = new QAction(icons::get("measure"), tr("Measure distance"), this);
+    measureLengthAct_->setShortcut(Qt::Key_M);
+    measureLengthAct_->setToolTip(tr("Measure a distance along a line on the map (M)"));
+    measureAreaAct_ = new QAction(icons::get("measure-area"), tr("Measure area"), this);
+    measureAreaAct_->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_M));
+    measureAreaAct_->setToolTip(tr("Measure the area of a polygon on the map (Shift+M)"));
+    splitAct_ = new QAction(icons::get("split"), tr("Split a pipe or conduit"), this);
+    splitAct_->setShortcut(Qt::Key_K);
+    splitAct_->setToolTip(tr("Click a pipe or conduit to split it in two with a new junction (K)"));
     toolGroup_->addAction(selectAct_);
     toolGroup_->addAction(panAct_);
     toolGroup_->addAction(zoomWindowAct_);
+    for (QAction* a : {lassoAct_, measureLengthAct_, measureAreaAct_, splitAct_})
+    {
+        a->setCheckable(true);
+        toolGroup_->addAction(a);
+    }
     connect(selectAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::Select); });
     connect(panAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::Pan); });
     connect(zoomWindowAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::ZoomWindow); });
+    connect(lassoAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::SelectPolygon); });
+    connect(measureLengthAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::MeasureLength); });
+    connect(measureAreaAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::MeasureArea); });
+    connect(splitAct_, &QAction::triggered, this, [this] { map_->setTool(MapView::Tool::SplitLink); });
+
+    selectAllAct_ = new QAction(tr("Select &all"), this);
+    selectAllAct_->setShortcut(QKeySequence::SelectAll);
+    connect(selectAllAct_, &QAction::triggered, this, [this] { selectAllOfKind(Category::None, {}); });
+    invertAct_ = new QAction(tr("&Invert selection"), this);
+    invertAct_->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
+    connect(invertAct_, &QAction::triggered, this, &MainWindow::invertSelection);
+    queryAct_ = new QAction(icons::get("query"), tr("Select by &query..."), this);
+    queryAct_->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F));
+    queryAct_->setToolTip(tr("Select elements by conditions on their properties and results (Ctrl+Shift+F)"));
+    connect(queryAct_, &QAction::triggered, this, [this] { showQueryDialog(); });
+    traceDownAct_ = new QAction(icons::get("trace-down"), tr("Trace &downstream"), this);
+    traceDownAct_->setShortcut(Qt::Key_D);
+    connect(traceDownAct_, &QAction::triggered, this, [this] { trace(core::TraceDirection::Downstream); });
+    traceUpAct_ = new QAction(icons::get("trace-up"), tr("Trace &upstream"), this);
+    traceUpAct_->setShortcut(Qt::Key_U);
+    connect(traceUpAct_, &QAction::triggered, this, [this] { trace(core::TraceDirection::Upstream); });
+    connectedAct_ = new QAction(tr("Select &connected"), this);
+    connect(connectedAct_, &QAction::triggered, this, [this] { trace(core::TraceDirection::Connected); });
+    pathAct_ = new QAction(tr("Select shortest &path"), this);
+    pathAct_->setToolTip(tr("Select the shortest path between the first and the last selected node"));
+    connect(pathAct_, &QAction::triggered, this, &MainWindow::selectShortestPath);
+    profilePathAct_ = new QAction(icons::get("profile"), tr("Profile &along the path"), this);
+    connect(profilePathAct_, &QAction::triggered, this, &MainWindow::profileAlongSelection);
+    zoomSelectionAct_ = new QAction(icons::get("zoom-fit"), tr("&Zoom to selection"), this);
+    zoomSelectionAct_->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F));
+    connect(zoomSelectionAct_, &QAction::triggered, this, [this] {
+        tabs_->setCurrentWidget(mapPage_);
+        map_->zoomToSelection();
+    });
+    reverseAct_ = new QAction(icons::get("reverse"), tr("&Reverse link direction"), this);
+    connect(reverseAct_, &QAction::triggered, this, &MainWindow::reverseSelectedLinks);
+    exportSelectionAct_ = new QAction(icons::get("export"), tr("&Export selection (CSV)..."), this);
+    connect(exportSelectionAct_, &QAction::triggered, this, &MainWindow::exportSelectionCsv);
+    followFlowsAct_ = new QAction(tr("Follow the flow direction of the results"), this);
+    followFlowsAct_->setCheckable(true);
+    followFlowsAct_->setChecked(true);
+    followFlowsAct_->setToolTip(tr("With results shown, traces follow the sign of the flows at the current time; "
+                                   "otherwise they follow the drawn direction of the links."));
+    stopClosedAct_ = new QAction(tr("Stop at closed links"), this);
+    stopClosedAct_->setCheckable(true);
+    stopClosedAct_->setChecked(true);
 
     runAct_ = new QAction(icons::get("run"), tr("Run"), this);
     runAct_->setShortcut(Qt::Key_F5);
@@ -466,6 +556,7 @@ void MainWindow::createMenus()
     exp->addAction(tr("Report document (PDF or HTML)..."), this, [this] { exportReport(); });
     exp->addAction(tr("Results animation (GIF or PNG)..."), this, [this] { exportAnimation(); });
     exp->addSeparator();
+    exp->addAction(exportSelectionAct_);
     exp->addAction(tr("Selected element time series (CSV)..."), this, [this] {
         const QString csv = results_->csvForSelection();
         if (csv.isEmpty())
@@ -490,9 +581,16 @@ void MainWindow::createMenus()
     edit->addAction(redoAct_);
     edit->addSeparator();
     edit->addAction(deleteAct_);
+    edit->addAction(reverseAct_);
+    edit->addAction(splitAct_);
     edit->addAction(icons::get("find"), tr("&Find element..."), QKeySequence::Find, this, &MainWindow::findElement);
     edit->addSeparator();
     edit->addAction(icons::get("report"), tr("Edit the input file as text"), this, [this] { tabs_->setCurrentWidget(inpEditor_); });
+
+    // Select
+    QMenu* select = menuBar()->addMenu(tr("Se&lect"));
+    connect(select, &QMenu::aboutToShow, this, [this, select] { fillSelectMenu(select); });
+    fillSelectMenu(select);
 
     // View
     QMenu* view = menuBar()->addMenu(tr("&View"));
@@ -500,6 +598,7 @@ void MainWindow::createMenus()
     view->addAction(icons::get("zoom-in"), tr("Zoom &in"), QKeySequence::ZoomIn, this, [this] { map_->zoomBy(1.5); });
     view->addAction(icons::get("zoom-out"), tr("Zoom &out"), QKeySequence::ZoomOut, this, [this] { map_->zoomBy(1 / 1.5); });
     view->addAction(zoomWindowAct_);
+    view->addAction(zoomSelectionAct_);
     view->addSeparator();
     QMenu* basemaps = view->addMenu(icons::get("basemap"), tr("&Basemap"));
     connect(basemaps, &QMenu::aboutToShow, this, [this, basemaps] {
@@ -611,6 +710,9 @@ void MainWindow::createMenus()
 
     // Tools
     QMenu* tools = menuBar()->addMenu(tr("&Tools"));
+    tools->addAction(measureLengthAct_);
+    tools->addAction(measureAreaAct_);
+    tools->addSeparator();
     tools->addAction(icons::get("profile"), tr("&Elevations from DEM..."), this, &MainWindow::elevationsFromDem);
     tools->addSeparator();
     pluginMenu_ = tools->addMenu(tr("&Plugins"));
@@ -658,12 +760,16 @@ void MainWindow::createToolBar()
     mainBar_->addAction(selectAct_);
     mainBar_->addAction(panAct_);
     mainBar_->addAction(zoomWindowAct_);
+    mainBar_->addAction(lassoAct_);
+    mainBar_->addAction(measureLengthAct_);
     mainBar_->addSeparator();
     // Element tools are inserted here by rebuildForDialect().
     QAction* elementsAnchor = mainBar_->addSeparator();
     elementsAnchor->setObjectName("elementsAnchor");
+    mainBar_->addAction(splitAct_);
     mainBar_->addAction(deleteAct_);
     mainBar_->addAction(icons::get("find"), tr("Find element (Ctrl+F)"), this, &MainWindow::findElement);
+    mainBar_->addAction(queryAct_);
     mainBar_->addSeparator();
     QToolButton* reportsButton = new QToolButton(this);
     reportsButton->setIcon(icons::get("chart"));
@@ -744,7 +850,10 @@ void MainWindow::createStatusBar()
     runState_ = new QLabel(this);
     runState_->setVisible(false);
     runState_->setStyleSheet(QString("color: %1; font-weight: 600;").arg(theme::kWarning.name()));
+    selectionLabel_ = new QLabel(this);
+    selectionLabel_->setVisible(false);
     statusBar()->addPermanentWidget(runState_);
+    statusBar()->addPermanentWidget(selectionLabel_);
     statusBar()->addPermanentWidget(progress_);
     statusBar()->addPermanentWidget(countsLabel_);
     statusBar()->addPermanentWidget(unitsLabel_);
@@ -1632,11 +1741,275 @@ void MainWindow::chooseCoordinateSystem()
 // ---------------------------------------------------------------------------
 void MainWindow::deleteSelection()
 {
-    const Selection sel = doc_->selection();
-    if (sel.isEmpty())
+    const auto items = doc_->selectedElements();
+    if (items.isEmpty())
         return;
-    const std::string id = sel.id.toStdString();
-    doc_->edit(tr("Delete %1").arg(sel.id), [&](core::Model& m, std::string*) { return m.removeElement(sel.category, id); });
+    std::vector<core::ElementRef> refs;
+    for (const auto& s : items)
+        refs.push_back(s.ref());
+    const QString what = items.size() == 1 ? tr("Delete %1").arg(items.first().id)
+                                           : tr("Delete %n elements", nullptr, static_cast<int>(items.size()));
+    doc_->edit(what, [&](core::Model& m, std::string*) { return m.removeElements(refs) > 0; });
+}
+
+void MainWindow::updateSelectionActions()
+{
+    const auto& items = doc_->selectedElements();
+    const int count = static_cast<int>(items.size());
+    int nodes = 0, links = 0;
+    for (const auto& s : items)
+    {
+        nodes += s.category == Category::Node ? 1 : 0;
+        links += s.category == Category::Link ? 1 : 0;
+    }
+    deleteAct_->setEnabled(count > 0);
+    reverseAct_->setEnabled(links > 0);
+    for (QAction* a : {traceDownAct_, traceUpAct_, connectedAct_, zoomSelectionAct_, exportSelectionAct_})
+        a->setEnabled(count > 0);
+    pathAct_->setEnabled(nodes >= 2);
+    profilePathAct_->setEnabled(nodes >= 2);
+    if (selectionLabel_)
+    {
+        selectionLabel_->setText(tr("%n selected", nullptr, count));
+        selectionLabel_->setVisible(count > 1);
+    }
+}
+
+void MainWindow::fillSelectMenu(QMenu* menu)
+{
+    menu->clear();
+    menu->addAction(selectAllAct_);
+    QMenu* kinds = menu->addMenu(tr("All of a &type"));
+    const auto& m = doc_->model();
+    const Dialect d = m.dialect();
+    for (Category c : {Category::Node, Category::Link})
+    {
+        kinds->addAction(c == Category::Node ? tr("All nodes") : tr("All links"), this,
+                         [this, c] { selectAllOfKind(c, {}); });
+        for (const auto& k : core::elementKinds(d, c))
+        {
+            const QString kind = QString::fromStdString(k);
+            kinds->addAction(icons::element(kind), kind, this, [this, c, kind] { selectAllOfKind(c, kind); });
+        }
+        kinds->addSeparator();
+    }
+    if (d == Dialect::Swmm)
+    {
+        kinds->addAction(icons::element("Subcatchment"), tr("Subcatchments"), this,
+                         [this] { selectAllOfKind(Category::Area, {}); });
+        kinds->addAction(icons::element("RainGage"), tr("Rain gages"), this,
+                         [this] { selectAllOfKind(Category::Gage, {}); });
+    }
+    menu->addAction(invertAct_);
+    menu->addAction(tr("C&lear selection"), this, [this] { doc_->clearSelection(); })
+        ->setEnabled(doc_->selectionCount() > 0);
+    menu->addSeparator();
+    menu->addAction(lassoAct_);
+    menu->addAction(queryAct_);
+    menu->addSeparator();
+    menu->addAction(traceDownAct_);
+    menu->addAction(traceUpAct_);
+    menu->addAction(connectedAct_);
+    menu->addAction(pathAct_);
+    QMenu* options = menu->addMenu(tr("Trace &options"));
+    options->addAction(followFlowsAct_);
+    options->addAction(stopClosedAct_);
+    menu->addSeparator();
+    menu->addAction(zoomSelectionAct_);
+    menu->addAction(profilePathAct_);
+    menu->addAction(exportSelectionAct_);
+}
+
+void MainWindow::selectAllOfKind(Category category, const QString& kind)
+{
+    const auto& m = doc_->model();
+    const std::string k = kind.toStdString();
+    QList<Selection> list;
+    if (category == Category::None || category == Category::Node)
+        for (const auto& n : m.nodes())
+            if (k.empty() || n.kind == k)
+                list.append({Category::Node, QString::fromStdString(n.id)});
+    if (category == Category::None || category == Category::Link)
+        for (const auto& l : m.links())
+            if (k.empty() || l.kind == k)
+                list.append({Category::Link, QString::fromStdString(l.id)});
+    if (category == Category::None || category == Category::Area)
+        for (const auto& a : m.areas())
+            list.append({Category::Area, QString::fromStdString(a.id)});
+    if (category == Category::None || category == Category::Gage)
+        for (const auto& g : m.gages())
+            list.append({Category::Gage, QString::fromStdString(g.id)});
+    doc_->setSelection(list);
+    statusBar()->showMessage(tr("%n element(s) selected.", nullptr, static_cast<int>(list.size())), 5000);
+}
+
+void MainWindow::invertSelection()
+{
+    const auto& m = doc_->model();
+    QList<Selection> list;
+    auto add = [&](Category c, const std::string& id) {
+        if (!doc_->isSelected(c, id))
+            list.append({c, QString::fromStdString(id)});
+    };
+    for (const auto& n : m.nodes())
+        add(Category::Node, n.id);
+    for (const auto& l : m.links())
+        add(Category::Link, l.id);
+    for (const auto& a : m.areas())
+        add(Category::Area, a.id);
+    for (const auto& g : m.gages())
+        add(Category::Gage, g.id);
+    doc_->setSelection(list);
+}
+
+void MainWindow::trace(core::TraceDirection direction)
+{
+    TraceSettings settings;
+    settings.followFlows = followFlowsAct_->isChecked();
+    settings.stopAtClosed = stopClosedAct_->isChecked();
+    QString summary;
+    const auto found = traceSelection(doc_, direction, settings, &summary);
+    if (!found.isEmpty())
+        doc_->setSelection(found, doc_->selection());
+    statusBar()->showMessage(summary, 10000);
+}
+
+void MainWindow::traceFromSelection(const QString& kind)
+{
+    if (kind == "downstream")
+        trace(core::TraceDirection::Downstream);
+    else if (kind == "upstream")
+        trace(core::TraceDirection::Upstream);
+    else if (kind == "connected")
+        trace(core::TraceDirection::Connected);
+    else if (kind == "path")
+        selectShortestPath();
+}
+
+void MainWindow::selectShortestPath()
+{
+    QString message;
+    const auto path = shortestPathSelection(doc_, &message);
+    if (!path.isEmpty())
+        doc_->setSelection(path, path.first());
+    statusBar()->showMessage(message, 10000);
+}
+
+void MainWindow::profileAlongSelection()
+{
+    QStringList nodes;
+    for (const auto& s : doc_->selectedElements())
+        if (s.category == Category::Node)
+            nodes << s.id;
+    if (nodes.size() < 2)
+    {
+        statusBar()->showMessage(tr("Select two nodes first."), 6000);
+        return;
+    }
+    openReport("profile");
+    showProfilePath(tabs_->currentWidget(), nodes.first(), nodes.last());
+}
+
+void MainWindow::selectByQuery(const QString& expression)
+{
+    std::string err;
+    const auto query = core::Query::parse(expression.toStdString(), &err);
+    if (!query)
+    {
+        statusBar()->showMessage(tr("The query is not valid: %1").arg(QString::fromStdString(err)), 8000);
+        return;
+    }
+    QList<Selection> list;
+    for (const auto& e : core::selectByQuery(doc_->model(), *query, Category::None, {}, doc_->results(), doc_->period()))
+        list.append(Selection::of(e));
+    doc_->setSelection(list);
+}
+
+void MainWindow::showQueryDialog(const QString& expression)
+{
+    QueryDialog dlg(doc_, this);
+    connect(&dlg, &QueryDialog::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 6000); });
+    if (!expression.isEmpty())
+        dlg.setExpression(expression);
+    dlg.exec();
+}
+
+void MainWindow::exportSelectionCsv()
+{
+    const auto& items = doc_->selectedElements();
+    if (items.isEmpty())
+    {
+        statusBar()->showMessage(tr("Select elements first."), 5000);
+        return;
+    }
+    const QString base = doc_->path().isEmpty() ? QDir::homePath() + "/selection"
+                                                : QFileInfo(doc_->path()).absolutePath() + "/" +
+                                                      QFileInfo(doc_->path()).completeBaseName() + "-selection";
+    const QString f = QFileDialog::getSaveFileName(this, tr("Export selection"), base + ".csv", tr("CSV (*.csv)"));
+    if (f.isEmpty())
+        return;
+    std::vector<core::ElementRef> refs;
+    for (const auto& s : items)
+        refs.push_back(s.ref());
+    const std::string csv = core::elementsCsv(doc_->model(), refs, doc_->results(), doc_->period());
+    QFile out(f);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        QMessageBox::warning(this, tr("Export selection"), tr("%1 could not be written.").arg(f));
+        return;
+    }
+    out.write(csv.data(), static_cast<qint64>(csv.size()));
+    statusBar()->showMessage(tr("%n element(s) written to %1.", nullptr, static_cast<int>(items.size()))
+                                 .arg(QFileInfo(f).fileName()),
+                             6000);
+}
+
+void MainWindow::reverseSelectedLinks()
+{
+    std::vector<std::string> links;
+    for (const auto& s : doc_->selectedElements())
+        if (s.category == Category::Link)
+            links.push_back(s.id.toStdString());
+    if (links.empty())
+        return;
+    const QString what = links.size() == 1 ? tr("Reverse %1").arg(QString::fromStdString(links.front()))
+                                           : tr("Reverse %n links", nullptr, static_cast<int>(links.size()));
+    QString err;
+    if (!doc_->edit(what,
+                    [&](core::Model& m, std::string* e) {
+                        for (const auto& id : links)
+                            if (!core::reverseLink(m, id, e))
+                                return false;
+                        return true;
+                    },
+                    &err))
+        statusBar()->showMessage(tr("The links were not reversed: %1").arg(err), 6000);
+}
+
+void MainWindow::selectElements(const QStringList& ids)
+{
+    const auto& m = doc_->model();
+    QList<Selection> list;
+    for (const QString& id : ids)
+    {
+        const std::string sid = id.trimmed().toStdString();
+        if (m.findNode(sid))
+            list.append({Category::Node, id.trimmed()});
+        else if (m.findLink(sid))
+            list.append({Category::Link, id.trimmed()});
+        else if (m.findArea(sid))
+            list.append({Category::Area, id.trimmed()});
+        else if (m.findGage(sid))
+            list.append({Category::Gage, id.trimmed()});
+    }
+    doc_->setSelection(list, list.isEmpty() ? Selection{} : list.last());
+}
+
+void MainWindow::selectRegion(const QRectF& world)
+{
+    const QRectF r = world.normalized();
+    map_->selectInPolygon({{r.left(), r.top()}, {r.right(), r.top()}, {r.right(), r.bottom()}, {r.left(), r.bottom()}},
+                          false);
 }
 
 void MainWindow::findElement()
@@ -1730,7 +2103,9 @@ void MainWindow::elevationsFromDem()
 
 void MainWindow::openTool(const QString& name)
 {
-    if (name == "elevations")
+    if (name == "select-query")
+        showQueryDialog();
+    else if (name == "elevations")
         elevationsFromDem();
     else if (name == "raster-layers")
         showRasterLayers();

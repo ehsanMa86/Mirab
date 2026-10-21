@@ -55,7 +55,17 @@ int main(int argc, char* argv[])
     parser.addPositionalArgument("file", "EPANET or SWMM input file to open", "[file.inp]");
     const QCommandLineOption screenshot("screenshot", "Save a picture of the window to <png> and quit.", "png");
     const QCommandLineOption runFirst("run", "With --screenshot: run the simulation before the picture is taken.");
-    const QCommandLineOption selectOpt("select", "Select an element by ID after opening.", "id");
+    const QCommandLineOption selectOpt("select", "Select elements by ID after opening (several separated by commas).",
+                                       "id[,id...]");
+    const QCommandLineOption regionOpt("select-region",
+                                       "Select the elements inside a rectangle of map coordinates.", "x1,y1,x2,y2");
+    const QCommandLineOption queryOpt("select-query",
+                                      "Select the elements that match an expression such as \"Diameter < 200\"; "
+                                      "with --open-tool select-query, fill the dialog with it instead.",
+                                      "expression");
+    const QCommandLineOption traceOpt("trace", "Trace from the selection: downstream, upstream, connected or path "
+                                               "(shortest path between the first and last selected node).",
+                                      "kind");
     const QCommandLineOption installEngine(
         "install-engine",
         "Download and install an engine without opening a window, then quit. <source> is \"swmm5plus\" "
@@ -94,9 +104,9 @@ int main(int argc, char* argv[])
                                                           "reactions, report for EPANET).",
                                         "page");
     const QCommandLineOption toolOpt("open-tool", "Open a tool dialog after the file: elevations (from a DEM), "
-                                                  "raster-layers, map-service, observed-data, calibration or "
+                                                  "raster-layers, map-service, observed-data, calibration, "
                                                   "calibration-run (starts the calibration; use --delay to "
-                                                  "picture its progress).",
+                                                  "picture its progress) or select-query.",
                                      "name");
     parser.addOption(toolOpt);
     parser.addOption(importOpt);
@@ -126,6 +136,9 @@ int main(int argc, char* argv[])
     parser.addOption(exportDialogOpt);
     parser.addOption(delayOpt);
     parser.addOption(selectOpt);
+    parser.addOption(regionOpt);
+    parser.addOption(queryOpt);
+    parser.addOption(traceOpt);
     parser.addOption(installEngine);
     parser.process(app);
 
@@ -177,7 +190,19 @@ int main(int argc, char* argv[])
     if (!files.isEmpty())
         window.openFile(files.first());
     if (parser.isSet(selectOpt))
-        window.selectElement(parser.value(selectOpt));
+        window.selectElements(parser.value(selectOpt).split(',', Qt::SkipEmptyParts));
+    if (parser.isSet(regionOpt))
+    {
+        const QStringList v = parser.value(regionOpt).split(',');
+        if (v.size() == 4)
+            window.selectRegion(
+                QRectF(QPointF(v[0].toDouble(), v[1].toDouble()), QPointF(v[2].toDouble(), v[3].toDouble())));
+    }
+    const bool queryDialog = parser.value(toolOpt) == "select-query";
+    if (parser.isSet(queryOpt) && !queryDialog)
+        window.selectByQuery(parser.value(queryOpt));
+    if (parser.isSet(traceOpt))
+        window.traceFromSelection(parser.value(traceOpt));
     if (parser.isSet(dataOpt))
     {
         const QString v = parser.value(dataOpt);
@@ -210,7 +235,15 @@ int main(int argc, char* argv[])
     if (parser.isSet(toolOpt))
     {
         const QString name = parser.value(toolOpt);
-        QTimer::singleShot(parser.isSet(runFirst) ? 3000 : 300, &window, [&window, name] { window.openTool(name); });
+        const QString expression = parser.value(queryOpt);
+        QTimer::singleShot(parser.isSet(runFirst) ? 3000 : 300, &window,
+                           [&window, name, expression]
+                           {
+                               if (name == "select-query")
+                                   window.showQueryDialog(expression);
+                               else
+                                   window.openTool(name);
+                           });
     }
     if (parser.isSet(screenshot) || exporting)
     {

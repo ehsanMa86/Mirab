@@ -56,7 +56,11 @@ public:
         AddNode,
         AddLink,
         AddArea,
-        AddGage
+        AddGage,
+        SelectPolygon, ///< lasso: click corners or drag freehand
+        MeasureLength,
+        MeasureArea,
+        SplitLink ///< split a pipe or conduit where it is clicked
     };
 
     explicit MapView(ProjectDocument* doc, QWidget* parent = nullptr);
@@ -67,6 +71,12 @@ public:
     void zoomBy(double factor);
     /// Centers the view on an element and makes sure it is visible.
     void zoomTo(const Selection& sel);
+    /// Fits the view to every selected element.
+    void zoomToSelection();
+    /// Selects the elements inside a polygon (map coordinates). Shift adds
+    /// to the selection and Ctrl removes from it.
+    void selectInPolygon(const std::vector<core::Point>& polygon, bool crossing,
+                         Qt::KeyboardModifiers modifiers = Qt::NoModifier);
 
     void setNodeVariable(const QString& name);
     void setLinkVariable(const QString& name);
@@ -194,7 +204,18 @@ private:
     std::optional<double> resultValue(const char* table, int variable, const std::string& id) const;
     int flowVariable() const;
     void finishArea();
+    void finishLasso();
     void cancelPending();
+    void zoomToBounds(const core::Bounds& b);
+    void includeElement(core::Bounds& b, const Selection& sel) const;
+    void clickSelect(const Selection& hit, Qt::KeyboardModifiers modifiers);
+    void splitAt(const QPointF& screen);
+    /// The link under the cursor and the point of it closest to the cursor, for the split tool.
+    bool splitTarget(const QPointF& screen, QString& link, core::Point& at) const;
+    QString measureText() const;
+    QString formatLength(double value, bool metres) const;
+    QString formatArea(double value, bool metres) const;
+    void drawOverlayText(QPainter& p, const QPointF& at, const QString& text);
     void userMovedView();
     QString prefixFor(const QString& kind) const;
     void updateCoordinateSystem();
@@ -216,6 +237,13 @@ private:
     bool panning_ = false;
     bool dragging_ = false;
     bool rubberBand_ = false;
+    bool selectBand_ = false; ///< rectangle selection with the select tool
+    Selection bandClick_;     ///< element to select when the rectangle turns out to be a click
+    Qt::KeyboardModifiers pressModifiers_;
+    std::vector<core::Point> lasso_;
+    bool lassoDragged_ = false;
+    std::vector<core::Point> measure_;
+    bool measureDone_ = false;
     QString dragNode_;
     core::Point dragTo_;
     QString linkStart_;
