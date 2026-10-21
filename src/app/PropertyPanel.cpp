@@ -192,7 +192,7 @@ PropertyPanel::PropertyPanel(ProjectDocument* doc, QWidget* parent) : QWidget(pa
     table_->setHorizontalHeaderLabels({tr("Property"), tr("Value"), tr("Units")});
     table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Interactive);
     table_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    table_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    table_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Interactive);
     table_->horizontalHeader()->setHighlightSections(false);
     table_->setColumnWidth(0, 170);
     table_->verticalHeader()->hide();
@@ -308,6 +308,9 @@ void PropertyPanel::rebuild()
     populateAddMenu();
     populating_ = false;
     applyFilter();
+    // Units are short; a long result legend (such as a status code) must not squeeze the values.
+    table_->resizeColumnToContents(2);
+    table_->setColumnWidth(2, std::min(table_->columnWidth(2), 72));
 }
 
 void PropertyPanel::addHeader(const QString& text, bool enabled, const QString& tip)
@@ -362,6 +365,7 @@ void PropertyPanel::addRow(const QString& name, const QString& value, const QStr
     v->setFlags(flags);
     auto* u = new QTableWidgetItem(unit);
     u->setFlags(Qt::ItemIsEnabled);
+    u->setToolTip(unit);
     if (!enabled)
     {
         const QColor grey = palette().color(QPalette::Disabled, QPalette::Text);

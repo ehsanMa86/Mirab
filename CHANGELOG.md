@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- SWMM editing without the text view: full schemas for inflows, dry weather flow, RDII, treatment, groundwater, coverages, loadings, inlet and LID usage; pollutants, land uses, aquifers, snow packs, streets and inlets as named objects with renames and deletions carried to every reference; dedicated editors for LID controls, LID usage, transects, unit hydrographs and control rules (SWMM 5.2 and EPANET, with line-numbered checks); a simulation options dialog for SWMM and EPANET.
+- Native GeoTIFF and ESRI ASCII grid reader (own Deflate decoder, no GDAL); node elevations from a DEM; hillshade and colour-ramp raster layers; ground elevation under the cursor and in profiles; custom XYZ, WMS and WMTS basemaps.
+- Live results while a simulation runs, with pause, resume and partial results after a stop, for every engine (`mirab-cli run --live`).
+- Input preparation removes everything the selected engine ignores, as its capability manifest says (pollutants and LID for SWMM5+).
+- Observed data, goodness-of-fit metrics (NSE, KGE, PBIAS, RMSE, MAE, R², peak, timing and volume errors), a calibration report and automated calibration with Dynamically Dimensioned Search or Latin hypercube screening (`mirab-cli calibrate`).
+- Print layouts (PDF, PNG, printing), report documents (PDF with a table of contents, or HTML) and results animations (animated GIF or PNG images).
+- `--json` output for every `mirab-cli` command, `model get`/`model set` for scripted edits, and the `mirab` Python package with a native results reader, batch runs and a Model Context Protocol server.
+- Multi-selection (rectangle, polygon, query), upstream/downstream/connected tracing and shortest paths, editing many elements at once, splitting pipes and conduits, measuring distances and areas.
+- Scenarios stored as changes to the base model, with inheritance, batch runs (`mirab-cli batch`), a comparison report and a difference map.
+- The CARTO basemap, which now requires an API key, is replaced by the Esri light gray canvas.
+- Fixes: crash when closing the window during a run; SWMM 5.2 runs with relative paths; ponded and LID unit areas shown in m²/ft²; long result units no longer squeeze values in *Properties*; release tags with a hyphen are published as pre-releases.
+
 ## 0.1.0 (2026-10-08)
 
 First release.
