@@ -65,7 +65,7 @@ Every engine delivers the results of each reporting period while it runs, and ev
 - **EPANET 2.2 and 2.3:** all variables, exactly as in the final results.
 - **EPANET-MSX:** the hydraulic pass first, then the species pass with all variables.
 - **EPA SWMM 5.2:** read with the SWMM 5.2 `swmm_getValue` functions at the routing step that reaches each reporting time. Node depth, head, volume, inflows and flooding, link flow, depth and velocity, and subcatchment rainfall, evaporation, infiltration and runoff are available; link capacity is approximated from the depth; link volume, snow, groundwater, soil moisture, pollutants and most system values appear when the run ends. The final results are always read from the binary output file.
-- **SWMM5+:** node depth and head, link flow, depth and velocity, as in its final results.
+- **SWMM5+:** with C interface version 2, every reporting period SWMM5+ stores in its own output, at the moment it stores it, so the live results equal the final results. They include node depth, head, volume, lateral and total inflow and flooding; link flow, depth, velocity, volume and capacity; subcatchment rainfall, evaporation, infiltration and runoff; and the system totals (rainfall, evaporation, infiltration, runoff, total lateral inflow, flooding, outflow and storage volume), in the units of the project. Mirab advances SWMM5+ one time step at a time, so a pause holds the solver between two steps. A version 1 library gives node depth and head and link flow, depth and velocity only, in SI units, sampled at the first time step that reaches each reporting time.
 
 ## Why engines run in a separate process
 
@@ -96,7 +96,7 @@ Prebuilt SWMM5+ libraries for Windows (x64), Linux (x86_64) and macOS (Apple sil
 
 - **Without a window** (scripts and managed installations): `mirab --install-engine swmm5plus`, or pass a manifest URL or file instead of `swmm5plus`. The command returns 0 on success, so it can follow the Mirab installer in a deployment script, for example `mirab.exe --install-engine swmm5plus` on Windows.
 
-Nothing is installed unless every file matches its checksum. A package for another platform, or one with a C interface version other than 1, is refused. The files are placed in the per-user folder (item 5 above); `mirab-cli engines where` prints it, and `--target DIR` installs elsewhere, for example into a shared folder listed in `MIRAB_ENGINE_PATH`.
+Nothing is installed unless every file matches its checksum. A package for another platform, or one with a C interface version other than 1 or 2, is refused. The files are placed in the per-user folder (item 5 above); `mirab-cli engines where` prints it, and `--target DIR` installs elsewhere, for example into a shared folder listed in `MIRAB_ENGINE_PATH`.
 
 To use a different download location, such as a mirror on an internal network, set the `MIRAB_SWMM5PLUS_MANIFEST_URL` environment variable to the manifest URL.
 
@@ -104,7 +104,15 @@ To use a different download location, such as a mirror on an internal network, s
 
 ### Building SWMM5+ yourself
 
-Build swmm5plus-capi as described in its README and copy both libraries, with the Fortran runtime if it is not installed system-wide (Windows builds link it into the DLLs), into any engine folder above. Mirab checks the interface version (`s5p_api_version`) before using it. The C interface is documented in the swmm5plus-capi repository.
+Build swmm5plus-capi as described in its README and copy both libraries, with the Fortran runtime if it is not installed system-wide (Windows builds link it into the DLLs), into any engine folder above. Mirab checks the interface version (`s5p_api_version`) before using it and supports versions 1 and 2. The C interface is documented in the swmm5plus-capi repository.
+
+What Mirab shows from SWMM5+ (interface version 2):
+
+- Results use the variable names and units of the EPA SWMM 5.2 results, so maps, graphs and tables treat both engines alike. Variables SWMM5+ does not compute (snow depth, groundwater, soil moisture, pollutants, air temperature, dry weather, groundwater, RDII and external inflow totals, potential evapotranspiration) are not listed.
+- The reporting periods are the levels of SWMM5+'s own output: one at the start, one at the first time step that reaches each reporting time, labelled with that time, and one at the end of the simulation.
+- Link values are averages over the link's finite volumes (sums for volume), as in SWMM5+'s output files. Node depth and head are those of the junction's own volume; nodes that SWMM5+ represents as faces between two volumes (junctions with two links, upstream ends and outfalls) report the mean of both sides.
+- Subcatchment results come from the EPA SWMM 5.1 hydrology inside SWMM5+, read like EPA SWMM's own output at each reporting time.
+- SWMM5+'s console text goes to the solver's error stream, never into the progress protocol.
 
 Status: SWMM5+ upstream is developed with Intel Fortran. swmm5plus-capi builds it with GNU gfortran on Windows (MinGW-w64), Linux and macOS, and with Intel ifx on Linux. It replaces the Intel-only extensions with standard Fortran, and the shell commands SWMM5+ runs (`mkdir`, `cp`, `rm`) with portable code, so no shell is started. Check the swmm5plus-capi README for the current state of each compiler.
 
@@ -113,4 +121,5 @@ SWMM5+ also has modeling rules of its own, which Mirab applies or reports:
 - only `INERTIAL_DAMPING NONE` is supported; Mirab sets it for the run,
 - routing is always dynamic wave; Mirab sets `FLOW_ROUTING DYNWAVE` for the run,
 - pollutants and LID controls are not modeled; Mirab removes them from the engine's copy of the input,
-- a subcatchment must drain to a storage node or to a junction next to a conduit; SWMM5+ stops with a configuration error otherwise.
+- a subcatchment must drain to a storage node, a junction with three or more links, or an upstream end or outfall next to a conduit (interface version 2 libraries); a junction with exactly two links is refused, and SWMM5+ stops with a configuration error,
+- every upstream end junction needs an inflow (`[INFLOWS]` or `[DWF]`, a small base flow is enough); SWMM5+ stops with "nJ1 should be converted to nBCup" otherwise.

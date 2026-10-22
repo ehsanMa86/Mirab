@@ -136,9 +136,9 @@ void installFromManifest(const EngineManifest& m, const std::filesystem::path& s
     if (m.platform != platformId())
         throw std::runtime_error("this " + m.name + " package is for " + m.platform + ", but this computer is " +
                                  platformId());
-    if (m.engine == "swmm5plus-1.0" && m.apiVersion != 1)
+    if (m.engine == "swmm5plus-1.0" && m.apiVersion != 1 && m.apiVersion != 2)
         throw std::runtime_error("this " + m.name + " package uses C interface version " +
-                                 std::to_string(m.apiVersion) + "; this Mirab supports version 1");
+                                 std::to_string(m.apiVersion) + "; this Mirab supports versions 1 and 2");
 
     // 1. Verify everything before touching the engine folder.
     for (const auto& f : m.files)

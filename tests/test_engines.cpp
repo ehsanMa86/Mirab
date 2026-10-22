@@ -65,11 +65,41 @@ fs::path scratch(const std::string& name)
 
 engine::EngineRegistry& registry()
 {
-    static engine::EngineRegistry r({fs::u8path(MIRAB_ENGINE_DIR)});
+    // The build's engine folder, then the folders of MIRAB_ENGINE_PATH, where
+    // a separately built SWMM5+ library can be found.
+    static engine::EngineRegistry r([] {
+        std::vector<fs::path> dirs{fs::u8path(MIRAB_ENGINE_DIR)};
+#if defined(_WIN32)
+        const char sep = ';';
+#else
+        const char sep = ':';
+#endif
+        if (const char* env = std::getenv("MIRAB_ENGINE_PATH"))
+        {
+            std::string dir;
+            for (const char* p = env;; ++p)
+            {
+                if (*p == sep || *p == '\0')
+                {
+                    if (!dir.empty())
+                        dirs.push_back(fs::u8path(dir));
+                    dir.clear();
+                    if (*p == '\0')
+                        break;
+                }
+                else
+                {
+                    dir += *p;
+                }
+            }
+        }
+        return dirs;
+    }());
     return r;
 }
 
-core::ResultSet run(const std::string& engineId, const fs::path& inp, const fs::path& msx = {})
+core::ResultSet run(const std::string& engineId, const fs::path& inp, const fs::path& msx = {},
+                    const engine::RunCallbacks& callbacks = {})
 {
     std::string error;
     auto e = registry().create(engineId, &error);
@@ -86,7 +116,7 @@ core::ResultSet run(const std::string& engineId, const fs::path& inp, const fs::
     req.reportFile = scratch(engineId + ".rpt");
     req.workDir = scratch(engineId + "-work");
     fs::create_directories(req.workDir);
-    auto outcome = e->run(req, {});
+    auto outcome = e->run(req, callbacks);
     if (!outcome.success)
         throw std::runtime_error(engineId + " failed: " + outcome.message);
     return outcome.results;
@@ -558,6 +588,93 @@ TEST_CASE("engines: EPA SWMM 5.2 frames match the binary output")
         }
     }
     CHECK(sameValues(live.frames.back().values, periodValues(r, r.periodCount() - 1)));
+}
+
+TEST_CASE("engines: SWMM5+ frames equal the final results, and runoff agrees with SWMM 5.2")
+{
+    // SWMM5+ is installed separately; a locally built library is found
+    // through MIRAB_ENGINE_PATH. It runs one model per process, so all checks
+    // use this one run.
+    std::string why;
+    if (!registry().isAvailable("swmm5plus-1.0", &why))
+        return;
+    const fs::path inp = fs::path(MIRAB_SOURCE_DIR) / "tests" / "data" / "swmm5plus-catchments.inp";
+    const auto live = runLive("swmm5plus-1.0", inp, 0.0);
+    CHECK(live.outcome.success);
+    const auto& r = live.outcome.results;
+    CHECK_EQ(live.frames.size(), static_cast<std::size_t>(r.periodCount()));
+    for (std::size_t i = 0; i < live.frames.size(); ++i)
+    {
+        const auto& f = live.frames[i];
+        CHECK_EQ(f.period, static_cast<int>(i));
+        CHECK_NEAR(f.time, r.times[i], 1e-9);
+        CHECK(core::live::sameLayout(f.shape, r));
+        CHECK(sameValues(f.values, periodValues(r, f.period)));
+    }
+    CHECK(live.checkpoints.size() > live.frames.size());
+    CHECK(std::is_sorted(live.checkpoints.begin(), live.checkpoints.end()));
+    const auto* subs = r.table("subcatchment");
+    if (!subs)
+        return; // a version 1 library: nodes and links only
+
+    // Interface version 2: every level SWMM5+ stores (0 to 2 h every 5
+    // minutes), in the units of the input file, with subcatchments and
+    // system totals named like the SWMM 5.2 results.
+    CHECK_EQ(r.periodCount(), 25);
+    CHECK_EQ(r.flowUnits, std::string("CFS"));
+    CHECK_NEAR(r.times.back(), 7200.0, 1e-9);
+    const auto* system = r.table("system");
+    CHECK(system != nullptr);
+    const auto epa = run("swmm-5.2-epa", inp);
+    const auto* epaSubs = epa.table("subcatchment");
+    const int rain = subs->variableIndex("Rainfall"), epaRain = epaSubs->variableIndex("Rainfall");
+    const int runoff = subs->variableIndex("Runoff"), epaRunoff = epaSubs->variableIndex("Runoff");
+    CHECK(rain >= 0 && runoff >= 0 && subs->variableIndex("Infiltration Loss") >= 0);
+    for (const char* id : {"S1", "S2", "S3"})
+    {
+        const int e = subs->elementIndex(id), g = epaSubs->elementIndex(id);
+        CHECK(e >= 0 && g >= 0);
+        double peak = 0.0, epaPeak = 0.0;
+        for (int p = 0; p < r.periodCount(); ++p)
+            peak = std::max(peak, static_cast<double>(subs->value(p, runoff, e)));
+        for (int k = 0; k < epa.periodCount(); ++k)
+            epaPeak = std::max(epaPeak, static_cast<double>(epaSubs->value(k, epaRunoff, g)));
+        CHECK(epaPeak > 1.0);
+        CHECK_NEAR(peak, epaPeak, 0.05 * epaPeak);
+        // Same reporting times: SWMM5+ starts at 0, SWMM 5.2 one step later.
+        for (int k = 0; k < epa.periodCount(); ++k)
+        {
+            const double t = epa.times[static_cast<std::size_t>(k)];
+            const int p = static_cast<int>(std::lround(t / r.reportStep));
+            if (p >= r.periodCount())
+                break;
+            CHECK_NEAR(r.times[static_cast<std::size_t>(p)], t, 1e-6);
+            CHECK_NEAR(subs->value(p, rain, e), epaSubs->value(k, epaRain, g), 1e-4);
+            // Both run the EPA SWMM hydrology (5.1.13 inside SWMM5+).
+            CHECK_NEAR(subs->value(p, runoff, e), epaSubs->value(k, epaRunoff, g), 0.05 * epaPeak);
+        }
+    }
+    // System runoff is the sum of the subcatchments, and the outfall carries
+    // a peak like SWMM 5.2's.
+    for (int p = 0; p < r.periodCount(); ++p)
+    {
+        double sum = 0.0;
+        for (int e = 0; e < subs->elementCount(); ++e)
+            sum += subs->value(p, runoff, e);
+        CHECK_NEAR(system->value(p, system->variableIndex("Runoff"), 0), sum, 1e-3 * (1.0 + sum));
+    }
+    const auto* nodes = r.table("node");
+    const auto* epaNodes = epa.table("node");
+    const int inflow = nodes->variableIndex("Total Inflow");
+    const int epaInflow = epaNodes->variableIndex("Total Inflow");
+    const int o1 = nodes->elementIndex("O1"), epaO1 = epaNodes->elementIndex("O1");
+    double outfall = 0.0, epaOutfall = 0.0;
+    for (int p = 0; p < r.periodCount(); ++p)
+        outfall = std::max(outfall, static_cast<double>(nodes->value(p, inflow, o1)));
+    for (int k = 0; k < epa.periodCount(); ++k)
+        epaOutfall = std::max(epaOutfall, static_cast<double>(epaNodes->value(k, epaInflow, epaO1)));
+    CHECK(epaOutfall > 5.0);
+    CHECK_NEAR(outfall, epaOutfall, 0.25 * epaOutfall);
 }
 
 TEST_CASE("engines: SWMM5+ input preparation removes every ignored feature")
