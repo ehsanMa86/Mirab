@@ -20,7 +20,8 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Model information, engine checks, resilience analyses, DEM elevations and export.
+"""Model information, engine checks, resilience analyses, DEM elevations, export and the
+dry-weather flow of a sewer model from a water model.
 
 Each function runs one ``mirab-cli`` command with ``--json`` (or in machine
 mode for the long analyses, which report progress) and returns the decoded
@@ -132,6 +133,38 @@ def export(model: PathLike, format: str, out: PathLike, crs: Optional[str] = Non
     """Writes ``geojson``, ``gpkg`` (GeoPackage) or ``wntr`` (WNTR JSON) and returns ``{"path", "notes"}``."""
     return resolve_cli(cli).json(["export", format, model, "--json"] +
                                  _opts(out=out, crs=crs, results=results, period=period))
+
+
+def link_dwf(sewer: PathLike, water: Optional[PathLike] = None, distance: Optional[float] = None,
+             return_factor: Optional[float] = None, category_factors: Optional[Dict[str, float]] = None,
+             categories: Optional[Sequence[str]] = None, use_results: Optional[PathLike] = None,
+             tag: Optional[str] = None, areas: Optional[PathLike] = None,
+             overrides: Optional[Dict[str, str]] = None, lag: Optional[float] = None, weekend: bool = False,
+             week_start: Optional[str] = None, prefix: Optional[str] = None, storage: bool = True,
+             crs: Optional[str] = None, water_crs: Optional[str] = None, out: Optional[PathLike] = None,
+             cli: CliArg = None) -> Dict[str, Any]:
+    """Dry-weather inflow of a SWMM sewer model from the water use of an EPANET model.
+
+    Options left out come from the link stored with the SWMM project. Demand
+    categories are named as in the EPANET file; ``""`` is the demand without a
+    category. ``areas`` is ``"subcatchments"`` or a polygon file, ``overrides``
+    maps EPANET nodes to SWMM nodes (``""`` leaves a node out). Returns the
+    inflows, patterns, assignments and totals; with ``out`` the model and its
+    link are written there (``out`` may be the model itself).
+    """
+    factors = None
+    if return_factor is not None or category_factors:
+        parts = [] if return_factor is None else [str(return_factor)]
+        parts += [f"{name or 'none'}={value}" for name, value in (category_factors or {}).items()]
+        factors = ",".join(parts)
+    pairs = ",".join(f"{w}={s}" for w, s in overrides.items()) if overrides else None
+    args = ["link", "dwf", sewer, "--json"] + _opts(
+        water=water, distance=distance, categories=_ids([c or "none" for c in categories]) if categories else None,
+        use_results=use_results, tag=tag, areas=areas, override=pairs, lag=lag, weekend=weekend,
+        week_start=week_start, prefix=prefix, no_storage=not storage, crs=crs, water_crs=water_crs, out=out)
+    if factors is not None:
+        args += ["--return", factors]
+    return resolve_cli(cli).json(args)
 
 
 def import_wntr(network: PathLike, out: PathLike, cli: CliArg = None) -> Dict[str, Any]:

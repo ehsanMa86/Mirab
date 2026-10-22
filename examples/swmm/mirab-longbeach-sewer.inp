@@ -1,0 +1,175 @@
+; Mirab - Unified Water Infrastructure Modeling Environment
+; https://github.com/ehsanMa86/Mirab
+;
+; File:    examples/swmm/mirab-longbeach-sewer.inp
+; Purpose: Sanitary sewer of the Long Beach demonstration network (EPSG:2229, CFS), linked to examples/epanet/mirab-demo-longbeach.inp.
+;
+; Copyright (C) 2026 Ehsan Madadi
+;
+; This program is free software: you can redistribute it and/or modify it
+; under the terms of the GNU General Public License as published by the Free
+; Software Foundation, either version 3 of the License, or (at your option)
+; any later version.
+;
+; This program is distributed in the hope that it will be useful, but WITHOUT
+; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+; FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+; more details.
+;
+; You should have received a copy of the GNU General Public License along
+; with this program. If not, see <https://www.gnu.org/licenses/>.
+;
+; SPDX-License-Identifier: GPL-3.0-or-later
+[TITLE]
+Mirab demonstration sanitary sewer, downtown Long Beach, California
+Sewers in the alleys east of the water mains of mirab-demo-longbeach.inp; dry-weather flow from its water use
+
+[OPTIONS]
+FLOW_UNITS           CFS
+INFILTRATION         HORTON
+FLOW_ROUTING         DYNWAVE
+LINK_OFFSETS         DEPTH
+MIN_SLOPE            0
+ALLOW_PONDING        NO
+SKIP_STEADY_STATE    NO
+START_DATE           01/05/2026
+START_TIME           00:00:00
+REPORT_START_DATE    01/05/2026
+REPORT_START_TIME    00:00:00
+END_DATE             01/07/2026
+END_TIME             00:00:00
+DRY_DAYS             5
+REPORT_STEP          00:15:00
+WET_STEP             00:05:00
+DRY_STEP             00:15:00
+ROUTING_STEP         0:00:10
+INERTIAL_DAMPING     PARTIAL
+NORMAL_FLOW_LIMITED  BOTH
+FORCE_MAIN_EQUATION  H-W
+VARIABLE_STEP        0.75
+LENGTHENING_STEP     0
+MIN_SURFAREA         12.566
+MAX_TRIALS           8
+HEAD_TOLERANCE       0.005
+SYS_FLOW_TOL         5
+LAT_FLOW_TOL         5
+THREADS              1
+
+[JUNCTIONS]
+;;Name           Elevation  MaxDepth   InitDepth  SurDepth   Aponded
+MH-A1            58         8          0          0          0
+MH-A1S           54.5       8          0          0          0
+MH-A2            51         8          0          0          0
+MH-A2S           47.5       8          0          0          0
+MH-A3            44         8          0          0          0
+MH-B1            51         8          0          0          0
+MH-B1S           46         8          0          0          0
+MH-B2            41         8          0          0          0
+MH-B2S           38         8          0          0          0
+MH-B3            35         8          0          0          0
+MH-C1            44         8          0          0          0
+MH-C1S           41         8          0          0          0
+MH-C2            38         8          0          0          0
+MH-C2S           34.5       8          0          0          0
+MH-C3            31         8          0          0          0
+MH-AB3           39.5       8          0          0          0
+MH-BC3           33         8          0          0          0
+MH-C4            28.75      8.75       0          0          0
+
+[OUTFALLS]
+;;Name           Elevation  Type       Stage Data       Gated
+OF-1             26.5       FREE                        NO
+
+[CONDUITS]
+;;Name           From Node        To Node          Length     Roughness  InOffset   OutOffset  InitFlow   MaxFlow
+S1               MH-A1            MH-A1S           492.2      0.013      0          0          0          0
+S2               MH-A1S           MH-A2            492.1      0.013      0          0          0          0
+S3               MH-A2            MH-A2S           492.1      0.013      0          0          0          0
+S4               MH-A2S           MH-A3            492.1      0.013      0          0          0          0
+S5               MH-B1            MH-B1S           492.2      0.013      0          0          0          0
+S6               MH-B1S           MH-B2            492.1      0.013      0          0          0          0
+S7               MH-B2            MH-B2S           492.1      0.013      0          0          0          0
+S8               MH-B2S           MH-B3            492.1      0.013      0          0          0          0
+S9               MH-C1            MH-C1S           492.2      0.013      0          0          0          0
+S10              MH-C1S           MH-C2            492.1      0.013      0          0          0          0
+S11              MH-C2            MH-C2S           492.1      0.013      0          0          0          0
+S12              MH-C2S           MH-C3            492.1      0.013      0          0          0          0
+S13              MH-A3            MH-AB3           450        0.013      0          0          0          0
+S14              MH-AB3           MH-B3            534.2      0.013      0          0          0          0
+S15              MH-B3            MH-BC3           450        0.013      0          0          0          0
+S16              MH-BC3           MH-C3            534.3      0.013      0          0          0          0
+S17              MH-C3            MH-C4            492.1      0.013      0          0          0          0
+S18              MH-C4            OF-1             492.1      0.013      0          0          0          0
+
+[XSECTIONS]
+;;Link           Shape        Geom1            Geom2      Geom3      Geom4      Barrels
+S1               CIRCULAR     0.667            0          0          0          1
+S2               CIRCULAR     0.667            0          0          0          1
+S3               CIRCULAR     0.667            0          0          0          1
+S4               CIRCULAR     0.667            0          0          0          1
+S5               CIRCULAR     0.667            0          0          0          1
+S6               CIRCULAR     0.667            0          0          0          1
+S7               CIRCULAR     0.833            0          0          0          1
+S8               CIRCULAR     0.833            0          0          0          1
+S9               CIRCULAR     0.667            0          0          0          1
+S10              CIRCULAR     0.667            0          0          0          1
+S11              CIRCULAR     0.833            0          0          0          1
+S12              CIRCULAR     0.833            0          0          0          1
+S13              CIRCULAR     0.833            0          0          0          1
+S14              CIRCULAR     0.833            0          0          0          1
+S15              CIRCULAR     1                0          0          0          1
+S16              CIRCULAR     1                0          0          0          1
+S17              CIRCULAR     1.25             0          0          0          1
+S18              CIRCULAR     1.25             0          0          0          1
+
+[DWF]
+ MH-A2           FLOW            0.138434        ""              ""              WW_PAT1
+ MH-A3           FLOW            0.112477        ""              ""              WW_PAT1
+ MH-B1           FLOW            0.138434        ""              ""              WW_PAT1
+ MH-B2           FLOW            0.216303        ""              ""              WW_PAT1
+ MH-B3           FLOW            0.190346        ""              ""              WW_PAT1
+ MH-C1           FLOW            0.138434        ""              ""              WW_PAT1
+ MH-C2           FLOW            0.16439         ""              ""              WW_PAT1
+ MH-C3           FLOW            0.138434        ""              ""              WW_PAT1
+
+[PATTERNS]
+ WW_PAT1         HOURLY          0.6695          0.5665          0.4893          0.4635          0.4893          0.618
+ WW_PAT1         0.8755          1.1845          1.3906          1.3906          1.2876          1.2103
+ WW_PAT1         1.1588          1.1073          1.0558          1.03            1.0815          1.2361
+ WW_PAT1         1.3906          1.3906          1.2361          1.03            0.8755          0.7725
+
+[REPORT]
+INPUT      NO
+CONTROLS   NO
+NODES ALL
+LINKS ALL
+
+[MAP]
+DIMENSIONS 6502800 1739600 6505700 1743300
+Units      Feet
+
+[COORDINATES]
+;;Node           X-Coord            Y-Coord
+MH-A1            6503491.1          1742993.2
+MH-A1S           6503491.1          1742501.0
+MH-A2            6503491.1          1742008.9
+MH-A2S           6503491.1          1741516.8
+MH-A3            6503491.1          1741024.7
+MH-B1            6504475.3          1742993.2
+MH-B1S           6504475.3          1742501.0
+MH-B2            6504475.3          1742008.9
+MH-B2S           6504475.3          1741516.8
+MH-B3            6504475.3          1741024.7
+MH-C1            6505459.6          1742993.2
+MH-C1S           6505459.6          1742501.0
+MH-C2            6505459.6          1742008.9
+MH-C2S           6505459.6          1741516.8
+MH-C3            6505459.6          1741024.7
+MH-AB3           6503941.1          1741024.7
+MH-BC3           6504925.3          1741024.7
+MH-C4            6505459.6          1740532.6
+OF-1             6505459.6          1740040.5
+
+[VERTICES]
+;;Link           X-Coord            Y-Coord
+

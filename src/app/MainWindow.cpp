@@ -48,6 +48,7 @@
 #include "SolverProcess.h"
 #include "SwmmEditors.h"
 #include "Theme.h"
+#include "WaterLinkDialog.h"
 #include "mirab/MirabConfig.h"
 #include "mirab/core/Editing.h"
 #include "mirab/core/Query.h"
@@ -141,6 +142,7 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
 
     createActions();
     createDocks();
+    linkedLayer_ = new LinkedNetworkLayer(doc_, map_, this);
     createMenus();
     createToolBar();
     createStatusBar();
@@ -162,6 +164,7 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
         // EPANET traces follow the flows by default, SWMM traces the conduit direction.
         followFlowsAct_->setChecked(doc_->model().dialect() != Dialect::Swmm);
         updateSelectionActions();
+        linkedLayer_->refresh();
     });
     connect(doc_, &ProjectDocument::modelChanged, this, [this] {
         updateCompatibility();
@@ -661,6 +664,23 @@ void MainWindow::createMenus()
         doc_->settings().backdropImage.clear();
         doc_->markSettingsChanged();
     });
+    linkedLayerAct_ = view->addAction(tr("Linked network layer"));
+    linkedLayerAct_->setCheckable(true);
+    linkedLayerAct_->setStatusTip(tr("Show the water network linked to this sewer model, or a sewer model "
+                                     "over this water network"));
+    connect(linkedLayerAct_, &QAction::triggered, this, [this](bool on) {
+        if (doc_->model().dialect() == Dialect::Swmm || !on)
+            linkedLayer_->setVisible(on);
+        else
+            linkedLayer_->chooseSewerModel(this);
+    });
+    connect(view, &QMenu::aboutToShow, this, [this] {
+        const bool swmm = doc_->model().dialect() == Dialect::Swmm;
+        linkedLayerAct_->setText(swmm ? tr("&Water network layer") : tr("&Sewer network layer..."));
+        linkedLayerAct_->setEnabled(linkedLayer_->available());
+        linkedLayerAct_->setChecked(linkedLayer_->available() && linkedLayer_->isVisible() &&
+                                    (swmm || linkedLayer_->hasSewerModel()));
+    });
     view->addSeparator();
     panelsMenu_ = view->addMenu(tr("&Panels"));
     for (auto* d : findChildren<QDockWidget*>())
@@ -744,6 +764,7 @@ void MainWindow::createMenus()
     tools->addAction(measureAreaAct_);
     tools->addSeparator();
     tools->addAction(icons::get("profile"), tr("&Elevations from DEM..."), this, &MainWindow::elevationsFromDem);
+    tools->addAction(tr("&Wastewater from water model..."), this, &MainWindow::wastewaterFromWaterModel);
     tools->addSeparator();
     pluginMenu_ = tools->addMenu(tr("&Plugins"));
     tools->addAction(icons::get("settings"), tr("&Settings..."), this, [this] { SettingsDialog(this).exec(); });
@@ -2137,9 +2158,29 @@ void MainWindow::elevationsFromDem()
         statusBar()->showMessage(tr("Elevations updated from the DEM. Undo restores the previous values."), 8000);
 }
 
+void MainWindow::wastewaterFromWaterModel()
+{
+    if (doc_->model().dialect() != Dialect::Swmm)
+    {
+        QMessageBox::information(this, tr("Wastewater from water model"),
+                                 tr("Open the SWMM model of the sewer first. This tool computes its "
+                                    "dry-weather inflow from the water use of an EPANET model; "
+                                    "View > Sewer network layer shows a sewer model over this network."));
+        return;
+    }
+    WaterLinkDialog dlg(doc_, this);
+    connect(&dlg, &WaterLinkDialog::linkChanged, linkedLayer_, &LinkedNetworkLayer::refresh);
+    if (dlg.exec() == QDialog::Accepted)
+        statusBar()->showMessage(tr("Dry-weather inflow written from the water model. Undo restores the "
+                                    "previous values."),
+                                 8000);
+}
+
 void MainWindow::openTool(const QString& name)
 {
-    if (name == "select-query")
+    if (name == "wastewater")
+        wastewaterFromWaterModel();
+    else if (name == "select-query")
         showQueryDialog();
     else if (name == "elevations")
         elevationsFromDem();

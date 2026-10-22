@@ -1,0 +1,27 @@
+{
+  "format": "mirab-project-settings/1",
+  "engine": "swmm-5.2-epa",
+  "useMsx": false,
+  "msxFile": "",
+  "crs": "EPSG:2229",
+  "backdropImage": "",
+  "basemap": "osm",
+  "pressureThreshold": 0,
+  "waterLink": {
+    "waterModel": "../epanet/mirab-demo-longbeach.inp",
+    "maxDistance": 300,
+    "returnFactor": 0.8,
+    "patternPrefix": "WW_",
+    "lagHours": 0.5,
+    "links": {
+      "J2": "MH-B1",
+      "J3": "MH-C1",
+      "J4": "MH-A2",
+      "J5": "MH-B2",
+      "J6": "MH-C2",
+      "J7": "MH-A3",
+      "J8": "MH-B3",
+      "J9": "MH-C3"
+    }
+  }
+}

@@ -36,8 +36,8 @@ NumPy is used when installed; pandas enables ``to_dataframe()``.
 """
 
 from ._cli import Cli, CliError, CliNotFoundError, default_cli, find_cli, set_cli
-from .analysis import (check, criticality, elevations, engines, export, fireflow, import_wntr, info, service,
-                       todini, topology)
+from .analysis import (check, criticality, elevations, engines, export, fireflow, import_wntr, info, link_dwf,
+                       service, todini, topology)
 from .batch import Case, CaseResult, run_batch
 from .project import Element, ElementCollection, Project, edit, open_project, option, rows, scenarios
 from .results import Results, Table, Variable, has_numpy, load_results
@@ -49,6 +49,6 @@ __all__ = [
     "Case", "CaseResult", "Cli", "CliError", "CliNotFoundError", "Element", "ElementCollection", "Event",
     "FrameEvent", "Project", "Results", "RunResult", "Simulation", "Table", "Variable", "check",
     "criticality", "decode_frame", "default_cli", "edit", "elevations", "engines", "export", "find_cli",
-    "fireflow", "has_numpy", "import_wntr", "info", "load_results", "open_project", "option", "rows", "run",
+    "fireflow", "has_numpy", "import_wntr", "info", "link_dwf", "load_results", "open_project", "option", "rows", "run",
     "run_batch", "scenarios", "service", "set_cli", "todini", "topology", "__version__",
 ]

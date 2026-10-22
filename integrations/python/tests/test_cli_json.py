@@ -177,3 +177,30 @@ def test_export_and_elevations(cli, epanet_demo, tmp_path):
     assert j1["new"] == pytest.approx(25.0, abs=0.6)
     applied = mirab.elevations(epanet_demo, dem, dem_units="m", out=tmp_path / "high.inp")
     assert applied["written"].endswith("high.inp") and applied["changed"] > 0
+
+
+def test_link_dwf(cli, examples, tmp_path):
+    import shutil
+    for rel in ("swmm/mirab-longbeach-sewer.inp", "epanet/mirab-demo-longbeach.inp"):
+        dst = tmp_path / rel
+        dst.parent.mkdir(exist_ok=True)
+        shutil.copyfile(examples / rel, dst)
+        shutil.copyfile(examples / (rel + ".mirab.json"), tmp_path / (rel + ".mirab.json"))
+    sewer = tmp_path / "swmm" / "mirab-longbeach-sewer.inp"
+    plan = mirab.link_dwf(sewer)
+    keys(plan, "model", "water", "flowUnits", "source", "days", "totals", "inflows", "patterns",
+         "assignments", "notes")
+    keys(plan["totals"], "waterDemand", "includedDemand", "returned", "unassignedFlow", "demandNodes",
+         "unassigned", "tooFar", "swmmNodes")
+    assert plan["flowUnits"] == "CFS" and plan["totals"]["unassigned"] == 0
+    keys(plan["inflows"][0], "node", "average", "sources")
+
+    # Half the water returns; a node left out and a short distance limit.
+    half = mirab.link_dwf(sewer, water=tmp_path / "epanet" / "mirab-demo-longbeach.inp", return_factor=0.4,
+                          distance=100, overrides={"J5": "MH-B1S"}, out=tmp_path / "half.inp")
+    manual = next(a for a in half["assignments"] if a["water"] == "J5")
+    assert manual["status"] == "manual" and manual["swmm"] == "MH-B1S"
+    assert half["totals"]["returned"] == pytest.approx(manual["demand"] * 0.4, rel=1e-6)
+    assert half["totals"]["tooFar"] == 7 and half["written"].endswith("half.inp")
+    link = json.loads((tmp_path / "half.inp.mirab.json").read_text())["waterLink"]
+    assert link["waterModel"] == "epanet/mirab-demo-longbeach.inp" and link["links"] == {"J5": "MH-B1S"}

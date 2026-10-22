@@ -23,6 +23,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include "Calibrate.h"
+#include "Link.h"
 #include "mirab/MirabConfig.h"
 #include "mirab/core/Elevation.h"
 #include "mirab/core/Features.h"
@@ -1986,7 +1987,7 @@ Usage:
                   [--nodes ID,ID] [--reservoirs] [--no-tanks] [--swmm invert|depth]
                   [--dem-units auto|m|ft|usft] [--crs EPSG:n] [--decimals N]
                   [--out model.inp] [--json]
-)" << cli::calibrateUsage() << R"(
+)" << cli::calibrateUsage() << cli::linkUsage() << R"(
 
 Engines: epanet-2.2-epa, epanet-2.3-owa, epanet-msx-2.0-epa22, epanet-msx-2.0-owa23,
          swmm-5.2-epa, swmm5plus-1.0 (when installed). Run "mirab-cli engines".
@@ -2080,6 +2081,8 @@ int runMain(int argc, char** argv)
             return cli::runCalibrate(std::vector<std::string>(argsv.begin() + 2, argsv.end()));
         if (cmd == "model")
             return cmdModel(a);
+        if (cmd == "link")
+            return cli::runLink(std::vector<std::string>(argsv.begin() + 2, argsv.end()));
         std::cerr << "unknown command " << cmd << "\n";
         usage();
         return 1;

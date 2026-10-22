@@ -55,6 +55,7 @@ set(APP_SOURCES
     SolverProcess.cpp SolverProcess.h
     SwmmEditors.cpp SwmmEditors.h
     Theme.cpp Theme.h
+    WaterLinkDialog.cpp WaterLinkDialog.h
     include/mirab/app/PluginInterface.h
     main.cpp
     resources/mirab.qrc)

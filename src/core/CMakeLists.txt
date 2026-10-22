@@ -33,6 +33,7 @@ add_library(mirab_core STATIC
     src/Inflate.cpp
     src/InpDocument.cpp
     src/Json.cpp
+    src/Linkage.cpp
     src/LiveResults.cpp
     src/Model.cpp
     src/ModelJson.cpp

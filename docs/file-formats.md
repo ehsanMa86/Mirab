@@ -36,7 +36,7 @@
 }
 ```
 
-Scenarios, when the project has any, are stored under `scenarios` (see [Scenarios](#scenarios)) and the calibration set-up under `calibration`. Members a version of Mirab does not know are ignored when the file is read.
+Scenarios, when the project has any, are stored under `scenarios` (see [Scenarios](#scenarios)), the calibration set-up under `calibration` and, in a SWMM project linked to a water distribution model, the link under `waterLink` (see [Water link](#water-link)). Members a version of Mirab does not know are ignored when the file is read.
 
 Paths are relative to the `.inp` file. `basemap` is a built-in provider (`osm`, `esri-imagery`, ...) or `custom:<name>`; `mapService` describes a custom one (`type` `xyz`, `wms` or `wmts`; WMTS also has `matrixSet`, `style` and `format`). Raster `style` is `hillshade`, `color`, `hillshade-color` or `image`; `verticalUnit` is metres per elevation unit and is left out when the file's own units are used. An optional `calibration` member holds the observed-data files, how their columns link to results, and the calibration parameters and objective; its layout is described in the [user guide](user-guide.md#from-the-command-line).
 
@@ -73,6 +73,46 @@ A change finds its row by `section` (upper case, without brackets), `key` and `r
 - `op` is `set` (one value: `column` counts from 0 over the row's values, `from` and `to` are strings), `row` (all values, when their number changes), `add` (a new row, inserted after the last row with the key), `remove`, or `text` (all lines of a free-text section such as `[TITLE]`).
 
 `from` holds the parent's value when the change was recorded. When it no longer matches, the change is reported as a conflict and the scenario's value is used; a change whose row no longer exists is reported and skipped, and so is an added row of an element ([DEMANDS], [COORDINATES], ...) that no longer exists.
+
+### Water link
+
+A SWMM project whose dry-weather inflow comes from an EPANET model of the same area
+([user guide](user-guide.md#water-and-wastewater-together)) keeps the link in its sidecar:
+
+```json
+"waterLink": {
+  "waterModel": "../epanet/mirab-demo-longbeach.inp",
+  "maxDistance": 300,
+  "nodeTag": "Sanitary",
+  "serviceAreas": "subcatchments",
+  "returnFactor": 0.8,
+  "categoryFactors": {"Irrigation": 0, "Commercial": 0.9},
+  "categories": ["", "Commercial"],
+  "patternPrefix": "WW_",
+  "weekend": true, "weekStart": "Monday",
+  "lagHours": 0.5,
+  "results": "../epanet/mirab-demo-longbeach.anr",
+  "overrides": {"J5": "MH-B1S", "J9": ""},
+  "links": {"J2": "MH-B1", "J3": "MH-C1", "J5": "MH-B1S"},
+  "showReference": true
+}
+```
+
+| Member | Meaning |
+|---|---|
+| `waterModel` | the EPANET input file, relative to the SWMM file |
+| `maxDistance` | largest distance from a water junction to its SWMM node in SWMM map units; 0 for none |
+| `nodeTag`, `serviceAreas`, `storage` | optional limits on the receiving SWMM nodes: a `[TAGS]` tag, `subcatchments` or a polygon file (relative path), and `false` when storage units do not receive flow |
+| `returnFactor`, `categoryFactors` | share of the water that returns, and per demand category (`""` is the demand without a category) |
+| `categories` | optional: only these demand categories return flow |
+| `patternPrefix`, `weekend`, `weekStart`, `lagHours` | names of the patterns written, weekly patterns, the day of the week at EPANET time zero, travel time in hours |
+| `results` | optional: EPANET results used instead of the base demands |
+| `overrides` | manual choices: water junction to SWMM node, `""` to leave it out |
+| `links` | the SWMM node of each water junction at the last apply, drawn on the map |
+| `showReference` | `false` hides the water network on the SWMM map |
+
+Optional members are left out when not used. The dry-weather inflow itself is part of the input
+file (`[DWF]` rows with constituent `FLOW` and patterns named with `patternPrefix`).
 
 ## Results format (`.anr`)
 

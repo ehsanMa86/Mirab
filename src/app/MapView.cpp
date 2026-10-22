@@ -824,7 +824,52 @@ void MapView::paintEvent(QPaintEvent*)
     RenderOptions o;
     o.overlays = true;
     o.highlights = true;
+    o.screenOverlays = true;
     paintTo(p, QRectF(rect()), o);
+}
+
+void MapView::setOverlay(const QString& name, Overlay overlay)
+{
+    overlays_[name] = std::move(overlay);
+    update();
+}
+
+void MapView::removeOverlay(const QString& name)
+{
+    if (overlays_.erase(name) > 0)
+        update();
+}
+
+void MapView::drawOverlays(QPainter& p, const QRectF& area, const RenderOptions& o, bool aboveLinks)
+{
+    const QRectF visible = area.adjusted(-20, -20, 20, 20);
+    for (const auto& [name, layer] : overlays_)
+    {
+        if (layer.aboveLinks != aboveLinks || !(layer.inExports || o.screenOverlays))
+            continue;
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(layer.lineColor, layer.lineWidth, layer.lineStyle, Qt::RoundCap, Qt::RoundJoin));
+        for (const auto& line : layer.lines)
+        {
+            QPolygonF poly;
+            for (const auto& pt : line)
+                poly << toScreen(pt);
+            if (poly.size() >= 2 && poly.boundingRect().adjusted(-1, -1, 1, 1).intersects(visible))
+                p.drawPolyline(poly);
+        }
+        if (layer.points.empty())
+            continue;
+        p.setPen(Qt::NoPen);
+        p.setBrush(layer.pointColor);
+        const double r = layer.pointSize / 2;
+        for (const auto& pt : layer.points)
+        {
+            const QPointF c = toScreen(pt);
+            if (visible.contains(c))
+                p.drawEllipse(c, r, r);
+        }
+    }
+    p.setBrush(Qt::NoBrush);
 }
 
 // Fits the current view into a target rectangle for the lifetime of the scope.
@@ -1134,6 +1179,8 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
         p.setOpacity(1.0);
     }
 
+    drawOverlays(p, area, o, false);
+
     if (!o.network)
     {
         if (o.overlays)
@@ -1356,6 +1403,8 @@ void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
             p.drawLine(c + QPointF(-10, 10), c + QPointF(10, -10));
         }
     }
+
+    drawOverlays(p, area, o, true);
 
     // Nodes
     const double r = std::clamp(scale_ * 2.4, 3.2, 6.5);

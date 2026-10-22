@@ -39,6 +39,7 @@ documents; the [Python package](python.md) is built on them.
 | `scenarios export <model>` | the file written and the conflicts |
 | `batch <model>` | the outcome of each run |
 | `export ...`, `import wntr ...` | the file written and notes |
+| `link dwf <sewer>` | the dry-weather inflows from a water model ([below](#water-and-wastewater-link-dwf)) |
 
 ## Engines and checks
 
@@ -320,3 +321,52 @@ Metrics that do not apply to a series (such as the volume error of a pressure) a
 `calibrate` writes `evaluations.csv`, `best.json` and `<model>-best.inp` to `--out-dir`; with
 `--machine` it reports each run as an `evaluation` event and ends with a `done` event whose
 `payload` holds the best parameters (see [file-formats.md](file-formats.md#solver-protocol)).
+
+## Water and wastewater: `link dwf`
+
+`link dwf` computes the dry-weather inflow of a SWMM sewer model from the water use of an EPANET
+model of the same area (see the [user guide](user-guide.md#water-and-wastewater-together)).
+Without `--out` it only previews.
+
+```sh
+mirab-cli link dwf sewer.inp --water water.inp --distance 300 --json
+mirab-cli link dwf sewer.inp --water water.inp --return 0.8,Irrigation=0,none=0.9 --lag 0.5 --out sewer.inp
+mirab-cli link dwf sewer.inp --use-results water.anr --weekend --week-start Saturday --out sewer.inp
+```
+
+| Option | Meaning |
+|---|---|
+| `--water FILE` | the EPANET model; its coordinate system is read from its sidecar |
+| `--distance D` | largest distance from a water junction to its SWMM node, in SWMM map units (0: no limit) |
+| `--return F[,CAT=F...]` | return factor, and factors of demand categories (`none` is the demand without a category) |
+| `--categories CAT,CAT` | only these demand categories return flow |
+| `--use-results FILE` | the delivered demand of an EPANET run (`.anr` or EPANET binary output) instead of the base demands and patterns |
+| `--tag TAG` | only SWMM nodes with this tag receive flow |
+| `--areas subcatchments\|FILE` | service areas: the SWMM subcatchments or the polygons of a shapefile or DXF file |
+| `--override W=S,...` | water junction `W` drains to SWMM node `S`; `W=` leaves it out |
+| `--lag HOURS` | travel time added to the patterns |
+| `--weekend`, `--week-start DAY` | weekly sources: `WEEKEND` and `DAILY` patterns too; the day of the week at EPANET time zero (default Monday) |
+| `--prefix P` | prefix of the pattern names (default `WW_`) |
+| `--no-storage` | storage units do not receive flow |
+| `--crs`, `--water-crs` | coordinate systems, when the sidecars have none |
+| `--out FILE` | writes the model with the `[DWF]` flow rows and patterns, and the link in its sidecar |
+
+Options not given come from the link in the SWMM project's sidecar (`waterLink`, see
+[file-formats.md](file-formats.md#settings-sidecar)). With `--json`:
+
+```json
+{"model": "sewer.inp", "water": "/data/water.inp", "flowUnits": "CFS", "source": "demands", "days": 1,
+ "totals": {"waterDemand": 1.547, "includedDemand": 1.547, "returned": 1.237, "unassignedFlow": 0,
+            "demandNodes": 8, "unassigned": 0, "tooFar": 0, "swmmNodes": 8},
+ "inflows": [{"node": "MH-A2", "average": 0.1384, "hourly": "WW_PAT1", "sources": ["J4"]}],
+ "patterns": [{"name": "WW_PAT1", "type": "HOURLY", "factors": [0.6695, 0.5665, "..."]}],
+ "assignments": [{"water": "J4", "swmm": "MH-A2", "status": "matched", "distance": 246,
+                  "demand": 0.173, "returned": 0.1384}],
+ "notes": [], "written": "sewer.inp", "changed": 12}
+```
+
+Flows are averages in the SWMM flow units. `inflows` may also have `weekend` and `daily` pattern
+names. `status` is `matched`, `manual`, `too-far` (with `nearest` and its `distance`),
+`no-coordinates`, `outside-areas`, `no-candidate` or `excluded`; `swmm` is `null` for a junction that
+is not connected, and `area` names its service area. `written` and `changed` (rows written or
+removed) appear with `--out`.

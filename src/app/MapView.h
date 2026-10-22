@@ -34,6 +34,7 @@
 #include <QVector>
 #include <QWidget>
 
+#include <map>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -108,6 +109,25 @@ public:
     /// Problem with the current map service, empty when none.
     QString basemapError() const;
 
+    /// Lines and points in model coordinates drawn with the network, for
+    /// reference layers and previews (another model, links between models).
+    struct Overlay
+    {
+        std::vector<std::vector<core::Point>> lines;
+        std::vector<core::Point> points;
+        QColor lineColor = QColor(120, 128, 140);
+        double lineWidth = 1.0; ///< painter units
+        Qt::PenStyle lineStyle = Qt::SolidLine;
+        QColor pointColor = QColor(120, 128, 140);
+        double pointSize = 3.0;  ///< diameter in painter units
+        bool aboveLinks = false; ///< over the links (under the nodes) instead of under the network
+        bool inExports = false;  ///< also drawn by render(), otherwise on screen only
+    };
+    /// Adds or replaces the overlay called @p name.
+    void setOverlay(const QString& name, Overlay overlay);
+    void removeOverlay(const QString& name);
+    bool hasOverlay(const QString& name) const { return overlays_.count(name) > 0; }
+
     /// Coordinate system of the model coordinates ("EPSG:32614", WKT, ...).
     void setCoordinateSystem(const QString& crs);
     QString coordinateSystemName() const;
@@ -125,6 +145,7 @@ public:
         bool network = true;
         bool overlays = false;   ///< the on-screen legend, scale bar and attribution
         bool highlights = false; ///< selection, hover and pending edits
+        bool screenOverlays = false; ///< overlays (setOverlay) that are not marked for exports
         QFont font;              ///< label font; the widget font when not set
         double pixelRatio = 1.0; ///< device pixels per painter unit
         /// Basemap tile pixels per painter unit: 1 matches the screen; higher
@@ -202,6 +223,7 @@ private:
     void drawScaleBar(QPainter& p, const QRectF& area);
     void drawAttribution(QPainter& p, const QRectF& area);
     void drawLabel(QPainter& p, const QPointF& at, const QString& text);
+    void drawOverlays(QPainter& p, const QRectF& area, const RenderOptions& o, bool aboveLinks);
     QColor colorFor(double value) const;
     /// Lower edge of legend class @p i (0 to 4); class 5 is the top of the range.
     double classEdge(int i) const;
@@ -281,6 +303,7 @@ private:
 
     QImage backdrop_;
     QRectF backdropWorld_;
+    std::map<QString, Overlay> overlays_;
 
     // render() state
     QFont paintFont_;

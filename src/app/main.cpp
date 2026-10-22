@@ -106,7 +106,8 @@ int main(int argc, char* argv[])
     const QCommandLineOption toolOpt("open-tool", "Open a tool dialog after the file: elevations (from a DEM), "
                                                   "raster-layers, map-service, observed-data, calibration, "
                                                   "calibration-run (starts the calibration; use --delay to "
-                                                  "picture its progress), select-query or run-scenarios.",
+                                                  "picture its progress), select-query, run-scenarios or "
+                                                  "wastewater (dry-weather flow from a water model).",
                                      "name");
     const QCommandLineOption scenarioOpt("scenario", "Activate a scenario of the project after opening it.", "name");
     const QCommandLineOption differenceOpt("map-difference",

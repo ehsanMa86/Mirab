@@ -20,7 +20,7 @@
 # with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
-add_executable(mirab-cli main.cpp Calibrate.cpp Calibrate.h)
+add_executable(mirab-cli main.cpp Calibrate.cpp Calibrate.h Link.cpp Link.h)
 target_link_libraries(mirab-cli PRIVATE
     Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 if(WIN32)

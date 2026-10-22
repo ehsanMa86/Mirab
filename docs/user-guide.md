@@ -451,6 +451,47 @@ mirab-cli calibrate model.inp [--config calib.json] [--engine ID] [--jobs N] [--
 
 `format` is `csv`, `epanet`, `swmm` or `auto`. Text tables also take `timeColumn`, `timeFormat` (`datetime` or `elapsed`), `timeUnit` (`hours`, `minutes`, `seconds`, `days`) and `dateOrder` (`MDY` or `DMY`). Without `links`, every column is linked by its name. With `--machine`, `calibrate` reports each run as an `evaluation` event (index, objective, best so far, parameter values) and stops on a `cancel` line.
 
+## Water and wastewater together
+
+Most of the water a town delivers comes back through its sewers. When the water distribution model (EPANET) and the sewer model (SWMM) cover the same area, Mirab links them: each water junction with a demand drains to a SWMM node, and the water used there, times a return factor, becomes the node's dry-weather inflow, with the daily rhythm of the demand.
+
+![Wastewater from water model](images/water-link-dialog.png)
+
+Open the SWMM model and choose *Tools > Wastewater from water model*:
+
+1. **Water model**: the EPANET input file of the same area. Its coordinate system comes from its own project settings; when it differs from the SWMM project's, the water coordinates are reprojected.
+2. **Matching**: every water junction with a demand goes to the nearest SWMM junction (or storage unit). *Maximum distance* (in the SWMM map units) leaves farther junctions unconnected, *Only nodes tagged* limits the candidates to SWMM nodes with a tag (`[TAGS]`, for example `Sanitary` in a combined model), and *Service areas* keeps each water junction inside its sewershed: the SWMM subcatchments, or the polygons of a shapefile or DXF drawing. Junctions outside every area are not connected. On the *Water nodes* tab, *Connect to* sends the selected water junctions to a SWMM node of your choice, *Do not connect* leaves them out and *Nearest node* undoes both.
+3. **Return to the sewer**: the share of the water that reaches the sewer (0.8 by default) and, per demand category of the EPANET model (`[DEMANDS]`), its own factor; untick a category, such as irrigation, to leave it out.
+4. **Flow and patterns**:
+   - *Base demands and patterns*: the average flow is the base demand times the mean of its pattern (with the global demand multiplier). The hourly pattern follows the demand pattern by clock hour, taking the pattern time step, pattern start and start clock time of the EPANET model into account, and is scaled to a mean of 1.
+   - *Simulation results*: the demand EPANET delivered in a run (an `.anr` file), hour by hour. With pressure-driven demand this is the water actually supplied. Emitter and leakage flows are left out.
+   - *Weekend pattern*: when the patterns or results cover a week, weekdays and weekends get their own hourly patterns (`HOURLY` and `WEEKEND`) and the day totals a `DAILY` pattern. Set the day of the week the EPANET patterns start on.
+   - *Travel time* delays the patterns by the time the water takes to reach the SWMM node.
+   - When several water junctions drain to one SWMM node, their patterns are combined in proportion to their flows. Identical patterns are written once; they are named with the *Pattern prefix* and the EPANET pattern (`WW_PAT1`) or the SWMM node.
+5. The tables preview each SWMM node's average flow (in the SWMM flow units), its pattern and the water junctions it receives, and each water junction's SWMM node, distance, demand and returned flow. The map beside them shows the SWMM network, the water junctions and a line to the node each one drains to; unconnected junctions are red. The line below sums up the water demand, the returned flow, and the junctions that are not connected or are farther than the distance.
+6. *Apply* writes the `FLOW` rows of `[DWF]` and the patterns as one step that *Edit > Undo* reverses. Other constituents in `[DWF]`, other patterns and the rest of the file are kept; flow rows and patterns written by an earlier apply that are no longer needed are removed. The link (the water model, the options, manual choices and the junctions each node receives) is saved with the project, so the dialog opens with it next time and a changed water model can be applied again.
+
+Once linked, the water network is drawn faintly under the SWMM map, with a dashed line from each water junction to its SWMM node. *View > Water network layer* shows or hides it. In an EPANET project, *View > Sewer network layer* draws a sewer model over the water network; when that sewer model is linked to this water model, the lines appear as well.
+
+![Water network and links on the sewer map](images/water-link-map.jpg)
+
+### Try it
+
+`examples/swmm/mirab-longbeach-sewer.inp` is a small sanitary sewer in the alleys of the streets of `examples/epanet/mirab-demo-longbeach.inp`, linked to it: 18 manholes, 8-inch to 15-inch pipes and an outfall to a trunk sewer. Its dry-weather inflow comes from the water network with a return factor of 0.8 and half an hour of travel time, so it runs as it is (*Simulation > Run*). Open *Tools > Wastewater from water model* and change the return factor, the distance or the travel time to see the effect, or run the water model with pressure-driven demand and use its results.
+
+### From the command line
+
+```
+mirab-cli link dwf sewer.inp --water water.inp                            # preview
+mirab-cli link dwf sewer.inp --water water.inp --out sewer.inp            # write
+mirab-cli link dwf sewer.inp --distance 300 --return 0.8,Irrigation=0 --lag 0.5 --out sewer.inp
+mirab-cli link dwf sewer.inp --use-results water.anr --weekend --week-start Monday --json
+```
+
+Options not given come from the link saved with the SWMM project; `--out` saves the link with the written model. See [cli.md](cli.md#water-and-wastewater-link-dwf) for every option and the JSON output, and [python.md](python.md#analyses) for `mirab.link_dwf`.
+
+The link is one-way: the water model sets the sewer inflows. A coupled simulation, in which the sewer would also affect the water network, is not part of Mirab.
+
 ## GIS and QGIS
 
 - *File > Export > GeoPackage* writes one layer per element type (junctions, pipes, conduits, subcatchments, ...) with every input value and, when results are loaded, the values of the current period.
@@ -497,7 +538,7 @@ mirab-cli calibrate model.inp [--config calib.json] [--engine ID] [--jobs N] [--
 | `--select-region X1,Y1,X2,Y2` | Selects the elements inside a rectangle of map coordinates. |
 | `--select-query EXPR` | Selects the elements that match a query expression; with `--open-tool select-query`, fills the dialog with it. |
 | `--trace KIND` | Traces from the selection: `downstream`, `upstream`, `connected` or `path`. |
-| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, `calibration-run` (starts the calibration), `select-query` or `run-scenarios`. |
+| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, `calibration-run` (starts the calibration), `select-query`, `run-scenarios` or `wastewater` (dry-weather flow from a water model). |
 | `--scenario NAME` | Activates a scenario of the project. |
 | `--map-difference NAME` | Colors the map by the change from a scenario's results (`Base` for the base model); exports show it too. |
 | `--period N` | Shows the results at reporting period N (0 is the first). |

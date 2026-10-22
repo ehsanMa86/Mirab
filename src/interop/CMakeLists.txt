@@ -21,7 +21,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 add_library(mirab_interop STATIC src/Gis.cpp src/Wntr.cpp
-    src/Shapefile.cpp src/Dxf.cpp src/CsvImport.cpp src/ImportModel.cpp)
+    src/Shapefile.cpp src/Dxf.cpp src/CsvImport.cpp src/ImportModel.cpp src/WaterLink.cpp)
 add_library(Mirab::interop ALIAS mirab_interop)
 target_include_directories(mirab_interop PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(mirab_interop PUBLIC Mirab::core PRIVATE Mirab::warnings)

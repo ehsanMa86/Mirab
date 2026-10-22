@@ -11,6 +11,8 @@
 - `--json` output for every `mirab-cli` command, `model get`/`model set` for scripted edits, and the `mirab` Python package with a native results reader, batch runs and a Model Context Protocol server.
 - Multi-selection (rectangle, polygon, query), upstream/downstream/connected tracing and shortest paths, editing many elements at once, splitting pipes and conduits, measuring distances and areas.
 - Scenarios stored as changes to the base model, with inheritance, batch runs (`mirab-cli batch`), a comparison report and a difference map.
+- Water and wastewater together: dry-weather flow of a SWMM model from the water use of a linked EPANET model (matching by distance, tags or service areas, return factors per demand category, patterns from demand patterns or results), a water network layer on the sewer map, `mirab-cli link dwf`, and a Long Beach sewer example linked to the water example.
+- SWMM5+ through its interface version 2: live results equal to the final results, subcatchment and system results, and pausing between steps.
 - The CARTO basemap, which now requires an API key, is replaced by the Esri light gray canvas.
 - Fixes: crash when closing the window during a run; SWMM 5.2 runs with relative paths; ponded and LID unit areas shown in m²/ft²; long result units no longer squeeze values in *Properties*; release tags with a hyphen are published as pre-releases.
 

@@ -172,7 +172,13 @@ p.fireflow(30, residual=14, nodes=["J5"])
 p.elevations("terrain/dem.tif", mode="missing", apply=True)
 p.export("gpkg", "network.gpkg")
 mirab.engines()                             # engines and whether they are installed
+mirab.link_dwf("sewer.inp", water="water.inp", distance=300, return_factor=0.8,
+               category_factors={"Irrigation": 0}, lag=0.5, out="sewer.inp")
 ```
+
+`mirab.link_dwf` computes the dry-weather inflow of a SWMM sewer model from the water use of an
+EPANET model of the same area and, with `out`, writes it; options left out come from the link saved
+with the SWMM project ([user guide](user-guide.md#water-and-wastewater-together)).
 
 They return the JSON documents of the matching `mirab-cli` commands ([cli.md](cli.md),
 [resilience.md](resilience.md)). Analyses read the file on disk, so save edits first.

@@ -78,6 +78,7 @@ struct ProjectSettings
     MapServiceSettings mapService; ///< definition of a custom basemap, so the project opens anywhere
     json::Value calibration;  ///< observed data and calibration set-up (core::CalibrationConfig)
     std::vector<Scenario> scenarios; ///< alternatives of the model, stored as changes (see Scenario.h)
+    json::Value waterLink;    ///< SWMM: link to the water distribution model (core::WaterLinkSettings)
 
     static std::filesystem::path sidecarPath(const std::filesystem::path& inpFile);
     /// Returns default settings when the sidecar does not exist or is invalid.

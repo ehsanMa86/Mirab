@@ -49,6 +49,7 @@ namespace mirab::app
 {
 
 class InpEditor;
+class LinkedNetworkLayer;
 class MapPage;
 class MapView;
 class MsxEditor;
@@ -104,8 +105,8 @@ public:
     /// Opens the simulation options dialog, optionally at a page (see OptionsDialog::showPage).
     void showSimulationOptions(const QString& page = {});
     /// Opens a tool dialog: "elevations", "raster-layers", "map-service", "observed-data",
-    /// "calibration", "calibration-run" (the calibration dialog with the run started) or
-    /// "run-scenarios".
+    /// "calibration", "calibration-run" (the calibration dialog with the run started),
+    /// "run-scenarios" or "wastewater" (SWMM: dry-weather flow from a water model).
     void openTool(const QString& name);
 
     // Deliverables. An empty path asks the user; a path exports without
@@ -182,6 +183,7 @@ private:
     void addMapService();
     void showRasterLayers();
     void elevationsFromDem();
+    void wastewaterFromWaterModel();
     void chooseCoordinateSystem();
     void loadPlugins();
     QString writeRunInput(QString* error);
@@ -199,6 +201,8 @@ private:
     engine::EngineRegistry registry_;
     MapPage* mapPage_ = nullptr;
     MapView* map_ = nullptr;
+    LinkedNetworkLayer* linkedLayer_ = nullptr;
+    QAction* linkedLayerAct_ = nullptr;
     StartPage* start_ = nullptr;
     PropertyPanel* props_ = nullptr;
     ResultsPanel* results_ = nullptr;
