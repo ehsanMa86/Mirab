@@ -26,6 +26,7 @@
 
 #include "ChartWidget.h"
 #include "Icons.h"
+#include "Language.h"
 #include "RulesEditor.h"
 #include "Theme.h"
 
@@ -238,6 +239,7 @@ core::UnitSystem SpecialEditor::unitSystem() const
 LidSchematic::LidSchematic(QWidget* parent) : QWidget(parent)
 {
     setAttribute(Qt::WA_OpaquePaintEvent);
+    setLayoutDirection(Qt::LeftToRight); // a cross-section drawing
 }
 
 void LidSchematic::setControl(const core::LidControl& control, core::UnitSystem system)
@@ -357,6 +359,9 @@ void LidSchematic::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
+    // Drawings keep their left-to-right geometry in every language; each text
+    // still runs in its own direction.
+    p.setLayoutDirection(Qt::LayoutDirectionAuto);
     p.fillRect(rect(), theme::kSurface);
     const QFontMetrics fm(font());
     const QRectF area = QRectF(rect()).adjusted(14, 10, -14, -12);
@@ -758,7 +763,7 @@ LidControlEditor::LidControlEditor(ProjectDocument* doc, const QString& id, QWid
     name_ = new QLineEdit(left);
     type_ = new QComboBox(left);
     for (const auto& t : core::lidTypes())
-        type_->addItem(qs(t.code + "  " + t.name), qs(t.code));
+        type_->addItem(qs(t.code) + "  " + coreText(t.name), qs(t.code));
     form->addRow(tr("Name"), name_);
     form->addRow(tr("Type"), type_);
     ll->addLayout(form);
@@ -846,7 +851,7 @@ void LidControlEditor::buildLayerTabs()
         loading_ = wasLoading;
         return;
     }
-    typeHelp_->setText(qs(info->help));
+    typeHelp_->setText(coreText(info->help));
     const std::string type = info->code;
     const auto system = unitSystem();
     QSet<QString> curves;
@@ -946,15 +951,15 @@ void LidControlEditor::buildLayerTabs()
             }
             f.setText(value.isEmpty() && f.combo && p.quantity == "yesno" ? qs(p.defaultUS) : value);
             const QString unit = qs(core::lidUnitLabel(p.quantity, system));
-            QString label = type == "RB" && layer == LidLayer::Storage && i == 0 ? tr("Barrel height") : qs(p.label);
+            QString label = type == "RB" && layer == LidLayer::Storage && i == 0 ? tr("Barrel height") : coreText(p.label);
             if (!unit.isEmpty())
                 label += " (" + unit + ")";
             QWidget* w = f.widget();
-            w->setToolTip(qs(p.help));
-            w->setProperty("helpTitle", qs(p.label));
+            w->setToolTip(coreText(p.help));
+            w->setProperty("helpTitle", coreText(p.label));
             w->installEventFilter(this);
             auto* lab = new QLabel(label, page);
-            lab->setToolTip(qs(p.help));
+            lab->setToolTip(coreText(p.help));
             form->addRow(lab, w);
             if (f.edit)
                 connect(f.edit, &QLineEdit::textEdited, this, [this] {
@@ -972,7 +977,7 @@ void LidControlEditor::buildLayerTabs()
         }
         pl->addLayout(form);
         pl->addStretch(1);
-        layerTabs_->addTab(page, tr(core::lidLayerName(layer)));
+        layerTabs_->addTab(page, coreText(core::lidLayerName(layer)));
     }
     if (current >= 0 && current < layerTabs_->count())
         layerTabs_->setCurrentIndex(current);
@@ -1778,7 +1783,7 @@ HydrographEditor::HydrographEditor(ProjectDocument* doc, const QString& id, QWid
     months_ = new QListWidget(split);
     months_->setMaximumWidth(200);
     for (const char* m : kMonthNames)
-        new QListWidgetItem(tr(m), months_);
+        new QListWidgetItem(QCoreApplication::translate("HydrographEditor", m), months_);
     auto* right = new QWidget(split);
     auto* rl = new QVBoxLayout(right);
     rl->setContentsMargins(8, 0, 0, 0);
@@ -1962,7 +1967,7 @@ void HydrographEditor::refresh()
         shown = 0;
         note_->setText(month_ == 0 ? tr("No parameters yet: enter R, T and K for at least one response.")
                                    : tr("%1 has no parameters of its own and uses the All months values (shown).")
-                                         .arg(tr(kMonthNames[month_])));
+                                         .arg(QCoreApplication::translate("HydrographEditor", kMonthNames[month_])));
     }
     else
     {
@@ -2013,7 +2018,7 @@ void HydrographEditor::refresh()
     }
     series.append(total);
     chart_->setSeries(series, tr("Ordinate (1/hr)"),
-                      tr("%1, %2").arg(name_->text().trimmed(), tr(kMonthNames[shown])));
+                      tr("%1, %2").arg(name_->text().trimmed(), QCoreApplication::translate("HydrographEditor", kMonthNames[shown])));
 }
 
 void HydrographEditor::apply()

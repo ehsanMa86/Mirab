@@ -120,6 +120,7 @@ QString num(double v, int digits = 4)
 
 class CalibrationReport : public QWidget
 {
+    Q_OBJECT
 public:
     CalibrationReport(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(doc), data_(ObservedData::of(doc))
     {
@@ -489,3 +490,5 @@ QWidget* createCalibrationReport(ProjectDocument* doc, QWidget* parent)
 }
 
 } // namespace mirab::app
+
+#include "CalibrationReport.moc"

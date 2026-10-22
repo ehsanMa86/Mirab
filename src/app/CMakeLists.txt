@@ -31,6 +31,7 @@ set(APP_SOURCES
     EngineDownloader.cpp EngineDownloader.h
     Icons.cpp Icons.h
     ImportDialog.cpp ImportDialog.h
+    Language.cpp Language.h CoreStrings.cpp
     LayoutDialog.cpp LayoutDialog.h
     MainWindow.cpp MainWindow.h
     MapDecorations.cpp MapDecorations.h
@@ -75,6 +76,36 @@ qt_add_executable(Mirab WIN32 MACOSX_BUNDLE ${APP_SOURCES})
 target_include_directories(Mirab PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(Mirab PRIVATE
     Qt6::Widgets Qt6::Network Qt6::PrintSupport Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
+
+# Translations: translations/mirab_<lang>.ts compiled into the program with
+# Qt's own translations of the same languages, so no package carries extra
+# files. "cmake --build <dir> --target update_translations" refreshes the
+# .ts files from the sources.
+set(MIRAB_LANGUAGES fa ar es zh_CN)
+if(TARGET Qt6::lrelease AND TARGET Qt6::lupdate)
+    set(_ts_files)
+    foreach(_lang IN LISTS MIRAB_LANGUAGES)
+        list(APPEND _ts_files "${PROJECT_SOURCE_DIR}/translations/mirab_${_lang}.ts")
+    endforeach()
+    qt_add_translations(Mirab
+        TS_FILES ${_ts_files}
+        RESOURCE_PREFIX /i18n
+        LUPDATE_OPTIONS -no-obsolete -locations none)
+    set(_qt_tr_dir "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_TRANSLATIONS}")
+    set(_qt_qm)
+    foreach(_lang IN LISTS MIRAB_LANGUAGES)
+        if(EXISTS "${_qt_tr_dir}/qtbase_${_lang}.qm")
+            list(APPEND _qt_qm "${_qt_tr_dir}/qtbase_${_lang}.qm")
+        else()
+            message(STATUS "qtbase_${_lang}.qm not found in ${_qt_tr_dir}: Qt's dialogs stay in English")
+        endif()
+    endforeach()
+    if(_qt_qm)
+        qt_add_resources(Mirab qt_translations PREFIX /i18n BASE "${_qt_tr_dir}" FILES ${_qt_qm})
+    endif()
+else()
+    message(WARNING "Qt LinguistTools not found: Mirab is built without translations")
+endif()
 
 if(APPLE)
     configure_file("${PROJECT_SOURCE_DIR}/packaging/macos/Info.plist.in"

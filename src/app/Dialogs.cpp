@@ -26,6 +26,7 @@
 
 #include "ChartWidget.h"
 #include "EngineDownloader.h"
+#include "Language.h"
 #include "SolverProcess.h"
 #include "mirab/MirabConfig.h"
 #include "mirab/core/Crs.h"
@@ -63,6 +64,7 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <cmath>
 
 namespace mirab::app
@@ -191,10 +193,10 @@ void EnginesDialog::populate()
         const bool ok = registry_.isAvailable(d.id, &why);
         QStringList limits;
         for (const auto& [f, s] : d.support)
-            limits << QString::fromUtf8(core::featureName(f)) + ": " +
-                          (s == engine::Support::Ignored ? tr("ignored") : tr("not supported"));
+            limits << tr("%1: %2").arg(coreText(core::featureName(f)),
+                                       s == engine::Support::Ignored ? tr("ignored") : tr("not supported"));
         auto* name = new QTableWidgetItem(QString::fromStdString(d.name));
-        name->setToolTip(QString::fromStdString(d.description));
+        name->setToolTip(coreText(d.description));
         table_->setItem(r, 0, name);
         auto* status = new QTableWidgetItem(ok ? tr("Installed") : (d.optional ? tr("Optional, not installed") : tr("Missing")));
         status->setToolTip(QString::fromStdString(ok ? registry_.locate(d)->u8string() : why));
@@ -584,6 +586,11 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent)
 {
     setWindowTitle(tr("Settings"));
     auto* form = new QFormLayout(this);
+    language_ = new QComboBox(this);
+    for (const UiLanguage& l : uiLanguages())
+        language_->addItem(l.nativeName, l.code);
+    language_->setCurrentIndex(std::max(0, language_->findData(configuredLanguage())));
+    form->addRow(tr("Language"), language_);
     auto* row = new QHBoxLayout;
     qgis_ = new QLineEdit(qgisPath(), this);
     qgis_->setPlaceholderText(findQgis().isEmpty() ? tr("QGIS was not found automatically") : findQgis());
@@ -605,6 +612,12 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent)
     });
     connect(buttons, &QDialogButtonBox::accepted, this, [this] {
         QSettings().setValue("qgis/path", qgis_->text().trimmed());
+        const QString language = language_->currentData().toString();
+        if (language != configuredLanguage())
+        {
+            setConfiguredLanguage(language);
+            QMessageBox::information(this, tr("Language"), tr("Restart Mirab to use the new language."));
+        }
         accept();
     });
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -663,9 +676,9 @@ AboutDialog::AboutDialog(QWidget* parent) : QDialog(parent)
     auto* header = new QHBoxLayout;
     auto* icon = new QLabel(this);
     icon->setPixmap(QApplication::windowIcon().pixmap(72, 72));
-    auto* title = new QLabel(QString("<h2>Mirab %1</h2><p>Unified modeling environment for water distribution "
-                                     "and stormwater systems.</p><p>%2<br><a href=\"%3\">%3</a></p>")
-                                 .arg(MIRAB_VERSION_STRING, QString(MIRAB_COPYRIGHT).toHtmlEscaped(), MIRAB_HOMEPAGE),
+    auto* title = new QLabel(tr("<h2>Mirab %1</h2><p>Unified modeling environment for water distribution "
+                                "and stormwater systems.</p><p>%2<br><a href=\"%3\">%3</a></p>")
+                                .arg(MIRAB_VERSION_STRING, QString(MIRAB_COPYRIGHT).toHtmlEscaped(), MIRAB_HOMEPAGE),
                              this);
     title->setOpenExternalLinks(true);
     title->setWordWrap(true);
@@ -834,9 +847,11 @@ void CoordinateSystemDialog::validate()
             where = tr("Node %1 would be at %2° %3, %4° %5.")
                         .arg(QString::fromStdString(n.id))
                         .arg(std::fabs(lat), 0, 'f', 5)
-                        .arg(lat >= 0 ? "N" : "S")
+                        //: compass direction (north / south)
+                        .arg(lat >= 0 ? tr("N") : tr("S"))
                         .arg(std::fabs(lon), 0, 'f', 5)
-                        .arg(lon >= 0 ? "E" : "W");
+                        //: compass direction (east / west)
+                        .arg(lon >= 0 ? tr("E") : tr("W"));
         if (std::fabs(lat) > 90 || std::fabs(lon) > 180 || !std::isfinite(lat) || !std::isfinite(lon))
             where = tr("The coordinates do not fit this system: node %1 falls outside the globe.").arg(QString::fromStdString(n.id));
         break;

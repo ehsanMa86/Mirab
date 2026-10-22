@@ -25,6 +25,7 @@
 #include "MapView.h"
 
 #include "Basemap.h"
+#include "Language.h"
 #include "RasterLayers.h"
 #include "Theme.h"
 #include "mirab/core/Crs.h"
@@ -119,6 +120,8 @@ MapView::MapView(ProjectDocument* doc, QWidget* parent)
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
     setMinimumSize(320, 240);
+    // Map geometry (and the overlays drawn on it) keeps east to the right in every language.
+    setLayoutDirection(Qt::LeftToRight);
     setAttribute(Qt::WA_OpaquePaintEvent);
     connect(basemap_, &Basemap::updated, this, qOverload<>(&QWidget::update));
     connect(rasters_, &RasterRenderer::updated, this, qOverload<>(&QWidget::update));
@@ -267,7 +270,9 @@ void MapView::setTool(Tool tool, const QString& kind)
         emit statusMessage(tr("Click the outline corners; double-click or press Enter to finish."));
     else if (tool == Tool::AddNode || tool == Tool::AddGage)
         emit statusMessage(tr("Click on the map to place the %1. Right-click or Esc to finish.")
-                               .arg(kind.isEmpty() ? tr("rain gage") : kind.toLower()));
+                               .arg(tool == Tool::AddGage || kind.isEmpty()
+                                        ? tr("rain gage")
+                                        : coreText(kind.toStdString()).toLower()));
     else if (tool == Tool::ZoomWindow)
         emit statusMessage(tr("Drag a rectangle to zoom into."));
     else if (tool == Tool::SelectPolygon)
@@ -1123,6 +1128,9 @@ void MapView::drawLabel(QPainter& p, const QPointF& at, const QString& text)
 void MapView::paintTo(QPainter& p, const QRectF& area, const RenderOptions& o)
 {
     p.setRenderHint(QPainter::Antialiasing);
+    // Drawings keep their left-to-right geometry in every language; each text
+    // still runs in its own direction.
+    p.setLayoutDirection(Qt::LayoutDirectionAuto);
     const auto& m = doc_->model();
     const Selection hover = highlights_ ? hover_ : Selection{};
     const bool drag = highlights_ && dragging_ && !dragNode_.isEmpty();
@@ -1860,7 +1868,7 @@ void MapView::mousePressEvent(QMouseEvent* e)
         const QString id = QString::fromStdString(m.uniqueId(Category::Node, prefixFor(kind_).toStdString()));
         QString err;
         const std::string k = kind_.toStdString();
-        if (doc_->edit(tr("Add %1 %2").arg(kind_.toLower(), id),
+        if (doc_->edit(tr("Add %1 %2").arg(coreText(k).toLower(), id),
                        [&](core::Model& mm, std::string* er) { return mm.addNode(k, id.toStdString(), w, er); }, &err))
             doc_->select({Category::Node, id});
         else
@@ -1895,7 +1903,7 @@ void MapView::mousePressEvent(QMouseEvent* e)
                 const std::string k = kind_.toStdString(), a = linkStart_.toStdString(), b = hit.id.toStdString();
                 const auto verts = pendingVertices_;
                 QString err;
-                if (doc_->edit(tr("Add %1 %2").arg(kind_.toLower(), id),
+                if (doc_->edit(tr("Add %1 %2").arg(coreText(k).toLower(), id),
                                [&](core::Model& mm, std::string* er) {
                                    if (!mm.addLink(k, id.toStdString(), a, b, er))
                                        return false;
@@ -1986,9 +1994,9 @@ void MapView::mouseMoveEvent(QMouseEvent* e)
         {
             QString kind;
             if (h.category == Category::Node)
-                kind = QString::fromStdString(doc_->model().findNode(h.id.toStdString())->kind);
+                kind = coreText(doc_->model().findNode(h.id.toStdString())->kind);
             else if (h.category == Category::Link)
-                kind = QString::fromStdString(doc_->model().findLink(h.id.toStdString())->kind);
+                kind = coreText(doc_->model().findLink(h.id.toStdString())->kind);
             else if (h.category == Category::Area)
                 kind = tr("Subcatchment");
             else

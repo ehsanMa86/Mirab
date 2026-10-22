@@ -222,6 +222,10 @@ void PageComposer::paint(QPainter& p, const LayoutSettings& s, double pixelRatio
     const auto f = core::layout::computeFrames(pageOptions(s));
     const double k = std::clamp(std::sqrt(f.widthMm * f.heightMm / (297.0 * 210.0)), 1.0, 1.4);
     p.save();
+    // The page keeps its left-to-right design in every language (painters on
+    // images and printers start in the application's direction); each text
+    // still runs in its own direction.
+    p.setLayoutDirection(Qt::LayoutDirectionAuto);
     p.setRenderHint(QPainter::Antialiasing);
     p.setRenderHint(QPainter::TextAntialiasing);
     p.setRenderHint(QPainter::SmoothPixmapTransform);
@@ -638,6 +642,7 @@ LayoutPreview::LayoutPreview(QWidget* parent) : QWidget(parent)
 {
     setMinimumSize(360, 260);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    setLayoutDirection(Qt::LeftToRight); // a picture of the page
 }
 
 void LayoutPreview::setImage(const QImage& image)

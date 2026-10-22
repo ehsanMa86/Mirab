@@ -149,6 +149,7 @@ public:
 
 private:
     QLineEdit* qgis_;
+    QComboBox* language_;
 };
 
 class AboutDialog : public QDialog

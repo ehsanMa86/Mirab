@@ -26,6 +26,7 @@
 
 #include "ChartWidget.h"
 #include "Icons.h"
+#include "Language.h"
 #include "Theme.h"
 #include "mirab/core/Text.h"
 
@@ -131,6 +132,7 @@ QString csvField(QString s)
 
 class ScenarioComparison : public QWidget
 {
+    Q_OBJECT
 public:
     ScenarioComparison(ProjectDocument* doc, QWidget* parent) : QWidget(parent), doc_(doc)
     {
@@ -429,7 +431,7 @@ private:
         summary_->setColumnCount(static_cast<int>(ref.size()) + 1);
         QStringList headers = {tr("Scenario")};
         for (const auto& f : ref)
-            headers << QString::fromStdString(f.name) + (f.unit.empty() ? QString() : " (" + QString::fromStdString(f.unit) + ")");
+            headers << coreText(f.name) + (f.unit.empty() ? QString() : " (" + QString::fromStdString(f.unit) + ")");
         summary_->setHorizontalHeaderLabels(headers);
         summary_->setRowCount(static_cast<int>(figures.size()));
         for (std::size_t s = 0; s < figures.size(); ++s)
@@ -683,3 +685,5 @@ bool scenarioComparisonSnapshot(const QWidget* page, ReportSnapshot& s)
 }
 
 } // namespace mirab::app
+
+#include "ScenarioCompare.moc"

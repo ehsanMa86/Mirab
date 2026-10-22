@@ -26,6 +26,7 @@
 
 #include "ChartWidget.h"
 #include "Icons.h"
+#include "Language.h"
 #include "SchemaWidgets.h"
 #include "ObservedData.h"
 #include "mirab/core/Text.h"
@@ -480,7 +481,7 @@ void ProjectBrowser::rebuild()
             QTreeWidgetItem*& sub = kinds[k];
             if (!sub)
             {
-                sub = new QTreeWidgetItem(top, {k});
+                sub = new QTreeWidgetItem(top, {coreText(kind)});
                 sub->setIcon(0, icons::element(k == tr("Rain gage") ? "RainGage" : k));
                 sub->setData(0, KindRole, key + "/" + k);
             }
@@ -709,6 +710,7 @@ InpEditor::InpEditor(ProjectDocument* doc, QWidget* parent) : QWidget(parent), d
     bar->addWidget(applyButton_);
     layout->addLayout(bar);
     edit_ = new QPlainTextEdit(this);
+    edit_->setLayoutDirection(Qt::LeftToRight); // input file text
     edit_->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     edit_->setLineWrapMode(QPlainTextEdit::NoWrap);
     new InpHighlighter(edit_->document());
@@ -773,6 +775,7 @@ MsxEditor::MsxEditor(QWidget* parent) : QWidget(parent)
     bar->addWidget(saveButton);
     layout->addLayout(bar);
     edit_ = new QPlainTextEdit(this);
+    edit_->setLayoutDirection(Qt::LeftToRight); // input file text
     edit_->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     edit_->setLineWrapMode(QPlainTextEdit::NoWrap);
     new InpHighlighter(edit_->document());

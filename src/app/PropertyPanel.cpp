@@ -25,12 +25,14 @@
 #include "PropertyPanel.h"
 
 #include "Icons.h"
+#include "Language.h"
 #include "SchemaWidgets.h"
 #include "Theme.h"
 #include "mirab/core/Features.h"
 #include "mirab/core/Text.h"
 
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QHash>
 #include <QHeaderView>
 #include <QLabel>
@@ -84,23 +86,40 @@ QString kindOfElement(const core::Model& m, const Selection& s)
 
 QString kindLabel(const QString& kind, int count)
 {
-    if (kind == "RainGage")
-        return count == 1 ? QObject::tr("rain gage") : QObject::tr("rain gages");
-    if (kind == "Storage")
-        return count == 1 ? QObject::tr("storage unit") : QObject::tr("storage units");
+    static const char* const labels[][3] = {
+        {"Junction", QT_TRANSLATE_NOOP("QObject", "junction"), QT_TRANSLATE_NOOP("QObject", "junctions")},
+        {"Reservoir", QT_TRANSLATE_NOOP("QObject", "reservoir"), QT_TRANSLATE_NOOP("QObject", "reservoirs")},
+        {"Tank", QT_TRANSLATE_NOOP("QObject", "tank"), QT_TRANSLATE_NOOP("QObject", "tanks")},
+        {"Pipe", QT_TRANSLATE_NOOP("QObject", "pipe"), QT_TRANSLATE_NOOP("QObject", "pipes")},
+        {"Pump", QT_TRANSLATE_NOOP("QObject", "pump"), QT_TRANSLATE_NOOP("QObject", "pumps")},
+        {"Valve", QT_TRANSLATE_NOOP("QObject", "valve"), QT_TRANSLATE_NOOP("QObject", "valves")},
+        {"Outfall", QT_TRANSLATE_NOOP("QObject", "outfall"), QT_TRANSLATE_NOOP("QObject", "outfalls")},
+        {"Divider", QT_TRANSLATE_NOOP("QObject", "divider"), QT_TRANSLATE_NOOP("QObject", "dividers")},
+        {"Storage", QT_TRANSLATE_NOOP("QObject", "storage unit"), QT_TRANSLATE_NOOP("QObject", "storage units")},
+        {"Conduit", QT_TRANSLATE_NOOP("QObject", "conduit"), QT_TRANSLATE_NOOP("QObject", "conduits")},
+        {"Orifice", QT_TRANSLATE_NOOP("QObject", "orifice"), QT_TRANSLATE_NOOP("QObject", "orifices")},
+        {"Weir", QT_TRANSLATE_NOOP("QObject", "weir"), QT_TRANSLATE_NOOP("QObject", "weirs")},
+        {"Outlet", QT_TRANSLATE_NOOP("QObject", "outlet"), QT_TRANSLATE_NOOP("QObject", "outlets")},
+        {"Subcatchment", QT_TRANSLATE_NOOP("QObject", "subcatchment"), QT_TRANSLATE_NOOP("QObject", "subcatchments")},
+        {"RainGage", QT_TRANSLATE_NOOP("QObject", "rain gage"), QT_TRANSLATE_NOOP("QObject", "rain gages")}};
+    for (const auto& l : labels)
+    {
+        if (kind == QLatin1String(l[0]))
+            return QCoreApplication::translate("QObject", count == 1 ? l[1] : l[2]);
+    }
     const QString lower = kind.toLower();
     return count == 1 ? lower : lower + "s";
 }
 
-class ChoiceDelegate : public QStyledItemDelegate
+class ChoiceDelegate : public DataItemDelegate
 {
 public:
-    using QStyledItemDelegate::QStyledItemDelegate;
+    using DataItemDelegate::DataItemDelegate;
     QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& opt, const QModelIndex& idx) const override
     {
         const QStringList choices = idx.data(ChoicesRole).toStringList();
         if (choices.isEmpty())
-            return QStyledItemDelegate::createEditor(parent, opt, idx);
+            return DataItemDelegate::createEditor(parent, opt, idx);
         auto* box = new QComboBox(parent);
         box->setEditable(true);
         box->addItems(choices);
@@ -392,7 +411,8 @@ void PropertyPanel::showElement(const Selection& sel)
     else if (sel.category == Category::Gage)
         kind = tr("Rain gage");
     title_->setText(sel.id);
-    subtitle_->setText(kind);
+    subtitle_->setText(sel.category == Category::Node || sel.category == Category::Link ? coreText(kind.toStdString())
+                                                                                        : kind);
     subtitle_->setToolTip({});
     icon_->setPixmap(icons::element(sel.category == Category::Gage ? "RainGage" : sel.category == Category::Area ? "Subcatchment" : kind).pixmap(28, 28));
     const auto units = model.units();
@@ -403,7 +423,7 @@ void PropertyPanel::showElement(const Selection& sel)
         QString why;
         const bool supported = sectionSupported(er.section, er.tokens, &why);
         const int n = ++occurrence[er.section];
-        QString header = er.def && !er.def->description.empty() ? QString::fromStdString(er.def->description)
+        QString header = er.def && !er.def->description.empty() ? coreText(er.def->description)
                                                                  : "[" + QString::fromStdString(er.section) + "]";
         if (er.def && er.def->multiRowPerKey)
             header += "  #" + QString::number(n);
@@ -442,7 +462,7 @@ void PropertyPanel::showElement(const Selection& sel)
                 value.clear();
             const QString name = known ? QString::fromStdString(layout.columnName(c)) : tr("Value %1").arg(c + 1);
             const QString unit = known && !colDef->quantity.empty() ? QString::fromStdString(units.label(colDef->quantity)) : QString();
-            QString tip = known ? QString::fromStdString(colDef->help) : QString();
+            QString tip = known ? coreText(colDef->help) : QString();
             if (!supported)
                 tip = why;
             QStringList choices;
@@ -568,7 +588,7 @@ void PropertyPanel::showMultiple()
         QString why;
         const bool supported = sectionSupported(er.section, er.tokens, &why);
         addHeader(er.def->description.empty() ? "[" + QString::fromStdString(er.section) + "]"
-                                              : QString::fromStdString(er.def->description),
+                                              : coreText(er.def->description),
                   supported, why.isEmpty() ? "[" + QString::fromStdString(er.section) + "]" : why);
         const core::RowLayout layout = er.def->layout(er.tokens);
         const std::size_t ncols = layout.repeatFrom >= 0 ? std::max(layout.columns.size(), er.tokens.size())
@@ -621,7 +641,7 @@ void PropertyPanel::showMultiple()
                 choices << QString::fromStdString(ch);
             choices << referenceChoices(model, *colDef);
             addRow(QString::fromStdString(name), same ? first.value_or(QString()) : mixed, unit,
-                   supported ? QString::fromStdString(colDef->help) : why, QString::fromStdString(er.section),
+                   supported ? coreText(colDef->help) : why, QString::fromStdString(er.section),
                    kAllSelected, static_cast<int>(c), tail, choices, supported);
             if (!same)
             {
@@ -859,7 +879,7 @@ void PropertyPanel::populateAddMenu()
         if (def.name == "GWF" && model.rowsOfKey(def.name, id).size() >= 2)
             continue; // one LATERAL and one DEEP expression at most
         QString why;
-        QAction* a = menu->addAction("[" + QString::fromStdString(def.name) + "]  " + QString::fromStdString(def.description));
+        QAction* a = menu->addAction("[" + QString::fromStdString(def.name) + "]  " + coreText(def.description));
         std::string missing;
         const auto row = model.newDataRow(def, id, &missing);
         if (!sectionSupported(def.name, row, &why))

@@ -25,12 +25,14 @@
 #include "RasterDialogs.h"
 
 #include "Icons.h"
+#include "Language.h"
 #include "RasterLayers.h"
 #include "mirab/core/Text.h"
 
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QDoubleSpinBox>
@@ -78,13 +80,16 @@ void selectUnit(QComboBox* c, double unit)
 QString describe(const raster::Raster& r)
 {
     const auto& info = r.info();
-    static const char* types[] = {"8-bit",  "8-bit signed",  "16-bit",       "16-bit signed",
-                                  "32-bit", "32-bit signed", "32-bit float", "64-bit float"};
+    static const char* types[] = {
+        QT_TRANSLATE_NOOP("QObject", "8-bit"), QT_TRANSLATE_NOOP("QObject", "8-bit signed"),
+        QT_TRANSLATE_NOOP("QObject", "16-bit"), QT_TRANSLATE_NOOP("QObject", "16-bit signed"),
+        QT_TRANSLATE_NOOP("QObject", "32-bit"), QT_TRANSLATE_NOOP("QObject", "32-bit signed"),
+        QT_TRANSLATE_NOOP("QObject", "32-bit float"), QT_TRANSLATE_NOOP("QObject", "64-bit float")};
     QString s = QObject::tr("%1, %2 x %3 pixels, %n band(s) of %4", nullptr, info.bands)
                     .arg(QString::fromStdString(info.format))
                     .arg(info.width)
                     .arg(info.height)
-                    .arg(QString::fromLatin1(types[static_cast<int>(info.type)]));
+                    .arg(QCoreApplication::translate("QObject", types[static_cast<int>(info.type)]));
     if (!info.compression.empty() && info.compression != "none")
         s += QObject::tr(", %1 compression").arg(QString::fromStdString(info.compression));
     if (info.overviews > 0)
@@ -570,7 +575,7 @@ void ElevationDialog::recompute()
         if (!c.note.empty())
             result += " - " + QString::fromStdString(c.note);
         const QStringList cells = {QString::fromStdString(c.id),
-                                   QString::fromStdString(c.kind),
+                                   coreText(c.kind),
                                    QString::fromStdString(c.field),
                                    num(c.oldValue),
                                    num(c.ground),

@@ -78,6 +78,8 @@ ChartWidget::ChartWidget(QWidget* parent) : QWidget(parent)
 {
     setMinimumHeight(150);
     setMouseTracking(true);
+    // Axes run left to right in every language.
+    setLayoutDirection(Qt::LeftToRight);
     d_.xLabel = tr("Time");
 }
 
@@ -180,6 +182,9 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
                        const QPointF& hover, bool background)
 {
     p.setRenderHint(QPainter::Antialiasing);
+    // Drawings keep their left-to-right geometry in every language; each text
+    // still runs in its own direction.
+    p.setLayoutDirection(Qt::LayoutDirectionAuto);
     p.setFont(font);
     if (background)
         p.fillRect(r, theme::kSurface);

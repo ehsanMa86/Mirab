@@ -24,6 +24,7 @@
  */
 #include "ReportExport.h"
 
+#include "Language.h"
 #include "MapDecorations.h"
 #include "MapView.h"
 #include "Theme.h"
@@ -176,6 +177,7 @@ void paintFigure(QPainter& p, const QRectF& rect, const ReportBuilder::Figure& f
                  double pixelRatio, bool vector)
 {
     p.save();
+    p.setLayoutDirection(Qt::LayoutDirectionAuto); // see ChartWidget::draw()
     if (!figure.map)
     {
         ChartWidget::paint(p, rect, decor::font(pt(7.5)), figure.chart, true);
@@ -274,7 +276,7 @@ void ReportBuilder::build(const ReportOptions& o)
             int total = 0;
             for (const auto& [kind, n] : list)
             {
-                parts << QStringLiteral("%1 %2").arg(QString::fromStdString(kind)).arg(n);
+                parts << QStringLiteral("%1 %2").arg(coreText(kind)).arg(n);
                 total += n;
             }
             return parts.isEmpty() ? QStringLiteral("0")
@@ -494,7 +496,9 @@ QString ReportBuilder::document(const ReportOptions& o, bool pdf) const
     if (pdf)
         h += "<html><body>";
     else
-        h += "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
+        h += "<!DOCTYPE html>\n<html lang=\"" + QString(currentLanguage()).replace('_', '-') + "\"" +
+             (QGuiApplication::layoutDirection() == Qt::RightToLeft ? " dir=\"rtl\"" : "") +
+             ">\n<head>\n<meta charset=\"utf-8\">\n"
              "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>" +
              esc(o.title) + "</title>\n<style>" + QString::fromLatin1(kHtmlCss) +
              "</style>\n</head>\n<body>\n<main>\n";

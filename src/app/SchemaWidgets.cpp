@@ -25,6 +25,7 @@
 #include "SchemaWidgets.h"
 
 #include "Icons.h"
+#include "Language.h"
 #include "mirab/core/Features.h"
 #include "mirab/core/Text.h"
 
@@ -123,7 +124,7 @@ bool engineSupportsSection(const engine::EngineDescriptor* engine, core::Dialect
         return true;
     if (why)
         *why = QObject::tr("%1 does not model %2.")
-                   .arg(QString::fromStdString(engine->name), QString::fromUtf8(core::featureName(f)));
+                   .arg(QString::fromStdString(engine->name), coreText(core::featureName(f)));
     return false;
 }
 
@@ -131,7 +132,7 @@ QString columnLabel(const core::ColumnDef& column)
 {
     if (!column.help.empty() && column.help.size() <= 48)
     {
-        QString h = QString::fromStdString(column.help);
+        QString h = coreText(column.help);
         h[0] = h[0].toUpper();
         return h;
     }
@@ -147,7 +148,7 @@ QString columnLabel(const core::ColumnDef& column)
             out += c;
     }
     out[0] = out[0].toUpper();
-    return out;
+    return coreText(out.toStdString());
 }
 
 QString objectKindLabel(const QString& kind, bool plural)
@@ -175,7 +176,7 @@ QString objectKindLabel(const QString& kind, bool plural)
         if (kind.compare(QLatin1String(l.kind), Qt::CaseInsensitive) == 0)
             return QCoreApplication::translate("mirab::app", plural ? l.many : l.one);
     }
-    return kind;
+    return coreText(kind.toStdString());
 }
 
 QIcon objectKindIcon(const QString& kind)
@@ -254,7 +255,7 @@ void RowForm::build()
         if (value == "*" && col.type != ColumnType::Number)
             value.clear();
         const QString tip = QString::fromStdString(col.name) +
-                            (col.help.empty() ? QString() : ": " + QString::fromStdString(col.help)) +
+                            (col.help.empty() ? QString() : ": " + coreText(col.help)) +
                             (col.optional ? tr(" (optional)") : QString());
         auto* label = new QLabel(columnLabel(col), this);
         label->setToolTip(tip);

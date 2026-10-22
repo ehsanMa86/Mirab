@@ -1152,6 +1152,7 @@ void CalibrationDialog::onEvent(const QString& name, const QJsonObject& o)
 void CalibrationDialog::plotProgress()
 {
     ChartWidget::Series runs;
+    //: Noun: one model run of the calibration
     runs.name = tr("Run");
     runs.style = ChartWidget::Series::Style::Points;
     runs.color = QColor(160, 170, 184);

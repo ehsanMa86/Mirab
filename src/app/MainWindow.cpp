@@ -31,6 +31,7 @@
 #include "Dialogs.h"
 #include "Icons.h"
 #include "ImportDialog.h"
+#include "Language.h"
 #include "LayoutDialog.h"
 #include "MapPage.h"
 #include "MapServices.h"
@@ -241,14 +242,15 @@ MainWindow::MainWindow() : doc_(new ProjectDocument(this))
         for (const auto& k : core::elementKinds(d, Category::Node))
         {
             const QString kind = QString::fromStdString(k);
-            add->addAction(icons::element(kind), kind, this, [this, kind, world] {
+            const QString label = coreText(k);
+            add->addAction(icons::element(kind), label, this, [this, kind, label, world] {
                 const auto& m = doc_->model();
                 static const QHash<QString, QString> prefixes = {{"Junction", "J"}, {"Reservoir", "R"}, {"Tank", "T"},
                                                                  {"Outfall", "O"}, {"Storage", "SU"}, {"Divider", "D"}};
                 const QString id = QString::fromStdString(
                     m.uniqueId(Category::Node, prefixes.value(kind, kind.left(1)).toStdString()));
                 QString err;
-                if (doc_->edit(tr("Add %1 %2").arg(kind.toLower(), id),
+                if (doc_->edit(tr("Add %1 %2").arg(label.toLower(), id),
                                [&](core::Model& mm, std::string* er) {
                                    return mm.addNode(kind.toStdString(), id.toStdString(), {world.x(), world.y()}, er);
                                },
@@ -589,7 +591,7 @@ void MainWindow::createMenus()
             statusBar()->showMessage(tr("Select an element with results first."), 6000);
             return;
         }
-        const QString f = QFileDialog::getSaveFileName(this, tr("Export time series"), doc_->selection().id + ".csv", "CSV (*.csv)");
+        const QString f = QFileDialog::getSaveFileName(this, tr("Export time series"), doc_->selection().id + ".csv", tr("CSV (*.csv)"));
         if (f.isEmpty())
             return;
         QFile out(f);
@@ -982,10 +984,10 @@ void MainWindow::rebuildForDialect()
         addActions_ << a;
     };
     for (const auto& k : core::elementKinds(d, Category::Node))
-        addTool(QString::fromStdString(k), QString::fromStdString(k), MapView::Tool::AddNode);
+        addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddNode);
     addMenu_->addSeparator();
     for (const auto& k : core::elementKinds(d, Category::Link))
-        addTool(QString::fromStdString(k), QString::fromStdString(k), MapView::Tool::AddLink);
+        addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddLink);
     if (d == Dialect::Swmm)
     {
         addMenu_->addSeparator();
@@ -1045,7 +1047,7 @@ void MainWindow::rebuildEngineChoices()
                               QString::fromStdString(desc->name) + (ok ? QString() : tr(" (not installed)")),
                               QString::fromStdString(desc->id));
         const int idx = engineCombo_->count() - 1;
-        engineCombo_->setItemData(idx, QString::fromStdString(ok ? desc->description : why), Qt::ToolTipRole);
+        engineCombo_->setItemData(idx, ok ? coreText(desc->description) : QString::fromStdString(why), Qt::ToolTipRole);
         if (!ok)
         {
             if (auto* model = qobject_cast<QStandardItemModel*>(engineCombo_->model()))
@@ -1846,7 +1848,7 @@ void MainWindow::fillSelectMenu(QMenu* menu)
         for (const auto& k : core::elementKinds(d, c))
         {
             const QString kind = QString::fromStdString(k);
-            kinds->addAction(icons::element(kind), kind, this, [this, c, kind] { selectAllOfKind(c, kind); });
+            kinds->addAction(icons::element(kind), coreText(k), this, [this, c, kind] { selectAllOfKind(c, kind); });
         }
         kinds->addSeparator();
     }
@@ -2190,6 +2192,8 @@ void MainWindow::openTool(const QString& name)
         addMapService();
     else if (name == "run-scenarios")
         runScenarios();
+    else if (name == "settings")
+        SettingsDialog(this).exec();
     else
         openCalibrationTool(name);
 }

@@ -25,6 +25,7 @@
  */
 #include "MapDecorations.h"
 
+#include "Language.h"
 #include "Theme.h"
 #include "mirab/core/PrintLayout.h"
 #include "mirab/core/Text.h"
@@ -81,20 +82,21 @@ QSizeF legend(QPainter* p, const QPointF& topLeft, const MapView::Legend& legend
         } kind;
         QString text;
         QColor color;
+        QString symbol; ///< element kind of a Symbol row
     };
     QVector<Row> rows;
     if (!legend.title.isEmpty())
     {
-        rows.append({Row::Heading, legend.title, {}});
+        rows.append({Row::Heading, legend.title, {}, {}});
         // Highest class on top, as on the map.
         for (int i = legend.classes.size() - 1; i >= 0; --i)
-            rows.append({Row::Class, legend.classes[i].label, legend.classes[i].color});
+            rows.append({Row::Class, legend.classes[i].label, legend.classes[i].color, {}});
         if (!kinds.isEmpty())
             rows.append(
-                {Row::Heading, QCoreApplication::translate("MapDecorations", "Network"), {}});
+                {Row::Heading, QCoreApplication::translate("MapDecorations", "Network"), {}, {}});
     }
     for (const QString& k : kinds)
-        rows.append({Row::Symbol, k, {}});
+        rows.append({Row::Symbol, coreText(k.toStdString()), {}, k});
 
     double w = 0, h = 0;
     QVector<double> ys;
@@ -141,7 +143,7 @@ QSizeF legend(QPainter* p, const QPointF& topLeft, const MapView::Legend& legend
         }
         else
         {
-            MapView::drawSymbol(*p, box.center(), swatch * 0.95, r.text);
+            MapView::drawSymbol(*p, box.center(), swatch * 0.95, r.symbol);
         }
         p->setFont(f);
         p->setPen(kInk);

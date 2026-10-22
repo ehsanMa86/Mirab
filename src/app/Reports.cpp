@@ -27,6 +27,7 @@
 #include "CalibrationReport.h"
 #include "ChartWidget.h"
 #include "Icons.h"
+#include "Language.h"
 #include "RasterLayers.h"
 #include "ObservedData.h"
 #include "ScenarioCompare.h"
@@ -236,6 +237,7 @@ protected:
 // ---------------------------------------------------------------------------
 class TableReport : public ReportPage
 {
+    Q_OBJECT
 public:
     TableReport(ProjectDocument* doc, QWidget* parent) : ReportPage(doc, parent)
     {
@@ -256,6 +258,7 @@ public:
         kind_ = new QComboBox(b);
         filter_ = new QLineEdit(b);
         filter_->setPlaceholderText(tr("Filter, e.g. Pressure < 20 or Diameter >= 300"));
+        filter_->setLayoutDirection(Qt::LeftToRight); // expressions use English names
         filter_->setClearButtonEnabled(true);
         count_ = new QLabel(b);
         count_->setObjectName("muted");
@@ -352,12 +355,12 @@ protected:
             for (const auto& l : m.links())
                 kinds.insert(l.kind);
         kind_->blockSignals(true);
-        const QString keep = kind_->currentText();
+        const QString keep = kind_->currentData().toString();
         kind_->clear();
         kind_->addItem(tr("All types"));
         for (const auto& k : kinds)
-            kind_->addItem(icons::element(QString::fromStdString(k)), QString::fromStdString(k));
-        const int idx = kind_->findText(keep);
+            kind_->addItem(icons::element(QString::fromStdString(k)), coreText(k), QString::fromStdString(k));
+        const int idx = keep.isEmpty() ? -1 : kind_->findData(keep);
         kind_->setCurrentIndex(idx >= 0 ? idx : 0);
         kind_->setVisible(cat != Category::Area);
         kind_->blockSignals(false);
@@ -367,7 +370,7 @@ protected:
     {
         const auto& m = doc_->model();
         const auto cat = static_cast<Category>(category_->currentData().toInt());
-        const QString kindFilter = kind_->currentIndex() > 0 ? kind_->currentText() : QString();
+        const QString kindFilter = kind_->currentIndex() > 0 ? kind_->currentData().toString() : QString();
         struct Row
         {
             std::string id, kind;
@@ -427,7 +430,7 @@ protected:
         {
             QList<QStandardItem*> items;
             items << cell(QString::fromStdString(row.id), QString::fromStdString(row.id));
-            items << cell(QString::fromStdString(row.kind), QString::fromStdString(row.kind));
+            items << cell(coreText(row.kind), QString::fromStdString(row.kind));
             std::map<std::string, std::string> values;
             for (const auto& er : m.rowsFor(cat, row.id))
             {
@@ -542,6 +545,7 @@ protected:
 // ---------------------------------------------------------------------------
 class TimeSeriesReport : public ReportPage
 {
+    Q_OBJECT
 public:
     TimeSeriesReport(ProjectDocument* doc, QWidget* parent) : ReportPage(doc, parent)
     {
@@ -712,6 +716,7 @@ protected:
 // ---------------------------------------------------------------------------
 class ProfileReport : public ReportPage
 {
+    Q_OBJECT
 public:
     ProfileReport(ProjectDocument* doc, QWidget* parent) : ReportPage(doc, parent)
     {
@@ -978,6 +983,7 @@ protected:
 // ---------------------------------------------------------------------------
 class FrequencyReport : public ReportPage
 {
+    Q_OBJECT
 public:
     FrequencyReport(ProjectDocument* doc, QWidget* parent) : ReportPage(doc, parent)
     {
@@ -1020,14 +1026,14 @@ protected:
             {
                 if (const auto* t = r->table(table))
                     for (const auto& v : t->variables)
-                        variable_->addItem((std::string(table) == "node" ? tr("Node ") : std::string(table) == "link" ? tr("Link ") : tr("Subcatchment ")) +
-                                               QString::fromStdString(v.name),
+                        variable_->addItem((std::string(table) == "node" ? tr("Node %1") : std::string(table) == "link" ? tr("Link %1") : tr("Subcatchment %1"))
+                                               .arg(QString::fromStdString(v.name)),
                                            QStringList{table, QString::fromStdString(v.name)});
             }
         }
         int idx = variable_->findText(keep);
         if (idx < 0)
-            idx = std::max(0, variable_->findText(doc_->model().dialect() == core::Dialect::Swmm ? tr("Node Depth") : tr("Node Pressure")));
+            idx = std::max(0, variable_->findData(QStringList{"node", doc_->model().dialect() == core::Dialect::Swmm ? "Depth" : "Pressure"}));
         variable_->setCurrentIndex(idx);
         variable_->blockSignals(false);
         plot();
@@ -1094,6 +1100,7 @@ protected:
 // ---------------------------------------------------------------------------
 class VariabilityReport : public ReportPage
 {
+    Q_OBJECT
 public:
     VariabilityReport(ProjectDocument* doc, QWidget* parent) : ReportPage(doc, parent)
     {
@@ -1145,14 +1152,14 @@ protected:
             {
                 if (const auto* t = r->table(table))
                     for (const auto& v : t->variables)
-                        variable_->addItem((std::string(table) == "node" ? tr("Node ") : std::string(table) == "link" ? tr("Link ") : tr("Subcatchment ")) +
-                                               QString::fromStdString(v.name),
+                        variable_->addItem((std::string(table) == "node" ? tr("Node %1") : std::string(table) == "link" ? tr("Link %1") : tr("Subcatchment %1"))
+                                               .arg(QString::fromStdString(v.name)),
                                            QStringList{table, QString::fromStdString(v.name)});
             }
         }
         int idx = variable_->findText(keep);
         if (idx < 0)
-            idx = std::max(0, variable_->findText(doc_->model().dialect() == core::Dialect::Swmm ? tr("Node Depth") : tr("Node Pressure")));
+            idx = std::max(0, variable_->findData(QStringList{"node", doc_->model().dialect() == core::Dialect::Swmm ? "Depth" : "Pressure"}));
         variable_->setCurrentIndex(idx);
         variable_->blockSignals(false);
         fillKinds();
@@ -1170,15 +1177,16 @@ protected:
         else if (!key.isEmpty() && key[0] == "link")
             for (const auto& l : m.links())
                 kinds.insert(l.kind);
-        const QString keep = kind_->currentText();
+        const QString keep = kind_->currentData().toString();
+        const bool keepAll = kind_->currentIndex() == 0;
         kind_->blockSignals(true);
         kind_->clear();
         kind_->addItem(tr("All"));
         for (const auto& k : kinds)
-            kind_->addItem(icons::element(QString::fromStdString(k)), QString::fromStdString(k));
-        int idx = kind_->findText(keep);
+            kind_->addItem(icons::element(QString::fromStdString(k)), coreText(k), QString::fromStdString(k));
+        int idx = keep.isEmpty() ? (keepAll ? 0 : -1) : kind_->findData(keep);
         if (idx < 0)
-            idx = std::max(0, kind_->findText("Junction"));
+            idx = std::max(0, kind_->findData(QString("Junction")));
         kind_->setCurrentIndex(idx);
         kind_->blockSignals(false);
     }
@@ -1194,7 +1202,7 @@ protected:
             return;
         }
         const int v = t->variableIndex(key[1].toStdString());
-        const QString kind = kind_->currentIndex() > 0 ? kind_->currentText() : QString();
+        const QString kind = kind_->currentIndex() > 0 ? kind_->currentData().toString() : QString();
         std::vector<int> elements;
         const auto& m = doc_->model();
         for (int e = 0; e < t->elementCount(); ++e)
@@ -1277,6 +1285,7 @@ protected:
 // ---------------------------------------------------------------------------
 class SystemFlowReport : public ReportPage
 {
+    Q_OBJECT
 public:
     SystemFlowReport(ProjectDocument* doc, QWidget* parent) : ReportPage(doc, parent)
     {
@@ -1398,6 +1407,7 @@ protected:
 // ---------------------------------------------------------------------------
 class EnergyReport : public ReportPage
 {
+    Q_OBJECT
 public:
     EnergyReport(ProjectDocument* doc, QWidget* parent) : ReportPage(doc, parent)
     {
@@ -1585,6 +1595,7 @@ protected:
 // ---------------------------------------------------------------------------
 class StatusReport : public ReportPage
 {
+    Q_OBJECT
 public:
     StatusReport(ProjectDocument* doc, const QString& file, QWidget* parent) : ReportPage(doc, parent), file_(file)
     {
@@ -1596,6 +1607,7 @@ public:
         auto* reload = actionButton("undo", tr("Reload"), this);
         actions->addWidget(reload);
         edit_ = new QPlainTextEdit(this);
+        edit_->setLayoutDirection(Qt::LeftToRight); // engine report text
         edit_->setReadOnly(true);
         edit_->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
         edit_->setLineWrapMode(QPlainTextEdit::NoWrap);
@@ -1740,3 +1752,5 @@ QWidget* createReport(const QString& kind, ProjectDocument* doc, const QString& 
 }
 
 } // namespace mirab::app
+
+#include "Reports.moc"

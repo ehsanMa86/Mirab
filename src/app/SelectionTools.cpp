@@ -25,6 +25,7 @@
 #include "SelectionTools.h"
 
 #include "Icons.h"
+#include "Language.h"
 #include "mirab/core/Crs.h"
 #include "mirab/core/Geometry.h"
 #include "mirab/core/Query.h"
@@ -262,6 +263,7 @@ QueryDialog::QueryDialog(ProjectDocument* doc, QWidget* parent) : QDialog(parent
     form->addRow(tr("Find"), what);
     expression_ = new QLineEdit(this);
     expression_->setPlaceholderText(tr("Conditions, e.g. Diameter < 200 AND Roughness < 100 (empty: all)"));
+    expression_->setLayoutDirection(Qt::LeftToRight); // expressions use English names
     expression_->setClearButtonEnabled(true);
     form->addRow(tr("Where"), expression_);
     fields_ = new QListWidget(this);
@@ -372,8 +374,7 @@ void QueryDialog::fillKinds()
     if (cat == Category::Node || cat == Category::Link)
     {
         for (const auto& k : core::elementKinds(doc_->model().dialect(), cat))
-            kind_->addItem(icons::element(QString::fromStdString(k)), QString::fromStdString(k),
-                           QString::fromStdString(k));
+            kind_->addItem(icons::element(QString::fromStdString(k)), coreText(k), QString::fromStdString(k));
     }
     kind_->setEnabled(kind_->count() > 1);
     kind_->blockSignals(false);

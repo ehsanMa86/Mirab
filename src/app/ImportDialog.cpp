@@ -25,6 +25,7 @@
 #include "ImportDialog.h"
 
 #include "Icons.h"
+#include "Language.h"
 #include "mirab/core/Crs.h"
 #include "mirab/core/Text.h"
 
@@ -57,6 +58,16 @@ using interop::GeometryType;
 
 namespace
 {
+/// Item data role of the element type combo that holds the untranslated kind.
+constexpr int KindRole = Qt::UserRole + 1;
+
+/// Adds an element kind to @p box: translated text, the category as data and the kind under KindRole.
+void addKind(QComboBox* box, const std::string& kind, Category category)
+{
+    box->addItem(icons::element(QString::fromStdString(kind)), coreText(kind), static_cast<int>(category));
+    box->setItemData(box->count() - 1, QString::fromStdString(kind), KindRole);
+}
+
 QString geometryName(GeometryType g)
 {
     switch (g)
@@ -273,20 +284,20 @@ void ImportDialog::layerChanged()
     if (l->geometry == GeometryType::Point && hasPoints)
     {
         for (const auto& k : core::elementKinds(m.dialect(), Category::Node))
-            kind_->addItem(icons::element(QString::fromStdString(k)), QString::fromStdString(k), static_cast<int>(Category::Node));
+            addKind(kind_, k, Category::Node);
     }
     if (l->geometry == GeometryType::Line || !hasPoints)
     {
         for (const auto& k : core::elementKinds(m.dialect(), Category::Link))
-            kind_->addItem(icons::element(QString::fromStdString(k)), QString::fromStdString(k), static_cast<int>(Category::Link));
+            addKind(kind_, k, Category::Link);
     }
     if (l->geometry == GeometryType::Polygon && swmm)
-        kind_->addItem(icons::element("Subcatchment"), "Subcatchment", static_cast<int>(Category::Area));
+        addKind(kind_, "Subcatchment", Category::Area);
     if (l->geometry == GeometryType::Polygon && !swmm)
     {
         // Polygon outlines can still become pipes (for example parcels drawn as rings).
         for (const auto& k : core::elementKinds(m.dialect(), Category::Link))
-            kind_->addItem(icons::element(QString::fromStdString(k)), QString::fromStdString(k), static_cast<int>(Category::Link));
+            addKind(kind_, k, Category::Link);
     }
     kind_->blockSignals(false);
 
@@ -299,7 +310,7 @@ void ImportDialog::layerChanged()
     }
     endpointKind_->clear();
     for (const auto& k : core::elementKinds(m.dialect(), Category::Node))
-        endpointKind_->addItem(icons::element(QString::fromStdString(k)), QString::fromStdString(k));
+        endpointKind_->addItem(icons::element(QString::fromStdString(k)), coreText(k), QString::fromStdString(k));
 
     // Extent, to compare with the project.
     double minX = std::numeric_limits<double>::max(), minY = minX, maxX = std::numeric_limits<double>::lowest(), maxY = maxX;
@@ -331,7 +342,7 @@ void ImportDialog::targetChanged()
     importButton_->setEnabled(true);
     const auto& m = doc_->model();
     const auto target = static_cast<Category>(kind_->currentData().toInt());
-    const std::string kind = kind_->currentText().toStdString();
+    const std::string kind = kind_->currentData(KindRole).toString().toStdString();
     linkBox_->setVisible(target == Category::Link);
     areaBox_->setVisible(target == Category::Area);
     const auto suggested = interop::suggestMapping(m, *l, target, kind);
@@ -344,7 +355,7 @@ void ImportDialog::targetChanged()
     select(fromField_, suggested.fromField);
     select(toField_, suggested.toField);
     select(outletField_, suggested.outletField);
-    const int ek = endpointKind_->findText(QString::fromStdString(suggested.endpointKind));
+    const int ek = endpointKind_->findData(QString::fromStdString(suggested.endpointKind));
     endpointKind_->setCurrentIndex(ek >= 0 ? ek : 0);
     if (suggested.snapTolerance > 0)
         snap_->setValue(suggested.snapTolerance);
@@ -375,13 +386,13 @@ void ImportDialog::runImport()
         return;
     interop::ImportMapping mp;
     mp.target = static_cast<Category>(kind_->currentData().toInt());
-    mp.kind = kind_->currentText().toStdString();
+    mp.kind = kind_->currentData(KindRole).toString().toStdString();
     mp.idField = fieldOf(idField_).toStdString();
     mp.idPrefix = idPrefix_->text().trimmed().toStdString();
     mp.fromField = fieldOf(fromField_).toStdString();
     mp.toField = fieldOf(toField_).toStdString();
     mp.snapTolerance = snap_->value();
-    mp.endpointKind = endpointKind_->currentText().toStdString();
+    mp.endpointKind = endpointKind_->currentData().toString().toStdString();
     mp.outletField = fieldOf(outletField_).toStdString();
     for (int r = 0; r < mapping_->rowCount(); ++r)
     {

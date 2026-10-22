@@ -25,6 +25,7 @@
 #include "ScenarioPanel.h"
 
 #include "Icons.h"
+#include "Language.h"
 #include "SolverProcess.h"
 #include "Theme.h"
 #include "mirab/core/Text.h"
@@ -403,7 +404,7 @@ void ScenarioPanel::rebuildChanges()
         row->setData(0, NameRole, qs(c.key));
         row->setData(0, BaseRole, static_cast<int>(i));
         const core::SectionDef* def = core::findSectionDef(dialect, c.section);
-        const QString where = "[" + qs(c.section) + "]" + (def && !def->description.empty() ? " " + qs(def->description) : QString());
+        const QString where = "[" + qs(c.section) + "]" + (def && !def->description.empty() ? " " + coreText(def->description) : QString());
         row->setToolTip(0, where);
         row->setToolTip(1, where);
         row->setToolTip(2, changeValues(c));

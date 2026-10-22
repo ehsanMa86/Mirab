@@ -184,3 +184,28 @@ if(MIRAB_BUILD_GUI)
         set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
     endforeach()
 endif()
+
+# Translations: the list of library strings lupdate reads, the .ts files
+# (well formed, no obsolete messages, placeholders kept) and the interface
+# started in each language.
+if(MIRAB_BUILD_GUI)
+    add_executable(mirab-i18n-check i18n_check.cpp)
+    target_link_libraries(mirab-i18n-check PRIVATE Qt6::Core Mirab::core Mirab::engine Mirab::warnings)
+    target_compile_definitions(mirab-i18n-check PRIVATE MIRAB_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+    set(_core_strings "${PROJECT_SOURCE_DIR}/src/app/CoreStrings.cpp")
+    add_test(NAME i18n-core-strings COMMAND mirab-i18n-check core-strings "${_core_strings}")
+    add_custom_target(update_core_strings
+        COMMAND mirab-i18n-check core-strings "${_core_strings}" --write
+        COMMENT "Updating the list of library strings in src/app/CoreStrings.cpp")
+    file(GLOB _ts_files "${PROJECT_SOURCE_DIR}/translations/*.ts")
+    add_test(NAME i18n-ts-files COMMAND mirab-i18n-check ts ${_ts_files})
+    # The interface in each language (fails when its translation is not in the program).
+    if(TARGET Qt6::lrelease)
+        foreach(lang IN ITEMS fa ar es zh_CN)
+            add_test(NAME gui-language-${lang}
+                COMMAND Mirab "${PROJECT_SOURCE_DIR}/examples/swmm/mirab-urban.inp" --language ${lang}
+                        --select J2 --delay 300 --screenshot "${CMAKE_CURRENT_BINARY_DIR}/gui-language-${lang}.png")
+            set_tests_properties(gui-language-${lang} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 60)
+        endforeach()
+    endif()
+endif()

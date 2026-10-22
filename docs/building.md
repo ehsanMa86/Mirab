@@ -4,7 +4,7 @@
 
 - CMake 3.21 or newer and Ninja (or another generator)
 - a C++17 compiler: GCC 9+, Clang 12+, MSVC 2019+ or MinGW-w64 GCC 11+
-- Qt 6.5 or newer (Widgets) for the desktop application
+- Qt 6.5 or newer (Widgets) for the desktop application, with Qt Linguist tools (`LinguistTools`, part of the standard Qt installation) for the translations; without them the application is built in English only
 - Python 3 is optional; it runs the license header check and the icon generator
 
 The first configure downloads the engine sources (pinned commits with SHA-256 checksums) and SQLite. For offline builds point CMake at local copies, for example `-DFETCHCONTENT_SOURCE_DIR_MIRAB_UPSTREAM_OWA_EPANET=/path/to/EPANET`.
@@ -45,12 +45,16 @@ This produces `Mirab-<version>-macos-<arch>.dmg` with a self-contained `Mirab.ap
 ## Linux
 
 ```
-sudo apt install cmake ninja-build g++ qt6-base-dev libgl1-mesa-dev   # Qt 6.5+ (Ubuntu 24.10 or newer)
+sudo apt install cmake ninja-build g++ qt6-base-dev qt6-tools-dev qt6-l10n-tools qt6-translations-l10n libgl1-mesa-dev   # Qt 6.5+ (Ubuntu 24.10 or newer)
 cmake --preset release
 cmake --build --preset release --target package
 ```
 
 This produces `Mirab-<version>-linux-x86_64.tar.gz`. The release workflow also builds an AppImage with linuxdeploy (see `.github/workflows/release.yml`).
+
+## Translations
+
+The `.ts` files in `translations/` are compiled into the application together with Qt's own translations of the same languages (`qtbase_<lang>.qm` from the Qt installation), so the packages need no extra files and the deploy steps run with `NO_TRANSLATIONS`. `cmake --build <dir> --target update_translations` refreshes the `.ts` files from the sources and `--target update_core_strings` the list of library texts they include; see [translations/README.md](../translations/README.md).
 
 ## Continuous integration
 

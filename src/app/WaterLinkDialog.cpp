@@ -24,6 +24,7 @@
  */
 #include "WaterLinkDialog.h"
 
+#include "Language.h"
 #include "MapView.h"
 #include "mirab/core/Crs.h"
 #include "mirab/core/Text.h"
@@ -201,6 +202,7 @@ void LinkPreview::paintEvent(QPaintEvent*)
 {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
+    p.setLayoutDirection(Qt::LayoutDirectionAuto); // a map: see ChartWidget::draw()
     p.fillRect(rect(), QColor(250, 251, 253));
     p.setPen(QColor(214, 220, 228));
     p.drawRect(rect().adjusted(0, 0, -1, -1));
@@ -850,7 +852,7 @@ void WaterLinkDialog::recompute()
         summary += ".";
     }
     for (const auto& n : plan_.notes)
-        summary += " " + QString::fromStdString(n);
+        summary += " " + coreText(n);
     summary_->setText(summary);
     valid_ = true;
     apply_->setEnabled(!plan_.inflows.empty());

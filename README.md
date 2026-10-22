@@ -37,6 +37,7 @@ Mirab runs on Windows, macOS and Linux. It needs no Python, no QGIS and no other
 - **Evaluate resilience** with native implementations of the Todini index, water service availability, network topology (bridges and articulation points), pipe criticality and fire-flow capacity.
 - **Exchange data** as GeoPackage or GeoJSON for QGIS and other GIS tools, and as WNTR JSON for the Python water community. "Open in QGIS" exports and launches QGIS in one step.
 - **Edit the input file directly** in a syntax-highlighted text view. The `.inp` file stays the master copy, and Mirab preserves every comment and line you did not change.
+- **Work in your language**: English, Persian, Arabic, Spanish and Simplified Chinese, with right-to-left layouts for Persian and Arabic.
 - **Extend Mirab** with C++ plugins built against Qt 6.
 
 ## Download

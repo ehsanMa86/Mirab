@@ -23,6 +23,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #include "EngineDownloader.h"
+#include "Language.h"
 #include "MainWindow.h"
 #include "Theme.h"
 
@@ -36,11 +37,15 @@
 #include <QTemporaryDir>
 #include <QTimer>
 
+#include <clocale>
 #include <cstdio>
 
 int main(int argc, char* argv[])
 {
     QApplication app(argc, argv);
+    // Qt adopts the user's locale for the C library on Unix; numbers in model
+    // files are always read and written with a decimal point.
+    std::setlocale(LC_NUMERIC, "C");
     QApplication::setApplicationName("Mirab");
     QApplication::setOrganizationName("Mirab");
     QApplication::setOrganizationDomain("mirab.app");
@@ -106,8 +111,8 @@ int main(int argc, char* argv[])
     const QCommandLineOption toolOpt("open-tool", "Open a tool dialog after the file: elevations (from a DEM), "
                                                   "raster-layers, map-service, observed-data, calibration, "
                                                   "calibration-run (starts the calibration; use --delay to "
-                                                  "picture its progress), select-query, run-scenarios or "
-                                                  "wastewater (dry-weather flow from a water model).",
+                                                  "picture its progress), select-query, run-scenarios, "
+                                                  "wastewater (dry-weather flow from a water model) or settings.",
                                      "name");
     const QCommandLineOption scenarioOpt("scenario", "Activate a scenario of the project after opening it.", "name");
     const QCommandLineOption differenceOpt("map-difference",
@@ -150,6 +155,10 @@ int main(int argc, char* argv[])
     parser.addOption(queryOpt);
     parser.addOption(traceOpt);
     parser.addOption(installEngine);
+    const QCommandLineOption languageOpt(
+        "language", "Interface language: en, fa, ar, es, zh_CN or system (default: the language chosen in Settings).",
+        "code");
+    parser.addOption(languageOpt);
     parser.process(app);
 
     if (parser.isSet(installEngine))
@@ -190,6 +199,15 @@ int main(int argc, char* argv[])
     {
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, automationSettings.path());
+    }
+
+    const QString language = parser.isSet(languageOpt) ? parser.value(languageOpt)
+                                                       : mirab::app::configuredLanguage();
+    const QString used = mirab::app::installTranslations(language);
+    if (parser.isSet(languageOpt) && language != "system" && used != language)
+    {
+        std::fprintf(stderr, "No translation for language \"%s\".\n", qPrintable(language));
+        return 1;
     }
 
     bool runFailed = false;

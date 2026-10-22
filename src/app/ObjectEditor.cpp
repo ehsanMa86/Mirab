@@ -25,6 +25,7 @@
 #include "ObjectEditor.h"
 
 #include "Icons.h"
+#include "Language.h"
 #include "SchemaWidgets.h"
 #include "mirab/core/Text.h"
 
@@ -54,18 +55,18 @@ using core::ColumnType;
 namespace
 {
 /// Combo box editors for table columns that have choices or references.
-class ColumnDelegate : public QStyledItemDelegate
+class ColumnDelegate : public DataItemDelegate
 {
 public:
     ColumnDelegate(std::vector<QStringList> choices, std::vector<bool> editable, QObject* parent)
-        : QStyledItemDelegate(parent), choices_(std::move(choices)), editable_(std::move(editable))
+        : DataItemDelegate(parent), choices_(std::move(choices)), editable_(std::move(editable))
     {
     }
     QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& opt, const QModelIndex& idx) const override
     {
         const auto c = static_cast<std::size_t>(idx.column());
         if (c >= choices_.size() || choices_[c].isEmpty())
-            return QStyledItemDelegate::createEditor(parent, opt, idx);
+            return DataItemDelegate::createEditor(parent, opt, idx);
         auto* box = new QComboBox(parent);
         box->setEditable(editable_[c]);
         box->addItems(choices_[c]);
@@ -343,7 +344,7 @@ void ObjectEditor::load()
                  : !defining        ? Mode::Table
                  : !d->variants.empty() ? Mode::Forms
                                         : Mode::Form;
-        auto* box = new QGroupBox(defining ? tr("Properties") : QString::fromStdString(d->description), content_);
+        auto* box = new QGroupBox(defining ? tr("Properties") : coreText(d->description), content_);
         g.box = box;
         auto* bl = new QVBoxLayout(box);
         bl->setSpacing(8);
@@ -434,7 +435,7 @@ void ObjectEditor::load()
             for (int c = 0; c < ncols; ++c)
             {
                 const auto& col = d->columns[static_cast<std::size_t>(c) + 1];
-                g.table->horizontalHeaderItem(c)->setToolTip(QString::fromStdString(col.help));
+                g.table->horizontalHeaderItem(c)->setToolTip(coreText(col.help));
             }
             g.table->setItemDelegate(new ColumnDelegate(choices, editable, g.table));
             g.table->verticalHeader()->hide();
@@ -508,6 +509,7 @@ void ObjectEditor::load()
             note->setObjectName("panelSubtitle");
             bl->addWidget(note);
             g.raw = new QPlainTextEdit(box);
+            g.raw->setLayoutDirection(Qt::LeftToRight); // input file text
             g.raw->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
             g.raw->setLineWrapMode(QPlainTextEdit::NoWrap);
             g.raw->setMinimumHeight(260);

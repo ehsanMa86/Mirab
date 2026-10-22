@@ -282,8 +282,9 @@ void DataEditor::updatePatternLabels()
 {
     QStringList periods;
     const QString type = swmm_ ? curveType_->currentText() : QString();
-    static const QStringList months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    static const QStringList days = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    const QStringList months = {tr("Jan"), tr("Feb"), tr("Mar"), tr("Apr"), tr("May"), tr("Jun"),
+                                tr("Jul"), tr("Aug"), tr("Sep"), tr("Oct"), tr("Nov"), tr("Dec")};
+    const QStringList days = {tr("Sun"), tr("Mon"), tr("Tue"), tr("Wed"), tr("Thu"), tr("Fri"), tr("Sat")};
     const double step = patternStepHours();
     for (int r = 0; r < table_->rowCount(); ++r)
     {

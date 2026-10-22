@@ -28,6 +28,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDateEdit>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -52,7 +53,22 @@ namespace mirab::app
 
 namespace
 {
-const QStringList kMonths = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+const char* const kMonths[] = {
+    QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Jan"), QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Feb"),
+    QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Mar"), QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Apr"),
+    QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "May"), QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Jun"),
+    QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Jul"), QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Aug"),
+    QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Sep"), QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Oct"),
+    QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Nov"), QT_TRANSLATE_NOOP("mirab::app::OptionsDialog", "Dec")};
+
+/// Month abbreviations shown as table headers.
+QStringList monthNames()
+{
+    QStringList out;
+    for (const char* m : kMonths)
+        out << QCoreApplication::translate("mirab::app::OptionsDialog", m);
+    return out;
+}
 
 QString firstWord(const QString& v)
 {
@@ -615,7 +631,7 @@ void OptionsDialog::buildEvaporation(QFormLayout* f)
     cl->addStretch(1);
     stack->addWidget(cpage);
     // Monthly
-    auto* monthly = valueTable({rate}, kMonths);
+    auto* monthly = valueTable({rate}, monthNames());
     setTableRow(monthly, 0, current == 1 ? words(currentValue) : QStringList());
     stack->addWidget(monthly);
     // Time series
@@ -637,7 +653,7 @@ void OptionsDialog::buildEvaporation(QFormLayout* f)
     // Temperature
     stack->addWidget(new QLabel(tr("Evaporation is computed from the daily temperatures (Hargreaves method)."), stack));
     // Climate file
-    auto* pan = valueTable({tr("Pan coefficient")}, kMonths);
+    auto* pan = valueTable({tr("Pan coefficient")}, monthNames());
     setTableRow(pan, 0, current == 4 ? words(currentValue) : QStringList());
     stack->addWidget(pan);
     stack->setCurrentIndex(current);
@@ -766,7 +782,7 @@ void OptionsDialog::buildClimate(QFormLayout* f)
     const QStringList windWords = words(value("TEMPERATURE", "WINDSPEED"));
     wind->setCurrentIndex(!windWords.isEmpty() && windWords[0].compare("FILE", Qt::CaseInsensitive) == 0 ? 1 : 0);
     f->addRow(tr("Wind speed"), wind);
-    auto* windTable = valueTable({si ? "km/h" : "mph"}, kMonths);
+    auto* windTable = valueTable({si ? "km/h" : "mph"}, monthNames());
     setTableRow(windTable, 0, wind->currentIndex() == 0 ? windWords.mid(1) : QStringList());
     windTable->setEnabled(wind->currentIndex() == 0);
     connect(wind, &QComboBox::currentIndexChanged, windTable, [windTable](int i) { windTable->setEnabled(i == 0); });
@@ -891,7 +907,7 @@ void OptionsDialog::buildAdjustments(QFormLayout* f)
     QStringList labels;
     for (const auto& r : rows)
         labels << r.label;
-    auto* table = valueTable(labels, kMonths);
+    auto* table = valueTable(labels, monthNames());
     for (int i = 0; i < static_cast<int>(rows.size()); ++i)
         setTableRow(table, i, words(value("ADJUSTMENTS", rows[static_cast<std::size_t>(i)].key)));
     f->addRow(table);

@@ -502,6 +502,18 @@ The link is one-way: the water model sets the sewer inflows. A coupled simulatio
 
 *File > Export > WNTR network* writes the JSON layout read by `wntr.network.read_json`, in SI units. *File > Import > WNTR network* reads a file written by `wntr.network.write_json` and saves it as an EPANET input file in LPS. Controls, rules and quality sources are reported as not transferred.
 
+## Language
+
+Mirab speaks English, Persian (فارسی), Arabic (العربية), Spanish (Español) and Simplified Chinese (简体中文). Choose the language in *Tools > Settings > Language* and start Mirab again; *System default* follows the language of the operating system and falls back to English. `mirab --language fa` (or `ar`, `es`, `zh_CN`, `en`) starts once in a given language without changing the setting. Qt's own dialogs and buttons (file dialogs, *OK*, *Cancel*) follow the same language.
+
+In Persian and Arabic the window is laid out from right to left: menus, docks, forms and tables are mirrored. The map, charts, profiles, the LID cross-section and print layouts keep their left-to-right geometry (east and time to the right), and numbers, IDs and values in tables read left to right. The input file text, control rules and query expressions stay left to right too.
+
+Some names stay in English in every language because they are part of the data: input column names (`Elevation`, `Diameter`, `InitLevel`) and result variable names (`Pressure`, `Flow`, `Depth`), which are also the names used in query expressions such as `Diameter < 200 AND Pressure < 20` and in CSV and GIS exports; `.inp` section and keyword names; unit symbols; and messages that name elements or lines of the input file. `mirab-cli` always prints English.
+
+Numbers keep a decimal point and Latin digits in every language, and the input file is always written the same way, so a model saved in one language opens unchanged in another. Spin boxes and dates follow the regional settings of the operating system.
+
+The translations are maintained in `translations/` of the source tree; [translations/README.md](../translations/README.md) explains how to review them and add a language.
+
 ## Keyboard shortcuts
 
 | Key | Action |
@@ -531,6 +543,7 @@ The link is one-way: the water model sets the sewer inflows. A coupled simulatio
 
 | Option | Effect |
 |---|---|
+| `--language CODE` | Starts in a language: `en`, `fa`, `ar`, `es`, `zh_CN` or `system` (default: the language chosen in *Tools > Settings*). |
 | `--import FILE` | Opens the import dialog for a shapefile, DXF drawing or CSV table. |
 | `--show-data SECTION:ID` | Opens the editor of a pattern, curve, time series, named object, LID control, transect or unit hydrograph group, for example `PATTERNS:PAT1`, `POLLUTANTS:TSS` or `LID_CONTROLS:Cell1`; `CONTROLS:` or `RULES:` opens the control rules and `LID_USAGE:S1` the LID usage of subcatchment S1. |
 | `--options-dialog PAGE` | Opens the simulation options dialog at a page: `general`, `dates`, `steps`, `dynwave`, `files`, `report`, `evaporation`, `climate`, `adjustments` (SWMM) or `hydraulics`, `quality`, `times`, `energy`, `report` (EPANET). |
@@ -538,7 +551,7 @@ The link is one-way: the water model sets the sewer inflows. A coupled simulatio
 | `--select-region X1,Y1,X2,Y2` | Selects the elements inside a rectangle of map coordinates. |
 | `--select-query EXPR` | Selects the elements that match a query expression; with `--open-tool select-query`, fills the dialog with it. |
 | `--trace KIND` | Traces from the selection: `downstream`, `upstream`, `connected` or `path`. |
-| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, `calibration-run` (starts the calibration), `select-query`, `run-scenarios` or `wastewater` (dry-weather flow from a water model). |
+| `--open-tool NAME` | Opens a tool dialog: `elevations`, `raster-layers`, `map-service`, `observed-data`, `calibration`, `calibration-run` (starts the calibration), `select-query`, `run-scenarios`, `wastewater` (dry-weather flow from a water model) or `settings`. |
 | `--scenario NAME` | Activates a scenario of the project. |
 | `--map-difference NAME` | Colors the map by the change from a scenario's results (`Base` for the base model); exports show it too. |
 | `--period N` | Shows the results at reporting period N (0 is the first). |

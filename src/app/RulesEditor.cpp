@@ -25,6 +25,7 @@
 #include "RulesEditor.h"
 
 #include "Icons.h"
+#include "Language.h"
 #include "Theme.h"
 
 #include "mirab/core/Model.h"
@@ -202,6 +203,7 @@ ControlRulesEditor::ControlRulesEditor(ProjectDocument* doc, const QString& sect
     list_->setMinimumWidth(170);
     list_->setVisible(!simple_);
     edit_ = new QPlainTextEdit(split);
+    edit_->setLayoutDirection(Qt::LeftToRight); // rule text
     QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     mono.setPointSizeF(std::max(9.5, mono.pointSizeF()));
     edit_->setFont(mono);
@@ -422,9 +424,9 @@ void ControlRulesEditor::fillTemplateMenu()
     const auto used = core::ruleNames(allLines());
     for (const auto& t : core::ruleTemplates(syntax_, ctx, used))
     {
-        QAction* a = menu->addAction(qs(t.title));
-        a->setToolTip(qs(t.description));
-        a->setStatusTip(qs(t.description));
+        QAction* a = menu->addAction(coreText(t.title));
+        a->setToolTip(coreText(t.description));
+        a->setStatusTip(coreText(t.description));
         const QStringList vars = qlist(t.variables), lines = qlist(t.lines);
         connect(a, &QAction::triggered, this, [this, vars, lines] { addRule(vars, lines); });
     }
@@ -585,6 +587,7 @@ RuleBuilderDialog::RuleBuilderDialog(core::RuleSyntax syntax, const core::RuleCo
 
     layout->addWidget(new QLabel(tr("Rule text"), this));
     preview_ = new QPlainTextEdit(this);
+    preview_->setLayoutDirection(Qt::LeftToRight); // rule text
     preview_->setReadOnly(true);
     preview_->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     new RuleHighlighter(preview_->document(), syntax_, false);
