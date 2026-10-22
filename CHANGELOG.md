@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-10-21)
 
 - SWMM editing without the text view: full schemas for inflows, dry weather flow, RDII, treatment, groundwater, coverages, loadings, inlet and LID usage; pollutants, land uses, aquifers, snow packs, streets and inlets as named objects with renames and deletions carried to every reference; dedicated editors for LID controls, LID usage, transects, unit hydrographs and control rules (SWMM 5.2 and EPANET, with line-numbered checks); a simulation options dialog for SWMM and EPANET.
 - Native GeoTIFF and ESRI ASCII grid reader (own Deflate decoder, no GDAL); node elevations from a DEM; hillshade and colour-ramp raster layers; ground elevation under the cursor and in profiles; custom XYZ, WMS and WMTS basemaps.

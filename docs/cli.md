@@ -209,7 +209,7 @@ Without `--table`, `--json` prints the header of the file (the same members as t
 ```json
 {"engineId": "epanet-2.3-owa", "engineName": "OWA EPANET 2.3 (2.3.5)", "title": "...",
  "flowUnits": "LPS", "unitSystem": "SI", "reportStart": 0, "reportStep": 3600, "periods": 25,
- "times": [0, 3600, ...], "metadata": {"input": "model.inp", "mirabVersion": "0.1.0"},
+ "times": [0, 3600, ...], "metadata": {"input": "model.inp", "mirabVersion": "0.2.0"},
  "messages": [], "tables": [{"kind": "node", "ids": ["J1", ...],
                              "variables": [{"name": "Pressure", "unit": "m"}, ...]}]}
 ```
