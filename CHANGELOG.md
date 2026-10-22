@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 (2026-10-22)
+
+- Fix: SWMM5+ runs started from the application never finished on Windows. The solver process waited for standard input while SWMM5+ inspected it; commands are now read only when they arrive.
+- The Long Beach sewer example runs with SWMM5+: its upstream end MH-A1 has a small infiltration flow.
+- Documentation: SWMM5+ applies the average dry-weather flow without its time patterns.
+
 ## 0.2.0 (2026-10-21)
 
 - SWMM editing without the text view: full schemas for inflows, dry weather flow, RDII, treatment, groundwater, coverages, loadings, inlet and LID usage; pollutants, land uses, aquifers, snow packs, streets and inlets as named objects with renames and deletions carried to every reference; dedicated editors for LID controls, LID usage, transects, unit hydrographs and control rules (SWMM 5.2 and EPANET, with line-numbered checks); a simulation options dialog for SWMM and EPANET.
