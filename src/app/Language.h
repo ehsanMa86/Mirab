@@ -37,12 +37,22 @@ namespace mirab::app
 
 struct UiLanguage
 {
-    QString code;       ///< "fa", "zh_CN", ...; empty for the system language
-    QString nativeName; ///< name in the language itself
+    QString code;        ///< "fa", "zh_CN", ...; empty for the system language
+    QString nativeName;  ///< name in the language itself
+    QString englishName; ///< name in English
 };
 
 /// Languages offered in Settings. The first entry (empty code) follows the system.
 QList<UiLanguage> uiLanguages();
+/// Name of a language as listed in menus: in the language itself and in English,
+/// e.g. "فارسی (Persian)", so anyone can find their way back to a language they read.
+QString languageLabel(const UiLanguage& language);
+/// A translated label followed by its English text in parentheses, unless the
+/// interface is in English: "زبان (Language)".
+QString withEnglish(const QString& translated, const QString& english);
+/// Asks whether to restart now so a newly chosen language takes effect; the
+/// question is shown in the current language and in English. True for "restart now".
+bool askRestartForLanguage(QWidget* parent);
 /// Language chosen in Settings; empty for the system language.
 QString configuredLanguage();
 void setConfiguredLanguage(const QString& code);

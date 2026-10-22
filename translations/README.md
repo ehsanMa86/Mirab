@@ -64,8 +64,10 @@ corrects one changes the text and marks it as done.
 Guidelines:
 
 - Keep placeholders, HTML tags, `.inp` keywords in capitals, file patterns (`*.inp`) and unit symbols.
-- Keep the menu accelerators: put `&` before a letter of the translated label. Chinese labels use the
-  Latin letter in brackets, for example `文件(&F)`.
+- Keep the menu accelerators in Spanish: put `&` before a letter of the translated label. Chinese labels
+  use the Latin letter in brackets, for example `文件(&F)`. Persian and Arabic labels have no `&`: Qt
+  draws the underlined letter on its own, which breaks the joined letters of the word (the check
+  enforces this).
 - Use the terms of the glossary below; consistency matters more than the perfect word.
 - Persian: Persian letters (ی and ک, not ي and ك), zero-width non-joiners where they belong
   (`می‌شود`, `داده‌ها`), Latin digits for data.

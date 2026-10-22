@@ -588,9 +588,9 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent)
     auto* form = new QFormLayout(this);
     language_ = new QComboBox(this);
     for (const UiLanguage& l : uiLanguages())
-        language_->addItem(l.nativeName, l.code);
+        language_->addItem(languageLabel(l), l.code);
     language_->setCurrentIndex(std::max(0, language_->findData(configuredLanguage())));
-    form->addRow(tr("Language"), language_);
+    form->addRow(withEnglish(tr("Language"), QStringLiteral("Language")), language_);
     auto* row = new QHBoxLayout;
     qgis_ = new QLineEdit(qgisPath(), this);
     qgis_->setPlaceholderText(findQgis().isEmpty() ? tr("QGIS was not found automatically") : findQgis());
@@ -616,7 +616,7 @@ SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent)
         if (language != configuredLanguage())
         {
             setConfiguredLanguage(language);
-            QMessageBox::information(this, tr("Language"), tr("Restart Mirab to use the new language."));
+            restartRequested_ = askRestartForLanguage(this);
         }
         accept();
     });

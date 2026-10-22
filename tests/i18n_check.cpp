@@ -32,7 +32,9 @@
 //     Each file must parse, carry no obsolete or vanished messages, and keep
 //     the placeholders (%1, %2, %n, ...) of every source text. Right-to-left
 //     translations that start with a Latin word, a number or a placeholder
-//     begin with U+200F RIGHT-TO-LEFT MARK.
+//     begin with U+200F RIGHT-TO-LEFT MARK, and have no mnemonic "&": the
+//     underlined letter is drawn on its own, which breaks the joined letters
+//     of Persian and Arabic words.
 
 #include "mirab/core/ControlRules.h"
 #include "mirab/core/Features.h"
@@ -415,6 +417,9 @@ int checkTs(const QString& path)
                     startsWithoutRtlLetter(t) &&
                     containsRtlLetter(t))
                     report("starts without a right-to-left letter; begin it with U+200F");
+                if (rtl && QString(t).replace(QStringLiteral("&&"), QString()).contains(QLatin1Char('&')))
+                    report("has a mnemonic \"&\", which splits joined letters; remove it in \"" + t.left(80) +
+                           "\"");
             }
             if (!empty && type.isEmpty())
                 ++finished;

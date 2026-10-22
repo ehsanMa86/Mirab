@@ -769,7 +769,7 @@ void MainWindow::createMenus()
     tools->addAction(tr("&Wastewater from water model..."), this, &MainWindow::wastewaterFromWaterModel);
     tools->addSeparator();
     pluginMenu_ = tools->addMenu(tr("&Plugins"));
-    tools->addAction(icons::get("settings"), tr("&Settings..."), this, [this] { SettingsDialog(this).exec(); });
+    tools->addAction(icons::get("settings"), tr("&Settings..."), this, &MainWindow::showSettings);
 
     // Help
     QMenu* help = menuBar()->addMenu(tr("&Help"));
@@ -918,6 +918,36 @@ void MainWindow::createStatusBar()
     statusBar()->addPermanentWidget(unitsLabel_);
     statusBar()->addPermanentWidget(engineLabel_);
     statusBar()->addPermanentWidget(coords_);
+
+    // Always visible, with a globe and the names in English too, so a language
+    // chosen by mistake can be changed back without reading it.
+    languageButton_ = new QToolButton(this);
+    languageButton_->setIcon(icons::get("globe"));
+    languageButton_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    languageButton_->setAutoRaise(true);
+    languageButton_->setPopupMode(QToolButton::InstantPopup);
+    languageButton_->setToolTip(withEnglish(tr("Interface language"), QStringLiteral("Interface language")));
+    for (const UiLanguage& l : uiLanguages())
+    {
+        if (l.code == currentLanguage())
+            languageButton_->setText(l.nativeName);
+    }
+    auto* languageMenu = new QMenu(languageButton_);
+    for (const UiLanguage& l : uiLanguages())
+    {
+        QAction* a = languageMenu->addAction(languageLabel(l));
+        a->setCheckable(true);
+        a->setChecked(l.code == configuredLanguage());
+        connect(a, &QAction::triggered, this, [this, code = l.code] {
+            if (code == configuredLanguage())
+                return;
+            setConfiguredLanguage(code);
+            if (askRestartForLanguage(this))
+                restartApplication();
+        });
+    }
+    languageButton_->setMenu(languageMenu);
+    statusBar()->addPermanentWidget(languageButton_);
 }
 
 void MainWindow::updateStatusInfo()
@@ -1333,9 +1363,29 @@ void MainWindow::updateRecentMenu()
     recentMenu_->setEnabled(!list.isEmpty());
 }
 
-void MainWindow::closeEvent(QCloseEvent* e)
+void MainWindow::showSettings()
+{
+    SettingsDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted && dlg.restartRequested())
+        restartApplication();
+}
+
+void MainWindow::restartApplication()
 {
     if (!maybeSave())
+        return;
+    QStringList args;
+    if (!doc_->path().isEmpty())
+        args << doc_->path();
+    if (!QProcess::startDetached(QCoreApplication::applicationFilePath(), args))
+        return;
+    restarting_ = true; // the project was saved or discarded above
+    close();
+}
+
+void MainWindow::closeEvent(QCloseEvent* e)
+{
+    if (!restarting_ && !maybeSave())
     {
         e->ignore();
         return;
@@ -2193,7 +2243,7 @@ void MainWindow::openTool(const QString& name)
     else if (name == "run-scenarios")
         runScenarios();
     else if (name == "settings")
-        SettingsDialog(this).exec();
+        showSettings();
     else
         openCalibrationTool(name);
 }

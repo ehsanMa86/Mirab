@@ -71,6 +71,12 @@ SOFTWARE.
 
 The SWMM5+ engine is not part of the Mirab packages. When it is installed from the swmm5plus-capi releases, it brings SWMM5+ (The Unlicense), EPA SWMM 5.1.13 (public domain), json-fortran (BSD-style), HDF5 (BSD-style) and the GNU Fortran runtime (GPL-3.0 with the GCC Runtime Library Exception). The installed files include `swmm5plus-capi-THIRD_PARTY_NOTICES.md` with the details.
 
+## Vazirmatn font
+
+- Source: https://github.com/rastikerdar/vazirmatn, version 33.003 (`Vazirmatn-Regular.ttf`, `Vazirmatn-Bold.ttf`, unmodified)
+- Use: compiled into the application and used for the Persian and Arabic interface
+- License: SIL Open Font License 1.1, Copyright 2015 The Vazirmatn Project Authors. The full text is in `third_party/fonts/vazirmatn/OFL.txt` and is installed with the application.
+
 ## MinGW-w64 runtime (Windows packages only)
 
 - `libstdc++-6.dll`, `libgcc_s_seh-1.dll` and `libwinpthread-1.dll` are shipped with the Windows build. They are covered by the GCC Runtime Library Exception (GPL-3.0 with exception) and the MinGW-w64 license (ZPL/MIT-style).

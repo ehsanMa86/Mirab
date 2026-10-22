@@ -25,7 +25,10 @@
 #include "Language.h"
 
 #include <QApplication>
+#include <QFontDatabase>
 #include <QLocale>
+#include <QMessageBox>
+#include <QPushButton>
 #include <QSettings>
 #include <QStyle>
 #include <QTableView>
@@ -45,6 +48,21 @@ QString& current()
 bool rightToLeft(const QString& code)
 {
     return code == "fa" || code == "ar";
+}
+
+/// Persian and Arabic use Vazirmatn, compiled into the program: system fonts
+/// often join or space these letters poorly in interface sizes.
+void useArabicScriptFont()
+{
+    const int regular = QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Vazirmatn-Regular.ttf"));
+    QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Vazirmatn-Bold.ttf"));
+    if (regular < 0)
+        return;
+    QFont f = QApplication::font();
+    QStringList families = QFontDatabase::applicationFontFamilies(regular);
+    families << f.families();
+    f.setFamilies(families);
+    QApplication::setFont(f);
 }
 
 /// Gives tables with the default delegate a DataItemDelegate when they are first shown.
@@ -91,12 +109,46 @@ void DataItemDelegate::initStyleOption(QStyleOptionViewItem* option, const QMode
 
 QList<UiLanguage> uiLanguages()
 {
-    return {{QString(), QCoreApplication::translate("Language", "System default")},
-            {"en", QStringLiteral("English")},
-            {"fa", QStringLiteral(u"فارسی")},
-            {"ar", QStringLiteral(u"العربية")},
-            {"es", QStringLiteral(u"Español")},
-            {"zh_CN", QStringLiteral(u"简体中文")}};
+    return {{QString(), QCoreApplication::translate("Language", "System default"), QStringLiteral("System default")},
+            {"en", QStringLiteral("English"), QStringLiteral("English")},
+            {"fa", QStringLiteral(u"فارسی"), QStringLiteral("Persian")},
+            {"ar", QStringLiteral(u"العربية"), QStringLiteral("Arabic")},
+            {"es", QStringLiteral(u"Español"), QStringLiteral("Spanish")},
+            {"zh_CN", QStringLiteral(u"简体中文"), QStringLiteral("Chinese, Simplified")}};
+}
+
+QString languageLabel(const UiLanguage& language)
+{
+    if (language.nativeName == language.englishName)
+        return language.nativeName;
+    // First-strong isolates keep the two names in their own directions in either layout.
+    return language.nativeName + QStringLiteral(u" \u2068(") + language.englishName + QStringLiteral(u")\u2069");
+}
+
+QString withEnglish(const QString& translated, const QString& english)
+{
+    if (current() == "en" || translated == english)
+        return translated;
+    return translated + QStringLiteral(u" \u2068(") + english + QStringLiteral(u")\u2069");
+}
+
+bool askRestartForLanguage(QWidget* parent)
+{
+    QString text = QCoreApplication::translate("Language", "Restart Mirab to use the new language.");
+    const QString english = QStringLiteral("Restart Mirab to use the new language.");
+    if (current() != "en" && text != english)
+        text += QStringLiteral("\n\n") + english;
+    QMessageBox box(QMessageBox::Question, withEnglish(QCoreApplication::translate("Language", "Language"),
+                                                      QStringLiteral("Language")),
+                    text, QMessageBox::NoButton, parent);
+    QPushButton* now = box.addButton(withEnglish(QCoreApplication::translate("Language", "Restart now"),
+                                                 QStringLiteral("Restart now")),
+                                     QMessageBox::AcceptRole);
+    box.addButton(withEnglish(QCoreApplication::translate("Language", "Later"), QStringLiteral("Later")),
+                  QMessageBox::RejectRole);
+    box.setDefaultButton(now);
+    box.exec();
+    return box.clickedButton() == now;
 }
 
 QString configuredLanguage()
@@ -155,7 +207,10 @@ QString installTranslations(const QString& code)
     }
     QGuiApplication::setLayoutDirection(rightToLeft(current()) ? Qt::RightToLeft : Qt::LeftToRight);
     if (rightToLeft(current()))
+    {
         qApp->installEventFilter(new DataTables(qApp));
+        useArabicScriptFont();
+    }
     return current();
 }
 

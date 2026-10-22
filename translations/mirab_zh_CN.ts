@@ -62,6 +62,22 @@
         <source>System default</source>
         <translation>系统默认</translation>
     </message>
+    <message>
+        <source>Restart Mirab to use the new language.</source>
+        <translation>重新启动 Mirab 以使用新语言。</translation>
+    </message>
+    <message>
+        <source>Language</source>
+        <translation>语言</translation>
+    </message>
+    <message>
+        <source>Restart now</source>
+        <translation>立即重启</translation>
+    </message>
+    <message>
+        <source>Later</source>
+        <translation>稍后</translation>
+    </message>
 </context>
 <context>
     <name>LayoutDialog</name>
@@ -6305,6 +6321,10 @@ pervious</source>
         <source>Dry-weather inflow written from the water model. Undo restores the previous values.</source>
         <translation>已根据供水模型写入旱流入流。撤销可恢复原值。</translation>
     </message>
+    <message>
+        <source>Interface language</source>
+        <translation>界面语言</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::MapPage</name>
@@ -9416,10 +9436,6 @@ pervious</source>
     <message>
         <source>Mirab never loads QGIS. &quot;Open in QGIS&quot; exports a GeoPackage and starts QGIS as a separate program.</source>
         <translation>Mirab 从不加载 QGIS。“在 QGIS 中打开”会导出 GeoPackage，并将 QGIS 作为独立程序启动。</translation>
-    </message>
-    <message>
-        <source>Restart Mirab to use the new language.</source>
-        <translation>重新启动 Mirab 以使用新语言。</translation>
     </message>
 </context>
 <context>

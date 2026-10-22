@@ -62,6 +62,22 @@
         <source>System default</source>
         <translation>Predeterminado del sistema</translation>
     </message>
+    <message>
+        <source>Restart Mirab to use the new language.</source>
+        <translation>Reinicie Mirab para usar el nuevo idioma.</translation>
+    </message>
+    <message>
+        <source>Language</source>
+        <translation>Idioma</translation>
+    </message>
+    <message>
+        <source>Restart now</source>
+        <translation>Reiniciar ahora</translation>
+    </message>
+    <message>
+        <source>Later</source>
+        <translation>Más tarde</translation>
+    </message>
 </context>
 <context>
     <name>LayoutDialog</name>
@@ -6329,6 +6345,10 @@ permeable</translation>
         <source>Dry-weather inflow written from the water model. Undo restores the previous values.</source>
         <translation>Aporte de tiempo seco escrito a partir del modelo de agua. Deshacer restaura los valores anteriores.</translation>
     </message>
+    <message>
+        <source>Interface language</source>
+        <translation>Idioma de la interfaz</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::MapPage</name>
@@ -9452,10 +9472,6 @@ permeable</translation>
     <message>
         <source>Mirab never loads QGIS. &quot;Open in QGIS&quot; exports a GeoPackage and starts QGIS as a separate program.</source>
         <translation>Mirab nunca carga QGIS. &quot;Abrir en QGIS&quot; exporta un GeoPackage e inicia QGIS como un programa independiente.</translation>
-    </message>
-    <message>
-        <source>Restart Mirab to use the new language.</source>
-        <translation>Reinicie Mirab para usar el nuevo idioma.</translation>
     </message>
 </context>
 <context>

@@ -62,6 +62,22 @@
         <source>System default</source>
         <translation>افتراضي النظام</translation>
     </message>
+    <message>
+        <source>Restart Mirab to use the new language.</source>
+        <translation>أعد تشغيل Mirab لاستخدام اللغة الجديدة.</translation>
+    </message>
+    <message>
+        <source>Language</source>
+        <translation>اللغة</translation>
+    </message>
+    <message>
+        <source>Restart now</source>
+        <translation>إعادة التشغيل الآن</translation>
+    </message>
+    <message>
+        <source>Later</source>
+        <translation>لاحقًا</translation>
+    </message>
 </context>
 <context>
     <name>LayoutDialog</name>
@@ -5409,15 +5425,15 @@ pervious</source>
     </message>
     <message>
         <source>Select &amp;all</source>
-        <translation>تحديد ال&amp;كل</translation>
+        <translation>تحديد الكل</translation>
     </message>
     <message>
         <source>&amp;Invert selection</source>
-        <translation>&amp;عكس التحديد</translation>
+        <translation>عكس التحديد</translation>
     </message>
     <message>
         <source>Select by &amp;query...</source>
-        <translation>تحديد ب&amp;استعلام...</translation>
+        <translation>تحديد باستعلام...</translation>
     </message>
     <message>
         <source>Select elements by conditions on their properties and results (Ctrl+Shift+F)</source>
@@ -5425,19 +5441,19 @@ pervious</source>
     </message>
     <message>
         <source>Trace &amp;downstream</source>
-        <translation>تتبّع نحو الم&amp;صب</translation>
+        <translation>تتبّع نحو المصب</translation>
     </message>
     <message>
         <source>Trace &amp;upstream</source>
-        <translation>تتبّع نحو المن&amp;بع</translation>
+        <translation>تتبّع نحو المنبع</translation>
     </message>
     <message>
         <source>Select &amp;connected</source>
-        <translation>تحديد المتص&amp;ل</translation>
+        <translation>تحديد المتصل</translation>
     </message>
     <message>
         <source>Select shortest &amp;path</source>
-        <translation>تحديد أقصر &amp;مسار</translation>
+        <translation>تحديد أقصر مسار</translation>
     </message>
     <message>
         <source>Select the shortest path between the first and the last selected node</source>
@@ -5445,19 +5461,19 @@ pervious</source>
     </message>
     <message>
         <source>Profile &amp;along the path</source>
-        <translation>المقطع الطولي على امت&amp;داد المسار</translation>
+        <translation>المقطع الطولي على امتداد المسار</translation>
     </message>
     <message>
         <source>&amp;Zoom to selection</source>
-        <translation>&amp;تكبير إلى التحديد</translation>
+        <translation>تكبير إلى التحديد</translation>
     </message>
     <message>
         <source>&amp;Reverse link direction</source>
-        <translation>ع&amp;كس اتجاه الوصلة</translation>
+        <translation>عكس اتجاه الوصلة</translation>
     </message>
     <message>
         <source>&amp;Export selection (CSV)...</source>
-        <translation>تصدي&amp;ر التحديد (CSV)...</translation>
+        <translation>تصدير التحديد (CSV)...</translation>
     </message>
     <message>
         <source>Follow the flow direction of the results</source>
@@ -5493,7 +5509,7 @@ pervious</source>
     </message>
     <message>
         <source>&amp;Save</source>
-        <translation>&amp;حفظ</translation>
+        <translation>حفظ</translation>
     </message>
     <message>
         <source>Save the project (Ctrl+S)</source>
@@ -5501,15 +5517,15 @@ pervious</source>
     </message>
     <message>
         <source>&amp;Undo</source>
-        <translation>&amp;تراجع</translation>
+        <translation>تراجع</translation>
     </message>
     <message>
         <source>&amp;Redo</source>
-        <translation>إ&amp;عادة</translation>
+        <translation>إعادة</translation>
     </message>
     <message>
         <source>&amp;Delete</source>
-        <translation>&amp;حذف</translation>
+        <translation>حذف</translation>
     </message>
     <message>
         <source>Project</source>
@@ -5529,7 +5545,7 @@ pervious</source>
     </message>
     <message>
         <source>&amp;File</source>
-        <translation>&amp;ملف</translation>
+        <translation>ملف</translation>
     </message>
     <message>
         <source>New water network (EPANET)...</source>
@@ -5541,15 +5557,15 @@ pervious</source>
     </message>
     <message>
         <source>&amp;Open...</source>
-        <translation>&amp;فتح...</translation>
+        <translation>فتح...</translation>
     </message>
     <message>
         <source>Open &amp;recent</source>
-        <translation>المشاريع ال&amp;أخيرة</translation>
+        <translation>المشاريع الأخيرة</translation>
     </message>
     <message>
         <source>Open e&amp;xample</source>
-        <translation>فتح م&amp;ثال</translation>
+        <translation>فتح مثال</translation>
     </message>
     <message>
         <source>No examples found</source>
@@ -5557,11 +5573,11 @@ pervious</source>
     </message>
     <message>
         <source>Save &amp;as...</source>
-        <translation>حفظ &amp;باسم...</translation>
+        <translation>حفظ باسم...</translation>
     </message>
     <message>
         <source>&amp;Import</source>
-        <translation>ا&amp;ستيراد</translation>
+        <translation>استيراد</translation>
     </message>
     <message>
         <source>Shapefile (SHP)...</source>
@@ -5581,7 +5597,7 @@ pervious</source>
     </message>
     <message>
         <source>&amp;Export</source>
-        <translation>ت&amp;صدير</translation>
+        <translation>تصدير</translation>
     </message>
     <message>
         <source>GeoPackage for GIS...</source>
@@ -5621,19 +5637,19 @@ pervious</source>
     </message>
     <message>
         <source>Open in &amp;QGIS</source>
-        <translation>فتح في &amp;QGIS</translation>
+        <translation>فتح في QGIS</translation>
     </message>
     <message>
         <source>E&amp;xit</source>
-        <translation>&amp;خروج</translation>
+        <translation>خروج</translation>
     </message>
     <message>
         <source>&amp;Edit</source>
-        <translation>&amp;تحرير</translation>
+        <translation>تحرير</translation>
     </message>
     <message>
         <source>&amp;Find element...</source>
-        <translation>&amp;بحث عن عنصر...</translation>
+        <translation>بحث عن عنصر...</translation>
     </message>
     <message>
         <source>Edit the input file as text</source>
@@ -5641,27 +5657,27 @@ pervious</source>
     </message>
     <message>
         <source>Se&amp;lect</source>
-        <translation>تح&amp;ديد</translation>
+        <translation>تحديد</translation>
     </message>
     <message>
         <source>&amp;View</source>
-        <translation>&amp;عرض</translation>
+        <translation>عرض</translation>
     </message>
     <message>
         <source>Zoom to &amp;fit</source>
-        <translation>&amp;ملاءمة العرض</translation>
+        <translation>ملاءمة العرض</translation>
     </message>
     <message>
         <source>Zoom &amp;in</source>
-        <translation>ت&amp;كبير</translation>
+        <translation>تكبير</translation>
     </message>
     <message>
         <source>Zoom &amp;out</source>
-        <translation>تص&amp;غير</translation>
+        <translation>تصغير</translation>
     </message>
     <message>
         <source>&amp;Basemap</source>
-        <translation>&amp;خريطة الأساس</translation>
+        <translation>خريطة الأساس</translation>
     </message>
     <message>
         <source>None</source>
@@ -5677,15 +5693,15 @@ pervious</source>
     </message>
     <message>
         <source>&amp;Coordinate system...</source>
-        <translation>&amp;نظام الإحداثيات...</translation>
+        <translation>نظام الإحداثيات...</translation>
     </message>
     <message>
         <source>&amp;Raster layers...</source>
-        <translation type="unfinished">ال&amp;طبقات النقطية...</translation>
+        <translation type="unfinished">الطبقات النقطية...</translation>
     </message>
     <message>
         <source>Backdrop &amp;image...</source>
-        <translation>&amp;صورة الخلفية...</translation>
+        <translation>صورة الخلفية...</translation>
     </message>
     <message>
         <source>Clear backdrop image</source>
@@ -5693,75 +5709,75 @@ pervious</source>
     </message>
     <message>
         <source>&amp;Panels</source>
-        <translation>ال&amp;لوحات</translation>
+        <translation>اللوحات</translation>
     </message>
     <message>
         <source>&amp;Reset layout</source>
-        <translation>إ&amp;عادة تعيين التخطيط</translation>
+        <translation>إعادة تعيين التخطيط</translation>
     </message>
     <message>
         <source>&amp;Add</source>
-        <translation>إ&amp;ضافة</translation>
+        <translation>إضافة</translation>
     </message>
     <message>
         <source>&amp;Project</source>
-        <translation>الم&amp;شروع</translation>
+        <translation>المشروع</translation>
     </message>
     <message>
         <source>Simulation &amp;options...</source>
-        <translation>&amp;خيارات المحاكاة...</translation>
+        <translation>خيارات المحاكاة...</translation>
     </message>
     <message>
         <source>Simulation &amp;engines...</source>
-        <translation>م&amp;حركات المحاكاة...</translation>
+        <translation>محركات المحاكاة...</translation>
     </message>
     <message>
         <source>Control &amp;rules...</source>
-        <translation>&amp;قواعد التحكم...</translation>
+        <translation>قواعد التحكم...</translation>
     </message>
     <message>
         <source>Choose &amp;MSX file...</source>
-        <translation>اختيار ملف &amp;MSX...</translation>
+        <translation>اختيار ملف MSX...</translation>
     </message>
     <message>
         <source>New &amp;scenario...</source>
-        <translation>&amp;سيناريو جديد...</translation>
+        <translation>سيناريو جديد...</translation>
     </message>
     <message>
         <source>Scenarios &amp;panel</source>
-        <translation>&amp;لوحة السيناريوهات</translation>
+        <translation>لوحة السيناريوهات</translation>
     </message>
     <message>
         <source>C&amp;heck compatibility</source>
-        <translation>التحقق من ال&amp;توافق</translation>
+        <translation>التحقق من التوافق</translation>
     </message>
     <message>
         <source>Observed &amp;data...</source>
-        <translation>البيانات ال&amp;مرصودة...</translation>
+        <translation>البيانات المرصودة...</translation>
     </message>
     <message>
         <source>Ca&amp;librate...</source>
-        <translation>الم&amp;عايرة...</translation>
+        <translation>المعايرة...</translation>
     </message>
     <message>
         <source>&amp;Simulation</source>
-        <translation>المحا&amp;كاة</translation>
+        <translation>المحاكاة</translation>
     </message>
     <message>
         <source>Run s&amp;cenarios...</source>
-        <translation>تشغيل ال&amp;سيناريوهات...</translation>
+        <translation>تشغيل السيناريوهات...</translation>
     </message>
     <message>
         <source>&amp;Load results...</source>
-        <translation>&amp;تحميل النتائج...</translation>
+        <translation>تحميل النتائج...</translation>
     </message>
     <message>
         <source>C&amp;lear results</source>
-        <translation>&amp;مسح النتائج</translation>
+        <translation>مسح النتائج</translation>
     </message>
     <message>
         <source>&amp;Reports</source>
-        <translation>الت&amp;قارير</translation>
+        <translation>التقارير</translation>
     </message>
     <message>
         <source>Fire flow analysis...</source>
@@ -5769,63 +5785,63 @@ pervious</source>
     </message>
     <message>
         <source>A&amp;nalysis</source>
-        <translation>الت&amp;حليل</translation>
+        <translation>التحليل</translation>
     </message>
     <message>
         <source>&amp;Resilience tools...</source>
-        <translation>أدوات ال&amp;مرونة...</translation>
+        <translation>أدوات المرونة...</translation>
     </message>
     <message>
         <source>&amp;Fire flow capacity...</source>
-        <translation>سعة &amp;تدفق الإطفاء...</translation>
+        <translation>سعة تدفق الإطفاء...</translation>
     </message>
     <message>
         <source>Pipe &amp;criticality...</source>
-        <translation>&amp;حرجية الأنابيب...</translation>
+        <translation>حرجية الأنابيب...</translation>
     </message>
     <message>
         <source>Network &amp;topology...</source>
-        <translation>&amp;طوبولوجيا الشبكة...</translation>
+        <translation>طوبولوجيا الشبكة...</translation>
     </message>
     <message>
         <source>&amp;Tools</source>
-        <translation>&amp;أدوات</translation>
+        <translation>أدوات</translation>
     </message>
     <message>
         <source>&amp;Elevations from DEM...</source>
-        <translation>ال&amp;مناسيب من DEM...</translation>
+        <translation>المناسيب من DEM...</translation>
     </message>
     <message>
         <source>&amp;Plugins</source>
-        <translation>المكونات الإ&amp;ضافية</translation>
+        <translation>المكونات الإضافية</translation>
     </message>
     <message>
         <source>&amp;Settings...</source>
-        <translation>الإ&amp;عدادات...</translation>
+        <translation>الإعدادات...</translation>
     </message>
     <message>
         <source>&amp;Help</source>
-        <translation>م&amp;ساعدة</translation>
+        <translation>مساعدة</translation>
     </message>
     <message>
         <source>&amp;Start page</source>
-        <translation>صفحة ال&amp;بداية</translation>
+        <translation>صفحة البداية</translation>
     </message>
     <message>
         <source>&amp;Documentation</source>
-        <translation>ال&amp;توثيق</translation>
+        <translation>التوثيق</translation>
     </message>
     <message>
         <source>Open &amp;examples folder</source>
-        <translation>فتح مجلد الأ&amp;مثلة</translation>
+        <translation>فتح مجلد الأمثلة</translation>
     </message>
     <message>
         <source>&amp;About Mirab</source>
-        <translation>&amp;حول Mirab</translation>
+        <translation>حول Mirab</translation>
     </message>
     <message>
         <source>About &amp;Qt</source>
-        <translation>حول &amp;Qt</translation>
+        <translation>حول Qt</translation>
     </message>
     <message>
         <source>Main</source>
@@ -6114,7 +6130,7 @@ pervious</source>
     </message>
     <message>
         <source>All of a &amp;type</source>
-        <translation>كل عناصر &amp;نوع</translation>
+        <translation>كل عناصر نوع</translation>
     </message>
     <message>
         <source>All nodes</source>
@@ -6134,11 +6150,11 @@ pervious</source>
     </message>
     <message>
         <source>C&amp;lear selection</source>
-        <translation>م&amp;سح التحديد</translation>
+        <translation>مسح التحديد</translation>
     </message>
     <message>
         <source>Trace &amp;options</source>
-        <translation>&amp;خيارات التتبع</translation>
+        <translation>خيارات التتبع</translation>
     </message>
     <message numerus="yes">
         <source>%n element(s) selected.</source>
@@ -6403,15 +6419,15 @@ pervious</source>
     </message>
     <message>
         <source>&amp;Water network layer</source>
-        <translation>&amp;طبقة شبكة المياه</translation>
+        <translation>طبقة شبكة المياه</translation>
     </message>
     <message>
         <source>&amp;Sewer network layer...</source>
-        <translation>&amp;طبقة شبكة الصرف الصحي...</translation>
+        <translation>طبقة شبكة الصرف الصحي...</translation>
     </message>
     <message>
         <source>&amp;Wastewater from water model...</source>
-        <translation>&amp;مياه الصرف الصحي من نموذج المياه...</translation>
+        <translation>مياه الصرف الصحي من نموذج المياه...</translation>
     </message>
     <message>
         <source>Wastewater from water model</source>
@@ -6424,6 +6440,10 @@ pervious</source>
     <message>
         <source>Dry-weather inflow written from the water model. Undo restores the previous values.</source>
         <translation>تمت كتابة تدفق الطقس الجاف الداخل من نموذج المياه. يستعيد التراجع القيم السابقة.</translation>
+    </message>
+    <message>
+        <source>Interface language</source>
+        <translation>لغة الواجهة</translation>
     </message>
 </context>
 <context>
@@ -6554,7 +6574,7 @@ pervious</source>
     </message>
     <message>
         <source>&lt;b&gt;Scenario: %1&lt;/b&gt; &amp;nbsp;·&amp;nbsp; edits are recorded in this scenario; the base model stays as it is</source>
-        <translation>‏&lt;b&gt;السيناريو: %1&lt;/b&gt; &amp;nbsp;·&amp;nbsp; تُسجَّل التعديلات في هذا السيناريو؛ ويبقى النموذج الأساسي كما هو</translation>
+        <translation>‏&lt;b&gt;السيناريو: %1&lt;/b&gt; nbsp;·nbsp; تُسجَّل التعديلات في هذا السيناريو؛ ويبقى النموذج الأساسي كما هو</translation>
     </message>
     <message>
         <source>(none)</source>
@@ -8405,7 +8425,7 @@ pervious</source>
     </message>
     <message>
         <source>Select elements whose properties or results meet conditions, for example &lt;i&gt;Diameter &amp;lt; 200 AND Roughness &amp;lt; 100&lt;/i&gt;, &lt;i&gt;Pressure &amp;lt; 20&lt;/i&gt; or &lt;i&gt;ID contains PS&lt;/i&gt;. Combine conditions with AND, OR, NOT and parentheses.</source>
-        <translation>حدد العناصر التي تستوفي خصائصها أو نتائجها شروطًا، مثل &lt;i&gt;Diameter &amp;lt; 200 AND Roughness &amp;lt; 100&lt;/i&gt; أو &lt;i&gt;Pressure &amp;lt; 20&lt;/i&gt; أو &lt;i&gt;ID contains PS&lt;/i&gt;. اجمع الشروط باستخدام AND وOR وNOT والأقواس.</translation>
+        <translation>حدد العناصر التي تستوفي خصائصها أو نتائجها شروطًا، مثل &lt;i&gt;Diameter lt; 200 AND Roughness lt; 100&lt;/i&gt; أو &lt;i&gt;Pressure lt; 20&lt;/i&gt; أو &lt;i&gt;ID contains PS&lt;/i&gt;. اجمع الشروط باستخدام AND وOR وNOT والأقواس.</translation>
     </message>
     <message>
         <source>Nodes</source>
@@ -9596,10 +9616,6 @@ pervious</source>
     <message>
         <source>Mirab never loads QGIS. &quot;Open in QGIS&quot; exports a GeoPackage and starts QGIS as a separate program.</source>
         <translation>لا يحمّل Mirab برنامج QGIS أبدًا. يصدّر الأمر &quot;فتح في QGIS&quot; ملف GeoPackage ويشغّل QGIS كبرنامج مستقل.</translation>
-    </message>
-    <message>
-        <source>Restart Mirab to use the new language.</source>
-        <translation>أعد تشغيل Mirab لاستخدام اللغة الجديدة.</translation>
     </message>
 </context>
 <context>

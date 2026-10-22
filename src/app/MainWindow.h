@@ -140,6 +140,10 @@ private:
     void createMenus();
     void createToolBar();
     void createStatusBar();
+    /// Opens Settings and restarts when a new language was chosen with "Restart now".
+    void showSettings();
+    /// Starts a new instance with the open project and closes this one.
+    void restartApplication();
     void resetLayout();
     void rebuildForDialect();
     void rebuildEngineChoices();
@@ -209,6 +213,8 @@ private:
     ScenarioPanel* scenarios_ = nullptr;
     QPointer<ScenarioRunDialog> runDialog_;
     QLabel* scenarioLabel_ = nullptr;
+    QToolButton* languageButton_ = nullptr;
+    bool restarting_ = false;
     ProjectBrowser* browser_ = nullptr;
     InpEditor* inpEditor_ = nullptr;
     MsxEditor* msxEditor_ = nullptr;

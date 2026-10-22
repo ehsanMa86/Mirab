@@ -146,10 +146,13 @@ public:
     explicit SettingsDialog(QWidget* parent = nullptr);
     static QString qgisPath();
     static QString findQgis();
+    /// True when a new language was chosen and the user asked to restart now.
+    bool restartRequested() const { return restartRequested_; }
 
 private:
     QLineEdit* qgis_;
     QComboBox* language_;
+    bool restartRequested_ = false;
 };
 
 class AboutDialog : public QDialog

@@ -77,6 +77,13 @@ target_include_directories(Mirab PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(Mirab PRIVATE
     Qt6::Widgets Qt6::Network Qt6::PrintSupport Mirab::engine Mirab::resilience Mirab::interop Mirab::warnings)
 
+# Vazirmatn (SIL Open Font License) for the Persian and Arabic interface.
+qt_add_resources(Mirab fonts PREFIX /fonts BASE "${PROJECT_SOURCE_DIR}/third_party/fonts/vazirmatn"
+    FILES "${PROJECT_SOURCE_DIR}/third_party/fonts/vazirmatn/Vazirmatn-Regular.ttf"
+          "${PROJECT_SOURCE_DIR}/third_party/fonts/vazirmatn/Vazirmatn-Bold.ttf")
+install(FILES "${PROJECT_SOURCE_DIR}/third_party/fonts/vazirmatn/OFL.txt"
+    DESTINATION "${MIRAB_INSTALL_DOCDIR}" RENAME "Vazirmatn-OFL.txt")
+
 # Translations: translations/mirab_<lang>.ts compiled into the program with
 # Qt's own translations of the same languages, so no package carries extra
 # files. "cmake --build <dir> --target update_translations" refreshes the
