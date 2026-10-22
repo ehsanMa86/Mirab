@@ -123,6 +123,8 @@ S17              CIRCULAR     1.25             0          0          0          
 S18              CIRCULAR     1.25             0          0          0          1
 
 [DWF]
+;MH-A1 serves no water customer; a small infiltration flow keeps every upstream end wet, which SWMM5+ requires
+ MH-A1           FLOW            0.01
  MH-A2           FLOW            0.138434        ""              ""              WW_PAT1
  MH-A3           FLOW            0.112477        ""              ""              WW_PAT1
  MH-B1           FLOW            0.138434        ""              ""              WW_PAT1

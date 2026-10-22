@@ -122,4 +122,5 @@ SWMM5+ also has modeling rules of its own, which Mirab applies or reports:
 - routing is always dynamic wave; Mirab sets `FLOW_ROUTING DYNWAVE` for the run,
 - pollutants and LID controls are not modeled; Mirab removes them from the engine's copy of the input,
 - a subcatchment must drain to a storage node, a junction with three or more links, or an upstream end or outfall next to a conduit (interface version 2 libraries); a junction with exactly two links is refused, and SWMM5+ stops with a configuration error,
-- every upstream end junction needs an inflow (`[INFLOWS]` or `[DWF]`, a small base flow is enough); SWMM5+ stops with "nJ1 should be converted to nBCup" otherwise.
+- every upstream end junction needs an inflow (`[INFLOWS]` or `[DWF]`, a small base flow is enough); SWMM5+ stops with "nJ1 should be converted to nBCup" otherwise,
+- dry-weather flow is applied at its average value: SWMM5+ 1.0 does not apply the time patterns of `[DWF]` (seen with hourly patterns; its log shows "unexpected else in interface_get_BC_resolution" for each inflow).

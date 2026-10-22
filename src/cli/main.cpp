@@ -44,6 +44,7 @@
 #include "mirab/interop/Interop.h"
 #include "mirab/resilience/Resilience.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -66,6 +67,9 @@
 #endif
 #include <windows.h>
 #include <shellapi.h>
+#else
+#include <cerrno>
+#include <unistd.h>
 #endif
 
 namespace fs = std::filesystem;
@@ -259,22 +263,75 @@ void setControl(std::atomic<bool>& flag, bool value)
     g_control.notify_all();
 }
 
+/// Reads up to \p size bytes of standard input; 0 at the end of input or on an error.
+long readStdin(char* buffer, unsigned size)
+{
+#if defined(_WIN32)
+    HANDLE in = GetStdHandle(STD_INPUT_HANDLE);
+    if (in == nullptr || in == INVALID_HANDLE_VALUE)
+        return 0;
+    // While a read waits on a pipe, Windows also blocks other threads that ask
+    // about that pipe, as the Fortran runtime of SWMM5+ does. Read a pipe only
+    // when it holds data.
+    if (GetFileType(in) == FILE_TYPE_PIPE)
+    {
+        for (;;)
+        {
+            DWORD available = 0;
+            if (!PeekNamedPipe(in, nullptr, 0, nullptr, &available, nullptr))
+                return 0;
+            if (available > 0)
+            {
+                size = std::min<unsigned>(size, available);
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    }
+    DWORD got = 0;
+    if (!ReadFile(in, buffer, size, &got, nullptr))
+        return 0;
+    return static_cast<long>(got);
+#else
+    for (;;)
+    {
+        const ssize_t got = ::read(0, buffer, size);
+        if (got >= 0 || errno != EINTR)
+            return got > 0 ? static_cast<long>(got) : 0;
+    }
+#endif
+}
+
+void handleCommand(const std::string& line)
+{
+    const std::string cmd = text::trim(line);
+    if (cmd == "cancel")
+        setControl(g_cancel, true);
+    else if (cmd == "pause")
+        setControl(g_pause, true);
+    else if (cmd == "resume")
+        setControl(g_pause, false);
+}
+
 /// Reads "cancel", "pause" and "resume" commands from standard input.
 void watchStdinForCommands()
 {
     g_stdinWatcher = true;
     std::thread([] {
-        std::string line;
-        while (std::getline(std::cin, line))
+        // Not std::cin: a thread waiting in it would hold the C library's
+        // stdin lock and a read on the stream for as long as no command comes.
+        std::string pending;
+        char chunk[256];
+        while (const long got = readStdin(chunk, sizeof chunk))
         {
-            const std::string cmd = text::trim(line);
-            if (cmd == "cancel")
-                setControl(g_cancel, true);
-            else if (cmd == "pause")
-                setControl(g_pause, true);
-            else if (cmd == "resume")
-                setControl(g_pause, false);
+            pending.append(chunk, static_cast<std::size_t>(got));
+            for (std::size_t end; (end = pending.find('\n')) != std::string::npos;)
+            {
+                handleCommand(pending.substr(0, end));
+                pending.erase(0, end + 1);
+            }
         }
+        handleCommand(pending);
         // Nobody can resume once standard input is closed.
         setControl(g_pause, false);
     }).detach();
@@ -2112,9 +2169,8 @@ int main(int argc, char** argv)
     const int rc = runMain(argc, argv);
     if (g_stdinWatcher)
     {
-        // The cancel watcher may be blocked reading standard input. On glibc,
-        // normal exit would wait for that stream's lock forever, so flush the
-        // output streams and end the process directly.
+        // The command watcher may still be blocked reading standard input, so
+        // flush the output streams and end the process directly.
         std::cout.flush();
         std::cerr.flush();
         std::fflush(stdout);
