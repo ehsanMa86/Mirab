@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Interface in Hebrew (right to left), Brazilian Portuguese, French, Italian, German and Traditional Chinese.
+- Fix: a SWMM model no longer lists the EPANET-only analyses (resilience tools, fire flow, pipe criticality) or the MSX file choice; *Analysis* offers network topology only.
 
 ## 0.2.2 (2026-10-23)
 

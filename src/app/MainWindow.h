@@ -223,6 +223,7 @@ private:
     QComboBox* engineCombo_ = nullptr;
     QCheckBox* msxCheck_ = nullptr;
     QAction* msxAction_ = nullptr; ///< toolbar slot of msxCheck_ (controls its visibility)
+    QAction* msxFileAct_ = nullptr; ///< Project > Choose MSX file (EPANET only)
     QProgressBar* progress_ = nullptr;
     QLabel* coords_ = nullptr;
     QLabel* engineLabel_ = nullptr;
