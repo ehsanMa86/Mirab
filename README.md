@@ -92,6 +92,10 @@ Use the `headless` preset to build the command-line tool and libraries without Q
 - [Building and packaging](docs/building.md)
 - [Writing plugins](docs/plugins.md)
 
+## Feedback and contributing
+
+Report problems and suggest features in [Issues](https://github.com/ehsanMa86/Mirab/issues/new/choose). Code contributions are welcome as pull requests; [CONTRIBUTING.md](CONTRIBUTING.md) explains how to build, test and submit them. Report security problems privately as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
 Mirab is free software, licensed under the [GNU General Public License, version 3 or later](LICENSE).

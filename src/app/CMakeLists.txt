@@ -84,6 +84,10 @@ qt_add_resources(Mirab fonts PREFIX /fonts BASE "${PROJECT_SOURCE_DIR}/third_par
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/fonts/vazirmatn/OFL.txt"
     DESTINATION "${MIRAB_INSTALL_DOCDIR}" RENAME "Vazirmatn-OFL.txt")
 
+# Qt is deployed with the application under the LGPL-3.0, whose text must travel with it.
+install(FILES "${PROJECT_SOURCE_DIR}/third_party/qt/LGPL-3.0.txt"
+    DESTINATION "${MIRAB_INSTALL_DOCDIR}" RENAME "Qt-LGPL-3.0.txt")
+
 # Translations: translations/mirab_<lang>.ts compiled into the program with
 # Qt's own translations of the same languages, so no package carries extra
 # files. "cmake --build <dir> --target update_translations" refreshes the

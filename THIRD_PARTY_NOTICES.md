@@ -64,8 +64,9 @@ SOFTWARE.
 
 ## Qt 6
 
-- Source: https://www.qt.io
-- Used by the desktop application under the GNU Lesser General Public License version 3. Qt is linked dynamically and its libraries are shipped unmodified. Qt source code is available from https://download.qt.io/official_releases/qt/.
+- Source: https://www.qt.io, version 6.8.3 (the version in the official Mirab packages)
+- Used by the desktop application under the GNU Lesser General Public License version 3. Qt is linked dynamically and its libraries are shipped unmodified, so they can be replaced with another build of Qt 6.8.3. The source code of the shipped version is available from https://download.qt.io/archive/qt/6.8/6.8.3/single/qt-everywhere-src-6.8.3.tar.xz.
+- License: the full LGPL-3.0 text is installed with the application as `Qt-LGPL-3.0.txt`. The LGPL-3.0 adds permissions to the GNU General Public License version 3, whose text is installed as `LICENSE`.
 
 ## SWMM5+ engine package (optional, installed separately)
 

@@ -1,0 +1,81 @@
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
+#
+# File:    .github/ISSUE_TEMPLATE/bug_report.yml
+# Purpose: Issue form for bug reports.
+#
+# Copyright (C) 2026 Ehsan Madadi
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Bug report
+description: Something in Mirab does not work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. A small model that shows it is the most useful thing you can attach.
+  - type: input
+    id: version
+    attributes:
+      label: Mirab version
+      description: Help > About Mirab, or `mirab-cli version`.
+      placeholder: "0.2.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Linux
+    validations:
+      required: true
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Engine
+      options:
+        - EPA EPANET 2.2
+        - OWA EPANET 2.3
+        - EPANET-MSX 2.0
+        - EPA SWMM 5.2
+        - SWMM5+ 1.0
+        - Not related to an engine
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open examples/epanet/mirab-demo.inp
+        2. ...
+  - type: textarea
+    id: files
+    attributes:
+      label: Input file and messages
+      description: Attach the smallest .inp file that shows the problem, if you can share it, and paste any error message or status report.

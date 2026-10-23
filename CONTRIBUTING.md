@@ -4,7 +4,7 @@ Thank you for helping. Bug reports, models that expose problems, documentation a
 
 ## Reporting a problem
 
-Open an issue with:
+Open an issue with the bug report form. It asks for:
 
 - the Mirab version (Help > About Mirab, or `mirab-cli version`),
 - the engine you selected,
