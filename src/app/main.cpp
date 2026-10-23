@@ -156,7 +156,9 @@ int main(int argc, char* argv[])
     parser.addOption(traceOpt);
     parser.addOption(installEngine);
     const QCommandLineOption languageOpt(
-        "language", "Interface language: en, fa, ar, es, zh_CN or system (default: the language chosen in Settings).",
+        "language",
+        "Interface language: en, fa, ar, he, es, pt_BR, fr, it, de, zh_CN, zh_TW or system "
+        "(default: the language chosen in Settings).",
         "code");
     parser.addOption(languageOpt);
     parser.process(app);

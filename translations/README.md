@@ -6,8 +6,14 @@ Mirab's interface is translated with Qt Linguist. This folder holds one source f
 |---|---|---|
 | `mirab_fa.ts` | Persian (فارسی) | right to left |
 | `mirab_ar.ts` | Arabic (العربية) | right to left |
+| `mirab_he.ts` | Hebrew (עברית) | right to left |
 | `mirab_es.ts` | Spanish (Español) | left to right |
+| `mirab_pt_BR.ts` | Portuguese, Brazil (Português do Brasil) | left to right |
+| `mirab_fr.ts` | French (Français) | left to right |
+| `mirab_it.ts` | Italian (Italiano) | left to right |
+| `mirab_de.ts` | German (Deutsch) | left to right |
 | `mirab_zh_CN.ts` | Simplified Chinese (简体中文) | left to right |
+| `mirab_zh_TW.ts` | Traditional Chinese (繁體中文) | left to right |
 
 The build compiles each file into a `.qm` file and puts it inside the program, together with Qt's own
 translations of the same languages (`qtbase_<lang>.qm`, for file dialogs and standard buttons). Packages
@@ -64,15 +70,25 @@ corrects one changes the text and marks it as done.
 Guidelines:
 
 - Keep placeholders, HTML tags, `.inp` keywords in capitals, file patterns (`*.inp`) and unit symbols.
-- Keep the menu accelerators in Spanish: put `&` before a letter of the translated label. Chinese labels
-  use the Latin letter in brackets, for example `文件(&F)`. Persian and Arabic labels have no `&`: Qt
-  draws the underlined letter on its own, which breaks the joined letters of the word (the check
-  enforces this).
+- Keep the menu accelerators in Spanish, Portuguese, French, Italian and German: put `&` before a
+  letter of the translated label. Chinese labels use the Latin letter in brackets, for example
+  `文件(&F)` and `檔案(&F)`. Persian, Arabic and Hebrew labels have no `&`: in Persian and Arabic Qt draws the
+  underlined letter on its own, which breaks the joined letters of the word, and right-to-left labels
+  follow one rule (the check enforces this).
 - Use the terms of the glossary below; consistency matters more than the perfect word.
 - Persian: Persian letters (ی and ک, not ي and ك), zero-width non-joiners where they belong
   (`می‌شود`, `داده‌ها`), Latin digits for data.
-- Arabic: Latin digits for data.
-- Persian and Arabic: a translation that starts with a Latin word, a number or a placeholder
+- Arabic and Hebrew: Latin digits for data.
+- Hebrew: no niqqud; the Hebrew maqaf (־) is not needed, a hyphen is fine (`תת-אגן`).
+- French: a no-break space (U+00A0) before `:`, `;`, `?` and `!`, as in French typography
+  (`Débit :`).
+- Portuguese: Brazilian spelling and terms (`arquivo`, `vazão`, `tubulação`); it is also used on systems
+  set to Portuguese of Portugal.
+- Traditional Chinese: Taiwan usage (`檔案`, `設定`, `資料`, `預設`, `檢視`), full-width punctuation as in
+  the Simplified Chinese file; it is also used on systems set to Hong Kong or Macau Chinese.
+- German: nouns capitalised, compounds written as one word or with a hyphen (`LID-Maßnahme`), the
+  formal "Sie" in messages.
+- Persian, Arabic and Hebrew: a translation that starts with a Latin word, a number or a placeholder
   (`%1 ...`, `QGIS ...`) begins with an invisible RIGHT-TO-LEFT MARK (U+200F); otherwise Qt lays the
   sentence out from left to right. The `i18n-ts-files` test reports entries that need one.
 - Sentence case and short labels, like the English interface.
@@ -91,93 +107,93 @@ Guidelines:
 
 Key terms of water distribution (EPANET) and stormwater (SWMM) modeling as used in the interface.
 
-| English | Persian | Arabic | Spanish | Chinese |
-|---|---|---|---|---|
-| Node | گره | عقدة | Nodo | 节点 |
-| Link | پیوند | وصلة | Línea | 管段 |
-| Junction | اتصال | تقاطع | Unión | 连接节点 |
-| Reservoir | منبع | خزان مصدر | Embalse | 水库 |
-| Tank | مخزن | خزان | Depósito | 水池 |
-| Pipe | لوله | أنبوب | Tubería | 管道 |
-| Pump | پمپ | مضخة | Bomba | 水泵 |
-| Valve | شیر | صمام | Válvula | 阀门 |
-| Emitter | افشانه | باعث | Emisor | 射流器 |
-| Pressure | فشار | الضغط | Presión | 压力 |
-| Head | هد | الضاغط | Altura piezométrica | 水头 |
-| Headloss | افت هد | فاقد الضاغط | Pérdida de carga | 水头损失 |
-| Flow | دبی | التدفق | Caudal | 流量 |
-| Demand | تقاضا | الطلب | Demanda | 需水量 |
-| Elevation | تراز | المنسوب | Cota | 高程 |
-| Roughness | زبری | الخشونة | Rugosidad | 粗糙系数 |
-| Minor loss | افت جزئی | الفاقد الثانوي | Pérdidas menores | 局部损失 |
-| Velocity | سرعت | السرعة | Velocidad | 流速 |
-| Pattern | الگو | نمط | Patrón | 模式 |
-| Curve | منحنی | منحنى | Curva | 曲线 |
-| Time series | سری زمانی | سلسلة زمنية | Serie temporal | 时间序列 |
-| Water quality | کیفیت آب | جودة المياه | Calidad del agua | 水质 |
-| Water age | عمر آب | عمر المياه | Edad del agua | 水龄 |
-| Pressure-driven demand | تقاضای وابسته به فشار | الطلب المعتمد على الضغط | Demanda dependiente de la presión | 压力驱动需水量 |
-| Leakage | نشت | التسرب | Fugas | 漏损 |
-| Fire flow | دبی آتش‌نشانی | تدفق الإطفاء | Caudal contra incendios | 消防流量 |
-| Subcatchment | زیرحوضه | حوض فرعي | Subcuenca | 子汇水区 |
-| Rain gage | باران‌سنج | مقياس المطر | Pluviómetro | 雨量计 |
-| Conduit | مجرا | قناة | Conducto | 管渠 |
-| Outfall | نقطه تخلیه | مَصبّ | Vertido | 排放口 |
-| Storage unit | واحد ذخیره | وحدة تخزين | Depósito de almacenamiento | 蓄水单元 |
-| Divider | مقسم جریان | مقسم التدفق | Divisor | 分流器 |
-| Orifice | روزنه | فتحة | Orificio | 孔口 |
-| Weir | سرریز | هدّار | Vertedero | 堰 |
-| Outlet | دریچه خروجی | مخرج | Salida | 出水口 |
-| Inlet | آبگیر | مدخل تصريف | Imbornal | 雨水口 |
-| Street | خیابان | شارع | Calle | 街道 |
-| Transect | مقطع عرضی | مقطع عرضي | Sección transversal | 横断面 |
-| Land use | کاربری اراضی | استخدام الأراضي | Uso del suelo | 土地利用 |
-| Pollutant | آلاینده | ملوِّث | Contaminante | 污染物 |
-| Aquifer | آبخوان | خزان جوفي | Acuífero | 含水层 |
-| Snow pack | توده برف | الغطاء الثلجي | Manto de nieve | 积雪 |
-| Unit hydrograph | هیدروگراف واحد | الهيدروغراف الوحدوي | Hidrograma unitario | 单位线 |
-| LID control | کنترل LID | ضابط LID | Control LID | LID 控制 |
-| Control rules | قواعد کنترلی | قواعد التحكم | Reglas de control | 控制规则 |
-| Runoff | رواناب | الجريان السطحي | Escorrentía | 径流 |
-| Infiltration | نفوذ | الارتشاح | Infiltración | 入渗 |
-| Rainfall | بارش | الهطول | Precipitación | 降雨 |
-| Evaporation | تبخیر | التبخر | Evaporación | 蒸发 |
-| Groundwater | آب زیرزمینی | المياه الجوفية | Aguas subterráneas | 地下水 |
-| Snowmelt | ذوب برف | ذوبان الثلوج | Fusión de nieve | 融雪 |
-| Flooding | آب‌گرفتگی | الغمر | Inundación | 溢流 |
-| Depth | عمق | العمق | Calado | 水深 |
-| Routing | روندیابی جریان | تتبع الجريان | Cálculo hidráulico | 流量演算 |
-| Dynamic wave | موج دینامیکی | الموجة الديناميكية | Onda dinámica | 动力波 |
-| Kinematic wave | موج سینماتیکی | الموجة الحركية | Onda cinemática | 运动波 |
-| Simulation | شبیه‌سازی | المحاكاة | Simulación | 模拟 |
-| Engine | موتور محاسباتی | محرك الحساب | Motor de cálculo | 计算引擎 |
-| Time step | گام زمانی | الخطوة الزمنية | Paso de tiempo | 时间步长 |
-| Reporting period | دوره گزارش | فترة التقرير | Periodo de informe | 报告时段 |
-| Results | نتایج | النتائج | Resultados | 结果 |
-| Report | گزارش | تقرير | Informe | 报告 |
-| Scenario | سناریو | سيناريو | Escenario | 方案 |
-| Calibration | واسنجی | المعايرة | Calibración | 率定 |
-| Observed data | داده‌های مشاهداتی | البيانات المرصودة | Datos observados | 观测数据 |
-| Goodness of fit | نیکویی برازش | جودة المطابقة | Bondad de ajuste | 拟合优度 |
-| Resilience | تاب‌آوری | المرونة | Resiliencia | 韧性 |
-| Criticality | بحرانی بودن | الحرجية | Criticidad | 关键性 |
-| Upstream / downstream | بالادست / پایین‌دست | المنبع / المصب | Aguas arriba / aguas abajo | 上游 / 下游 |
-| Profile | نیمرخ طولی | المقطع الطولي | Perfil longitudinal | 纵断面 |
-| Basemap | نقشه پایه | خريطة الأساس | Mapa base | 底图 |
-| Coordinate system | سیستم مختصات | نظام الإحداثيات | Sistema de coordenadas | 坐标系 |
-| Elevation model (DEM) | مدل رقومی ارتفاع | نموذج الارتفاع الرقمي | Modelo digital de elevaciones | 数字高程模型 |
-| Layer | لایه | طبقة | Capa | 图层 |
-| Legend | راهنمای نقشه | مفتاح الخريطة | Leyenda | 图例 |
-| Print layout | صفحه‌آرایی چاپ | تخطيط الطباعة | Diseño de impresión | 打印布局 |
-| Input file | فایل ورودی | ملف الإدخال | Archivo de entrada | 输入文件 |
-| Query | پرس‌وجو | استعلام | Consulta | 查询 |
-| Wastewater | فاضلاب | مياه الصرف الصحي | Aguas residuales | 污水 |
-| Sewer | فاضلاب‌رو | الصرف الصحي | Alcantarillado | 污水管 |
-| Sewer network | شبکه فاضلاب | شبكة الصرف الصحي | Red de alcantarillado | 污水管网 |
-| Manhole | آدم‌رو | غرفة تفتيش | Pozo de registro | 检查井 |
-| Dry-weather flow | جریان هوای خشک | تدفق الطقس الجاف | Caudal de tiempo seco | 旱流 |
-| Return factor | ضریب بازگشت | معامل الإرجاع | Coeficiente de retorno | 排放系数 |
-| Water use | مصرف آب | استهلاك المياه | Consumo de agua | 用水量 |
-| Demand category | دسته تقاضا | فئة الطلب | Categoría de demanda | 需水类别 |
-| Service area | محدوده خدمات | منطقة الخدمة | Área de servicio | 服务区域 |
-| Inflow | جریان ورودی | التدفق الداخل | Caudal de entrada | 入流 |
+| English | Persian | Arabic | Hebrew | Spanish | Portuguese (Brazil) | French | Italian | German | Chinese (Simplified) | Chinese (Traditional) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Node | گره | عقدة | צומת | Nodo | Nó | Nœud | Nodo | Knoten | 节点 | 節點 |
+| Link | پیوند | وصلة | מקטע | Línea | Trecho | Tronçon | Ramo | Verbindung | 管段 | 管段 |
+| Junction | اتصال | تقاطع | צומת חיבור | Unión | Junção | Nœud de jonction | Giunzione | Knotenpunkt | 连接节点 | 連接節點 |
+| Reservoir | منبع | خزان مصدر | מאגר | Embalse | Reservatório de nível fixo | Bâche | Serbatoio a livello fisso | Reservoir | 水库 | 水庫 |
+| Tank | مخزن | خزان | מיכל | Depósito | Reservatório | Réservoir | Serbatoio | Behälter | 水池 | 水池 |
+| Pipe | لوله | أنبوب | צינור | Tubería | Tubulação | Tuyau | Condotta | Rohrleitung | 管道 | 管線 |
+| Pump | پمپ | مضخة | משאבה | Bomba | Bomba | Pompe | Pompa | Pumpe | 水泵 | 抽水機 |
+| Valve | شیر | صمام | מגוף | Válvula | Válvula | Vanne | Valvola | Ventil | 阀门 | 閥門 |
+| Emitter | افشانه | باعث | מתז | Emisor | Emissor | Émetteur | Erogatore | Emitter | 射流器 | 噴嘴 |
+| Pressure | فشار | الضغط | לחץ | Presión | Pressão | Pression | Pressione | Druck | 压力 | 壓力 |
+| Head | هد | الضاغط | עומד | Altura piezométrica | Carga hidráulica | Charge | Carico piezometrico | Druckhöhe | 水头 | 水頭 |
+| Headloss | افت هد | فاقد الضاغط | הפסד עומד | Pérdida de carga | Perda de carga | Perte de charge | Perdita di carico | Druckhöhenverlust | 水头损失 | 水頭損失 |
+| Flow | دبی | التدفق | ספיקה | Caudal | Vazão | Débit | Portata | Durchfluss | 流量 | 流量 |
+| Demand | تقاضا | الطلب | צריכה | Demanda | Demanda | Demande | Domanda | Bedarf | 需水量 | 需水量 |
+| Elevation | تراز | المنسوب | רום | Cota | Cota | Altitude | Quota | Höhe | 高程 | 高程 |
+| Roughness | زبری | الخشونة | חספוס | Rugosidad | Rugosidade | Rugosité | Scabrezza | Rauheit | 粗糙系数 | 粗糙係數 |
+| Minor loss | افت جزئی | الفاقد الثانوي | הפסד מקומי | Pérdidas menores | Perda localizada | Pertes singulières | Perdite localizzate | Einzelverlust | 局部损失 | 局部損失 |
+| Velocity | سرعت | السرعة | מהירות | Velocidad | Velocidade | Vitesse | Velocità | Fließgeschwindigkeit | 流速 | 流速 |
+| Pattern | الگو | نمط | תבנית | Patrón | Padrão temporal | Courbe de modulation | Modulazione | Zeitmuster | 模式 | 時間模式 |
+| Curve | منحنی | منحنى | עקומה | Curva | Curva | Courbe | Curva | Kennlinie | 曲线 | 曲線 |
+| Time series | سری زمانی | سلسلة زمنية | סדרה עתית | Serie temporal | Série temporal | Série temporelle | Serie temporale | Zeitreihe | 时间序列 | 時間序列 |
+| Water quality | کیفیت آب | جودة المياه | איכות מים | Calidad del agua | Qualidade da água | Qualité de l'eau | Qualità dell'acqua | Wasserqualität | 水质 | 水質 |
+| Water age | عمر آب | عمر المياه | גיל המים | Edad del agua | Idade da água | Âge de l'eau | Età dell'acqua | Wasseralter | 水龄 | 水齡 |
+| Pressure-driven demand | تقاضای وابسته به فشار | الطلب المعتمد على الضغط | צריכה תלוית לחץ | Demanda dependiente de la presión | Demanda dependente da pressão | Demande dépendante de la pression | Domanda dipendente dalla pressione | Druckabhängiger Bedarf | 压力驱动需水量 | 壓力驅動需水量 |
+| Leakage | نشت | التسرب | דליפה | Fugas | Vazamentos | Fuites | Perdite idriche | Leckage | 漏损 | 漏水 |
+| Fire flow | دبی آتش‌نشانی | تدفق الإطفاء | ספיקת כיבוי אש | Caudal contra incendios | Vazão de incêndio | Débit incendie | Portata antincendio | Löschwassermenge | 消防流量 | 消防流量 |
+| Subcatchment | زیرحوضه | حوض فرعي | תת-אגן | Subcuenca | Sub-bacia | Sous-bassin versant | Sottobacino | Teileinzugsgebiet | 子汇水区 | 子集水區 |
+| Rain gage | باران‌سنج | مقياس المطر | מד גשם | Pluviómetro | Pluviômetro | Pluviomètre | Pluviometro | Regenmesser | 雨量计 | 雨量站 |
+| Conduit | مجرا | قناة | מוביל | Conducto | Conduto | Conduite | Collettore | Haltung | 管渠 | 管渠 |
+| Outfall | نقطه تخلیه | مَصبّ | מוצא | Vertido | Exutório | Exutoire | Scarico finale | Auslauf | 排放口 | 放流口 |
+| Storage unit | واحد ذخیره | وحدة تخزين | יחידת אגירה | Depósito de almacenamiento | Unidade de armazenamento | Ouvrage de stockage | Vasca di accumulo | Speicherbauwerk | 蓄水单元 | 蓄水單元 |
+| Divider | مقسم جریان | مقسم التدفق | מפצל זרימה | Divisor | Divisor de vazão | Répartiteur | Partitore | Abflussteiler | 分流器 | 分流器 |
+| Orifice | روزنه | فتحة | פתח | Orificio | Orifício | Orifice | Luce | Blende | 孔口 | 孔口 |
+| Weir | سرریز | هدّار | גלשן | Vertedero | Vertedor | Déversoir | Stramazzo | Wehr | 堰 | 堰 |
+| Outlet | دریچه خروجی | مخرج | מבנה יציאה | Salida | Estrutura de saída | Ouvrage de sortie | Manufatto di scarico | Auslassbauwerk | 出水口 | 出水口 |
+| Inlet | آبگیر | مدخل تصريف | קולטן | Imbornal | Boca de lobo | Avaloir | Caditoia | Straßenablauf | 雨水口 | 進水口 |
+| Street | خیابان | شارع | רחוב | Calle | Rua | Rue | Strada | Straße | 街道 | 街道 |
+| Transect | مقطع عرضی | مقطع عرضي | חתך רוחב | Sección transversal | Seção transversal | Profil en travers | Sezione trasversale | Querprofil | 横断面 | 橫斷面 |
+| Land use | کاربری اراضی | استخدام الأراضي | שימוש קרקע | Uso del suelo | Uso do solo | Occupation du sol | Uso del suolo | Landnutzung | 土地利用 | 土地利用 |
+| Pollutant | آلاینده | ملوِّث | מזהם | Contaminante | Poluente | Polluant | Inquinante | Schadstoff | 污染物 | 污染物 |
+| Aquifer | آبخوان | خزان جوفي | אקוויפר | Acuífero | Aquífero | Aquifère | Acquifero | Grundwasserleiter | 含水层 | 含水層 |
+| Snow pack | توده برف | الغطاء الثلجي | מעטה שלג | Manto de nieve | Manto de neve | Manteau neigeux | Manto nevoso | Schneedecke | 积雪 | 積雪 |
+| Unit hydrograph | هیدروگراف واحد | الهيدروغراف الوحدوي | הידרוגרף יחידה | Hidrograma unitario | Hidrograma unitário | Hydrogramme unitaire | Idrogramma unitario | Einheitsganglinie | 单位线 | 單位歷線 |
+| LID control | کنترل LID | ضابط LID | אמצעי LID | Control LID | Controle LID | Ouvrage LID | Intervento LID | LID-Maßnahme | LID 控制 | LID 設施 |
+| Control rules | قواعد کنترلی | قواعد التحكم | כללי בקרה | Reglas de control | Regras de controle | Règles de contrôle | Regole di controllo | Steuerregeln | 控制规则 | 控制規則 |
+| Runoff | رواناب | الجريان السطحي | נגר | Escorrentía | Escoamento superficial | Ruissellement | Deflusso superficiale | Oberflächenabfluss | 径流 | 逕流 |
+| Infiltration | نفوذ | الارتشاح | חלחול | Infiltración | Infiltração | Infiltration | Infiltrazione | Versickerung | 入渗 | 入滲 |
+| Rainfall | بارش | الهطول | משקעים | Precipitación | Precipitação | Précipitations | Precipitazione | Niederschlag | 降雨 | 降雨 |
+| Evaporation | تبخیر | التبخر | התאדות | Evaporación | Evaporação | Évaporation | Evaporazione | Verdunstung | 蒸发 | 蒸發 |
+| Groundwater | آب زیرزمینی | المياه الجوفية | מי תהום | Aguas subterráneas | Água subterrânea | Eaux souterraines | Acque sotterranee | Grundwasser | 地下水 | 地下水 |
+| Snowmelt | ذوب برف | ذوبان الثلوج | הפשרת שלג | Fusión de nieve | Degelo | Fonte des neiges | Scioglimento nivale | Schneeschmelze | 融雪 | 融雪 |
+| Flooding | آب‌گرفتگی | الغمر | הצפה | Inundación | Alagamento | Débordement | Allagamento | Überstau | 溢流 | 溢淹 |
+| Depth | عمق | العمق | עומק | Calado | Profundidade | Hauteur d'eau | Tirante idrico | Wassertiefe | 水深 | 水深 |
+| Routing | روندیابی جریان | تتبع الجريان | ניתוב זרימה | Cálculo hidráulico | Propagação de vazões | Propagation des écoulements | Propagazione delle portate | Abflusstransport | 流量演算 | 流量演算 |
+| Dynamic wave | موج دینامیکی | الموجة الديناميكية | גל דינמי | Onda dinámica | Onda dinâmica | Onde dynamique | Onda dinamica | Dynamische Welle | 动力波 | 動力波 |
+| Kinematic wave | موج سینماتیکی | الموجة الحركية | גל קינמטי | Onda cinemática | Onda cinemática | Onde cinématique | Onda cinematica | Kinematische Welle | 运动波 | 運動波 |
+| Simulation | شبیه‌سازی | المحاكاة | סימולציה | Simulación | Simulação | Simulation | Simulazione | Simulation | 模拟 | 模擬 |
+| Engine | موتور محاسباتی | محرك الحساب | מנוע חישוב | Motor de cálculo | Motor de cálculo | Moteur de calcul | Motore di calcolo | Rechenkern | 计算引擎 | 計算引擎 |
+| Time step | گام زمانی | الخطوة الزمنية | צעד זמן | Paso de tiempo | Passo de tempo | Pas de temps | Passo temporale | Zeitschritt | 时间步长 | 時間間距 |
+| Reporting period | دوره گزارش | فترة التقرير | תקופת דיווח | Periodo de informe | Período de relatório | Période de rapport | Periodo di report | Berichtszeitraum | 报告时段 | 報表時段 |
+| Results | نتایج | النتائج | תוצאות | Resultados | Resultados | Résultats | Risultati | Ergebnisse | 结果 | 結果 |
+| Report | گزارش | تقرير | דוח | Informe | Relatório | Rapport | Report | Bericht | 报告 | 報表 |
+| Scenario | سناریو | سيناريو | תרחיש | Escenario | Cenário | Scénario | Scenario | Szenario | 方案 | 情境 |
+| Calibration | واسنجی | المعايرة | כיול | Calibración | Calibração | Calage | Calibrazione | Kalibrierung | 率定 | 檢定 |
+| Observed data | داده‌های مشاهداتی | البيانات المرصودة | נתונים נמדדים | Datos observados | Dados observados | Données observées | Dati osservati | Messdaten | 观测数据 | 觀測資料 |
+| Goodness of fit | نیکویی برازش | جودة المطابقة | טיב התאמה | Bondad de ajuste | Qualidade do ajuste | Qualité d'ajustement | Bontà di adattamento | Anpassungsgüte | 拟合优度 | 適合度 |
+| Resilience | تاب‌آوری | المرونة | חוסן | Resiliencia | Resiliência | Résilience | Resilienza | Resilienz | 韧性 | 韌性 |
+| Criticality | بحرانی بودن | الحرجية | קריטיות | Criticidad | Criticidade | Criticité | Criticità | Kritikalität | 关键性 | 關鍵性 |
+| Upstream / downstream | بالادست / پایین‌دست | المنبع / المصب | במעלה הזרם / במורד הזרם | Aguas arriba / aguas abajo | Montante / jusante | Amont / aval | Monte / valle | Oberstrom / Unterstrom | 上游 / 下游 | 上游 / 下游 |
+| Profile | نیمرخ طولی | المقطع الطولي | חתך אורך | Perfil longitudinal | Perfil longitudinal | Profil en long | Profilo longitudinale | Längsschnitt | 纵断面 | 縱剖面 |
+| Basemap | نقشه پایه | خريطة الأساس | מפת רקע | Mapa base | Mapa de fundo | Fond de carte | Mappa di base | Hintergrundkarte | 底图 | 底圖 |
+| Coordinate system | سیستم مختصات | نظام الإحداثيات | מערכת קואורדינטות | Sistema de coordenadas | Sistema de coordenadas | Système de coordonnées | Sistema di coordinate | Koordinatensystem | 坐标系 | 座標系統 |
+| Elevation model (DEM) | مدل رقومی ارتفاع | نموذج الارتفاع الرقمي | מודל רום דיגיטלי | Modelo digital de elevaciones | Modelo digital de elevação | Modèle numérique de terrain | Modello digitale del terreno | Digitales Geländemodell | 数字高程模型 | 數值高程模型 |
+| Layer | لایه | طبقة | שכבה | Capa | Camada | Couche | Livello | Ebene | 图层 | 圖層 |
+| Legend | راهنمای نقشه | مفتاح الخريطة | מקרא | Leyenda | Legenda | Légende | Legenda | Legende | 图例 | 圖例 |
+| Print layout | صفحه‌آرایی چاپ | تخطيط الطباعة | פריסת הדפסה | Diseño de impresión | Layout de impressão | Mise en page | Layout di stampa | Drucklayout | 打印布局 | 列印版面 |
+| Input file | فایل ورودی | ملف الإدخال | קובץ קלט | Archivo de entrada | Arquivo de entrada | Fichier d'entrée | File di input | Eingabedatei | 输入文件 | 輸入檔 |
+| Query | پرس‌وجو | استعلام | שאילתה | Consulta | Consulta | Requête | Interrogazione | Abfrage | 查询 | 查詢 |
+| Wastewater | فاضلاب | مياه الصرف الصحي | שפכים | Aguas residuales | Águas residuárias | Eaux usées | Acque reflue | Abwasser | 污水 | 污水 |
+| Sewer | فاضلاب‌رو | الصرف الصحي | ביוב | Alcantarillado | Esgoto | Égout | Fognatura | Kanal | 污水管 | 污水下水道 |
+| Sewer network | شبکه فاضلاب | شبكة الصرف الصحي | רשת ביוב | Red de alcantarillado | Rede de esgoto | Réseau d'assainissement | Rete fognaria | Kanalnetz | 污水管网 | 污水下水道系統 |
+| Manhole | آدم‌رو | غرفة تفتيش | שוחה | Pozo de registro | Poço de visita | Regard | Pozzetto | Schacht | 检查井 | 人孔 |
+| Dry-weather flow | جریان هوای خشک | تدفق الطقس الجاف | ספיקת מזג אוויר יבש | Caudal de tiempo seco | Vazão de tempo seco | Débit de temps sec | Portata in tempo secco | Trockenwetterabfluss | 旱流 | 旱天流量 |
+| Return factor | ضریب بازگشت | معامل الإرجاع | מקדם החזרה | Coeficiente de retorno | Coeficiente de retorno | Coefficient de rejet | Coefficiente di restituzione | Abwasseranteil | 排放系数 | 回歸係數 |
+| Water use | مصرف آب | استهلاك المياه | צריכת מים | Consumo de agua | Consumo de água | Consommation d'eau | Consumo idrico | Wasserverbrauch | 用水量 | 用水量 |
+| Demand category | دسته تقاضا | فئة الطلب | קטגוריית צריכה | Categoría de demanda | Categoria de demanda | Catégorie de demande | Categoria di domanda | Bedarfskategorie | 需水类别 | 用水類別 |
+| Service area | محدوده خدمات | منطقة الخدمة | אזור שירות | Área de servicio | Área de atendimento | Zone desservie | Area servita | Versorgungsgebiet | 服务区域 | 服務區域 |
+| Inflow | جریان ورودی | التدفق الداخل | זרימה נכנסת | Caudal de entrada | Vazão afluente | Apport | Afflusso | Zufluss | 入流 | 入流 |

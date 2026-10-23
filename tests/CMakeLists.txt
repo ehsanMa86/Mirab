@@ -201,7 +201,7 @@ if(MIRAB_BUILD_GUI)
     add_test(NAME i18n-ts-files COMMAND mirab-i18n-check ts ${_ts_files})
     # The interface in each language (fails when its translation is not in the program).
     if(TARGET Qt6::lrelease)
-        foreach(lang IN ITEMS fa ar es zh_CN)
+        foreach(lang IN ITEMS fa ar he es pt_BR fr it de zh_CN zh_TW)
             add_test(NAME gui-language-${lang}
                 COMMAND Mirab "${PROJECT_SOURCE_DIR}/examples/swmm/mirab-urban.inp" --language ${lang}
                         --select J2 --delay 300 --screenshot "${CMAKE_CURRENT_BINARY_DIR}/gui-language-${lang}.png")

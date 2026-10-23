@@ -323,6 +323,118 @@ TEST_CASE("engines: SWMM5+ manifest adapts SWMM 5.2 models")
     CHECK(engine::checkCompatibility(model, *swmm).issues.empty());
 }
 
+TEST_CASE("engines: SWMM5+ gets inflows at dead-end junctions and refuses terminal ones")
+{
+    // J1 and J4 start a branch and receive only runoff. SWMM5+ turns a
+    // dead-end junction into an upstream boundary only when it has an
+    // inflow, and stops the program otherwise.
+    const auto model = core::Model::fromFile(example("swmm/mirab-urban.inp"));
+    const auto ends = core::deadEndJunctions(model);
+    CHECK(ends.withoutInflow == std::vector<std::string>({"J1", "J4"}));
+    CHECK(ends.terminal.empty());
+
+    const auto* s5p = registry().descriptor("swmm5plus-1.0");
+    std::vector<std::string> notes;
+    const auto prepared = core::Model::fromText(engine::prepareInput(model, *s5p, &notes));
+    const auto* inflows = prepared.document().find("INFLOWS");
+    CHECK(inflows != nullptr);
+    CHECK_EQ(inflows->rowCount(), 2);
+    for (int r = 0; r < inflows->rowCount(); ++r)
+    {
+        const auto t = inflows->rowTokens(r);
+        CHECK_EQ(t.at(1), std::string("FLOW"));
+        CHECK_EQ(std::stod(t.at(6)), 0.0);
+    }
+    CHECK(core::deadEndJunctions(prepared).withoutInflow.empty());
+    std::string all;
+    for (const auto& n : notes)
+        all += n + "\n";
+    CHECK(all.find("J1, J4") != std::string::npos);
+
+    // A conduit that ends at a junction: SWMM5+ cannot run it, SWMM 5.2 can.
+    std::string text = model.toText();
+    const auto insertAfter = [&](const std::string& header, const std::string& row) {
+        const auto at = text.find('\n', text.find(header)) + 1;
+        text.insert(at, row + "\n");
+    };
+    insertAfter("[JUNCTIONS]", "J6 97.5 3 0 0 0");
+    insertAfter("[CONDUITS]", "C6 J5 J6 80 0.013 0 0 0 0");
+    insertAfter("[XSECTIONS]", "C6 CIRCULAR 0.3 0 0 0 1");
+    const auto terminal = core::Model::fromText(text);
+    CHECK(core::deadEndJunctions(terminal).terminal == std::vector<std::string>({"J6"}));
+    const auto report = engine::checkCompatibility(terminal, *s5p);
+    CHECK(!report.runnable());
+    bool named = false;
+    for (const auto& i : report.issues)
+        named |= i.level == engine::Support::Unsupported && i.message.find("J6") != std::string::npos;
+    CHECK(named);
+    CHECK(engine::checkCompatibility(terminal, *registry().descriptor("swmm-5.2-epa")).runnable());
+
+    // Two links ending at the junction crash SWMM5+ too ("unexpected null link").
+    insertAfter("[CONDUITS]", "C7 J3 J6 90 0.013 0 0 0 0");
+    insertAfter("[XSECTIONS]", "C7 CIRCULAR 0.3 0 0 0 1");
+    const auto twoIn = core::Model::fromText(text);
+    CHECK(core::deadEndJunctions(twoIn).terminal == std::vector<std::string>({"J6"}));
+    CHECK(!engine::checkCompatibility(twoIn, *s5p).runnable());
+}
+
+TEST_CASE("engines: SWMM5+ gets inflow time series that reach the end of the simulation")
+{
+    // Inflow1 ends at 6:00 in a 12 h simulation; SWMM5+ stops when an inflow
+    // has no data up to the end, EPA SWMM takes it as zero after its last point.
+    const fs::path original = example("swmm/mirab-quality.inp");
+    const auto model = core::Model::fromFile(original);
+    const auto series = core::shortInflowSeries(model);
+    CHECK_EQ(series.size(), std::size_t(1));
+    CHECK_EQ(series.at(0).name, std::string("Inflow1"));
+    CHECK_NEAR(series.at(0).endSeconds, 6 * 3600.0, 1e-9);
+    // Its last value is already zero: one row an hour past the end is enough.
+    CHECK(series.at(0).zeroRows == std::vector<std::vector<std::string>>({{"Inflow1", "13", "0"}}));
+
+    const auto* s5p = registry().descriptor("swmm5plus-1.0");
+    CHECK(core::shortInflowSeries(core::Model::fromText(engine::prepareInput(model, *s5p))).empty());
+
+    // With only this change, the same model as EPA SWMM reads it: identical results.
+    engine::EngineDescriptor seriesOnly = *registry().descriptor("swmm-5.2-epa");
+    seriesOnly.support = {{core::Feature::SwmmShortInflowSeries, engine::Support::Ignored}};
+    const std::string text = engine::prepareInput(model, seriesOnly);
+    const fs::path prepared = scratch("quality-continued.inp");
+    std::ofstream(prepared, std::ios::binary) << text;
+    const auto a = run("swmm-5.2-epa", original);
+    const auto b = run("swmm-5.2-epa", prepared);
+    CHECK_EQ(a.periodCount(), b.periodCount());
+    const auto* la = a.table("link");
+    const auto* lb = b.table("link");
+    const int flow = la->variableIndex("Flow");
+    for (const char* id : {"C1", "C2", "C3", "C4", "C5"})
+    {
+        for (int p = 0; p < a.periodCount(); ++p)
+            CHECK_NEAR(la->value(p, flow, la->elementIndex(id)), lb->value(p, flow, lb->elementIndex(id)), 1e-6);
+    }
+
+    // A dated series that ends on a non-zero value drops to zero a second
+    // later, and keeps its date format; SWMM also writes dates with '-'.
+    // A series that only a pollutant uses is left alone.
+    std::string dated = model.toText();
+    const auto at = dated.find("Inflow1          0:00");
+    dated.insert(at, "Dated1 01/01/2026 00:00 0.02\nDated1 01-01-2026 04:30 0.03\nTss1 0:00 10\nTss1 1:00 20\n");
+    const auto inflow = dated.find("J2               TSS");
+    dated.insert(inflow, "J3               FLOW             Dated1           FLOW     1.0      1.0      0\n"
+                         "J3               TSS              Tss1             CONCEN   1.0      1.0      0\n");
+    bool found = false;
+    for (const auto& s : core::shortInflowSeries(core::Model::fromText(dated)))
+    {
+        CHECK(s.name != "Tss1");
+        if (s.name != "Dated1")
+            continue;
+        found = true;
+        CHECK_NEAR(s.endSeconds, 4.5 * 3600.0, 1e-9);
+        CHECK(s.zeroRows == std::vector<std::vector<std::string>>(
+                                {{"Dated1", "01/01/2026", "04:30:01", "0"}, {"Dated1", "01/01/2026", "13:00:00", "0"}}));
+    }
+    CHECK(found);
+}
+
 namespace
 {
 /// Values of one period, table by table (the order of a frame event).
@@ -698,8 +810,10 @@ TEST_CASE("engines: SWMM5+ input preparation removes every ignored feature")
     for (const char* s : {"POLLUTANTS", "LANDUSES", "COVERAGES", "LOADINGS", "BUILDUP", "WASHOFF", "TREATMENT",
                           "LID_CONTROLS", "LID_USAGE"})
         CHECK(!doc.has(s));
-    CHECK_EQ(doc.find("INFLOWS")->rowCount(), 1);
+    // J1's flow inflow stays; the dead-end J4 has none and gets a zero one.
+    CHECK_EQ(doc.find("INFLOWS")->rowCount(), 2);
     CHECK_EQ(doc.find("INFLOWS")->rowTokens(0).at(1), std::string("FLOW"));
+    CHECK_EQ(doc.find("INFLOWS")->rowTokens(1).at(0), std::string("J4"));
     CHECK_EQ(doc.find("DWF")->rowCount(), 1);
     CHECK_EQ(text::splitInpLine(prepared.option("FLOW_ROUTING")).tokens.at(0), std::string("DYNWAVE"));
     CHECK_EQ(text::splitInpLine(prepared.option("INERTIAL_DAMPING")).tokens.at(0), std::string("NONE"));

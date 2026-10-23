@@ -147,6 +147,7 @@ private:
     void resetLayout();
     void rebuildForDialect();
     void rebuildEngineChoices();
+    bool modelChosen() const;
     void updateCompatibility();
     void updateTitle();
     void updateRecentMenu();
@@ -223,6 +224,11 @@ private:
     QComboBox* engineCombo_ = nullptr;
     QCheckBox* msxCheck_ = nullptr;
     QAction* msxAction_ = nullptr; ///< toolbar slot of msxCheck_ (controls its visibility)
+    QAction* msxFileAct_ = nullptr; ///< Project > Choose MSX file (EPANET only)
+    /// The untitled model made at start-up has no type of the user's choosing: until they create
+    /// or open a model, the engine list, MSX and element tools stay empty (see modelChosen()).
+    bool newProjectChosen_ = false;
+    bool toolsForModel_ = false; ///< whether rebuildForDialect() last filled the model-specific tools
     QProgressBar* progress_ = nullptr;
     QLabel* coords_ = nullptr;
     QLabel* engineLabel_ = nullptr;

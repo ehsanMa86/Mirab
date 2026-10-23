@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Interface in Hebrew (right to left), Brazilian Portuguese, French, Italian, German and Traditional Chinese.
+- Fix: a SWMM model no longer lists the EPANET-only analyses (resilience tools, fire flow, pipe criticality) or the MSX file choice; *Analysis* offers network topology only.
+- Until a model is created or opened, the engine list reads "Open or create a model" and the MSX option and drawing tools are hidden, instead of offering EPANET engines before a model type is chosen.
+- Fix: SWMM5+ stopped on models whose upstream end junctions receive only runoff, such as the urban and water quality examples, and `mirab-cli` reported success. Mirab now adds a zero inflow at those junctions for SWMM5+, refuses terminal junctions before the run, and exits with code 3 when SWMM5+ stops the program.
+- Fix: SWMM5+ stopped when an inflow time series ended before the simulation, as in the water quality example. Mirab continues such series with zero for SWMM5+, the inflow EPA SWMM uses after their last point, and SWMM5+'s messages are no longer lost when it stops the program on Linux and macOS.
+
 ## 0.2.2 (2026-10-23)
 
 - Installers for Intel Macs (`Mirab-<version>-macos-x64.dmg`) next to the Apple silicon ones.

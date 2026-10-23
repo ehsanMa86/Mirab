@@ -37,7 +37,7 @@ Mirab runs on Windows, macOS and Linux. It needs no Python, no QGIS and no other
 - **Evaluate resilience** with native implementations of the Todini index, water service availability, network topology (bridges and articulation points), pipe criticality and fire-flow capacity.
 - **Exchange data** as GeoPackage or GeoJSON for QGIS and other GIS tools, and as WNTR JSON for the Python water community. "Open in QGIS" exports and launches QGIS in one step.
 - **Edit the input file directly** in a syntax-highlighted text view. The `.inp` file stays the master copy, and Mirab preserves every comment and line you did not change.
-- **Work in your language**: English, Persian, Arabic, Spanish and Simplified Chinese, with right-to-left layouts for Persian and Arabic.
+- **Work in your language**: English, Persian, Arabic, Hebrew, Spanish, Brazilian Portuguese, French, Italian, German, Simplified and Traditional Chinese, with right-to-left layouts for Persian, Arabic and Hebrew.
 - **Extend Mirab** with C++ plugins built against Qt 6.
 
 ## Download
@@ -45,6 +45,8 @@ Mirab runs on Windows, macOS and Linux. It needs no Python, no QGIS and no other
 Installers for Windows (`.exe` and `.zip`), macOS (`.dmg` for Apple silicon and Intel) and Linux (`.AppImage` and `.tar.gz`) are attached to each [release](https://github.com/ehsanMa86/Mirab/releases), with SHA-256 checksums. To confirm that a download was built by this repository's release workflow, run `gh attestation verify <file> --repo ehsanMa86/Mirab` with the [GitHub CLI](https://cli.github.com). Example models are installed with the application and are also in [`examples/`](examples).
 
 SWMM5+ is an optional engine for Windows, macOS and Linux, published separately by [swmm5plus-capi](https://github.com/ehsanMa86/swmm5plus-capi). Install it from *Project > Simulation engines > Install SWMM5+*, with `mirab --install-engine swmm5plus` in a deployment script, or with `mirab-cli engines install <manifest.json>` for offline use. See [docs/engines.md](docs/engines.md#installing-swmm5).
+
+![SWMM5+ routing a sewer model, paused mid-run with live results on the map and chart](docs/images/swmm5plus-live.jpg)
 
 ## Command line
 

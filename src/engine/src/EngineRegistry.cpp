@@ -125,7 +125,10 @@ std::vector<EngineDescriptor> builtinDescriptors()
                    {Feature::SwmmLowImpactDevelopment, Support::Ignored},
                    {Feature::SwmmStreetsAndInlets, Support::Ignored},
                    {Feature::SwmmNonDynamicRouting, Support::Ignored},
-                   {Feature::SwmmInertialDamping, Support::Ignored}};
+                   {Feature::SwmmInertialDamping, Support::Ignored},
+                   {Feature::SwmmDeadEndJunctions, Support::Ignored},
+                   {Feature::SwmmTerminalJunctions, Support::Unsupported},
+                   {Feature::SwmmShortInflowSeries, Support::Ignored}};
     v.push_back(s5p);
 
     return v;

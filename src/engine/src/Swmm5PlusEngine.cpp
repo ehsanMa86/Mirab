@@ -37,7 +37,10 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 namespace mirab::engine::detail
 {
@@ -82,6 +85,34 @@ struct S5pApi
     int (*setConsole)(int) = nullptr;
     int (*step)(double*) = nullptr;
     int (*getValues)(int, int, double*, int) = nullptr;
+};
+
+// At its crash points SWMM5+ ends the whole process with a Fortran STOP,
+// whose exit code is 0. While a run is in progress an exit handler turns
+// that into a failure, so that callers do not take it for a finished run.
+std::atomic<bool> g_running{false};
+
+void exitDuringRun()
+{
+    if (!g_running.load())
+        return;
+    std::fputs("\nerror: SWMM5+ stopped the program during the simulation; its messages give the cause\n",
+               stderr);
+    std::fflush(stderr);
+    std::_Exit(3);
+}
+
+struct RunGuard
+{
+    RunGuard()
+    {
+        static const bool registered = std::atexit(exitDuringRun) == 0;
+        (void)registered;
+        g_running = true;
+    }
+    ~RunGuard() { g_running = false; }
+    RunGuard(const RunGuard&) = delete;
+    RunGuard& operator=(const RunGuard&) = delete;
 };
 
 ResultFrame frameOf(const core::ResultSet& results, int p)
@@ -250,6 +281,17 @@ public:
 
     bool load(std::string* error) override
     {
+        // SWMM5+ writes its messages with Fortran PRINT. Unbuffered, they
+        // are not lost when it stops the program (see exitDuringRun). The
+        // Fortran runtime reads this when the library loads.
+        if (!std::getenv("GFORTRAN_UNBUFFERED_PRECONNECTED"))
+        {
+#if defined(_WIN32)
+            _putenv_s("GFORTRAN_UNBUFFERED_PRECONNECTED", "y");
+#else
+            setenv("GFORTRAN_UNBUFFERED_PRECONNECTED", "y", 0);
+#endif
+        }
         if (!lib_.open(libraryPath_, error))
             return false;
         std::string missing;
@@ -333,6 +375,7 @@ public:
         const std::string od = outDir.u8string();
         const std::string libDir = libraryPath_.parent_path().u8string();
 
+        const RunGuard guard;
         cb.report(0.0, "Initializing SWMM5+");
         // Standard output carries the solver protocol: SWMM5+'s own text goes
         // to standard error (version 2) or is reduced (version 1).

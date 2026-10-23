@@ -52,6 +52,8 @@ namespace
 std::string consequence(Feature f, Support level, const EngineDescriptor& e)
 {
     const std::string name = core::featureName(f);
+    if (f == Feature::SwmmTerminalJunctions && level == Support::Unsupported)
+        return name + " are not supported by " + e.name + "; make them outfalls or choose another engine";
     if (level == Support::Unsupported)
         return name + " is not available in " + e.name + "; choose another engine or remove it";
     switch (f)
@@ -76,6 +78,12 @@ std::string consequence(Feature f, Support level, const EngineDescriptor& e)
                         "to DYNWAVE for the run";
     case Feature::SwmmInertialDamping:
         return e.name + " supports INERTIAL_DAMPING NONE only; it will be set to NONE for the run";
+    case Feature::SwmmDeadEndJunctions:
+        return e.name + " treats a dead-end junction as an upstream boundary only when it has an inflow; "
+                        "a zero baseline inflow will be added there for the run";
+    case Feature::SwmmShortInflowSeries:
+        return e.name + " needs inflow time series that reach the end of the simulation; they will be "
+                        "continued with zero for the run, the value EPA SWMM uses after their last point";
     default:
         return name + " is ignored by " + e.name;
     }
@@ -225,6 +233,24 @@ std::string prepareInput(const core::Model& model, const EngineDescriptor& engin
             doc.setKeyValue("OPTIONS", "FLOW_ROUTING", "DYNWAVE");
             note("set FLOW_ROUTING to DYNWAVE");
             break;
+        case Feature::SwmmDeadEndJunctions:
+        {
+            // A zero inflow changes no flow; it only makes the engine see the inflow it needs.
+            core::InpSection& inflows = doc.ensure("INFLOWS");
+            for (const auto& id : core::deadEndJunctions(model).withoutInflow)
+                inflows.appendRow({id, "FLOW", "\"\"", "FLOW", "1.0", "1.0", "0"});
+            note("added a zero baseline inflow at dead-end junctions (" + use.detail + ")");
+            break;
+        }
+        case Feature::SwmmShortInflowSeries:
+        {
+            core::InpSection& series = doc.ensure("TIMESERIES");
+            for (const auto& s : core::shortInflowSeries(model))
+                for (const auto& row : s.zeroRows)
+                    series.appendRow(row);
+            note("continued inflow time series with zero past the end of the simulation (" + use.detail + ")");
+            break;
+        }
         default:
             break;
         }

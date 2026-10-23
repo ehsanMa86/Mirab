@@ -240,7 +240,9 @@ QDoubleSpinBox* spin(QWidget* parent, double value, double max, int decimals = 2
 ResilienceDialog::ResilienceDialog(ProjectDocument* doc, const QString& engineId, const QString& inputFile, QWidget* parent)
     : QDialog(parent), doc_(doc), engineId_(engineId), inputFile_(inputFile)
 {
-    setWindowTitle(tr("Resilience analysis"));
+    // Only network topology is meaningful for a SWMM model; the others need EPANET hydraulics.
+    const bool water = doc_->model().dialect() == core::Dialect::Epanet;
+    setWindowTitle(water ? tr("Resilience analysis") : tr("Network topology"));
     resize(860, 600);
     const bool si = doc_->model().units().system == core::UnitSystem::SI;
     const QString pUnit = QString::fromStdString(doc_->model().units().label("pressure"));
@@ -249,11 +251,17 @@ ResilienceDialog::ResilienceDialog(ProjectDocument* doc, const QString& engineId
     auto* layout = new QVBoxLayout(this);
     auto* top = new QHBoxLayout;
     analysis_ = new QComboBox(this);
-    analysis_->addItem(tr("Todini resilience index"), "todini");
-    analysis_->addItem(tr("Water service availability"), "service");
+    if (water)
+    {
+        analysis_->addItem(tr("Todini resilience index"), "todini");
+        analysis_->addItem(tr("Water service availability"), "service");
+    }
     analysis_->addItem(tr("Network topology"), "topology");
-    analysis_->addItem(tr("Pipe criticality"), "criticality");
-    analysis_->addItem(tr("Fire-flow capacity"), "fireflow");
+    if (water)
+    {
+        analysis_->addItem(tr("Pipe criticality"), "criticality");
+        analysis_->addItem(tr("Fire-flow capacity"), "fireflow");
+    }
     top->addWidget(new QLabel(tr("Analysis"), this));
     top->addWidget(analysis_, 1);
     runButton_ = new QPushButton(tr("Run"), this);
@@ -323,7 +331,13 @@ ResilienceDialog::ResilienceDialog(ProjectDocument* doc, const QString& engineId
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(csv, &QPushButton::clicked, this, &ResilienceDialog::exportCsv);
-    connect(analysis_, qOverload<int>(&QComboBox::currentIndexChanged), params_, &QStackedWidget::setCurrentIndex);
+    // Parameter pages are built in this order whatever the combo lists.
+    auto showParams = [this] {
+        static const QStringList pages = {"todini", "service", "topology", "criticality", "fireflow"};
+        params_->setCurrentIndex(pages.indexOf(analysis_->currentData().toString()));
+    };
+    connect(analysis_, qOverload<int>(&QComboBox::currentIndexChanged), this, showParams);
+    showParams();
     connect(runButton_, &QPushButton::clicked, this, &ResilienceDialog::run);
     connect(table_, &QTableWidget::itemSelectionChanged, this, [this] {
         const auto items = table_->selectedItems();

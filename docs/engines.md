@@ -42,10 +42,13 @@ Each engine declares how it handles features whose support differs between engin
 | Streets and inlets | | | yes | ignored |
 | Kinematic wave or steady routing | | | yes | ignored (set to dynamic wave) |
 | `INERTIAL_DAMPING` PARTIAL or FULL | | | yes | set to NONE (the only mode SWMM5+ supports) |
+| Dead-end junctions without inflow | | | yes | a zero inflow is added |
+| Terminal junctions (links end there, none leaves) | | | yes | cannot run |
+| Inflow time series that end before the simulation | | | yes | continued with zero |
 
-"Ignored" features are removed from the copy of the input file given to the engine; the project file itself does not change. The run log lists what was removed:
+"Ignored" features are removed from or adapted in the copy of the input file given to the engine; the project file itself does not change. The run log lists every change:
 
-| Feature | Removed from the engine's copy |
+| Feature | Change to the engine's copy |
 |---|---|
 | FAVAD pipe leakage | `[LEAKAGE]` |
 | BAR or FEET pressure units | the `PRESSURE` option |
@@ -55,6 +58,8 @@ Each engine declares how it handles features whose support differs between engin
 | Streets and inlets | `[STREETS]`, `[INLETS]`, `[INLET_USAGE]` |
 | Kinematic wave or steady routing | `FLOW_ROUTING` is set to `DYNWAVE` |
 | `INERTIAL_DAMPING` | set to `NONE` |
+| Dead-end junctions without inflow | a zero baseline `FLOW` row in `[INFLOWS]` for each of them |
+| Inflow time series that end before the simulation | zero points in `[TIMESERIES]`: one second after the last point when that is not zero, and one an hour past the end of the simulation |
 
 "Cannot run" blocks the run until you change the engine or the model.
 
@@ -122,5 +127,8 @@ SWMM5+ also has modeling rules of its own, which Mirab applies or reports:
 - routing is always dynamic wave; Mirab sets `FLOW_ROUTING DYNWAVE` for the run,
 - pollutants and LID controls are not modeled; Mirab removes them from the engine's copy of the input,
 - a subcatchment must drain to a storage node, a junction with three or more links, or an upstream end or outfall next to a conduit (interface version 2 libraries); a junction with exactly two links is refused, and SWMM5+ stops with a configuration error,
-- every upstream end junction needs an inflow (`[INFLOWS]` or `[DWF]`, a small base flow is enough); SWMM5+ stops with "nJ1 should be converted to nBCup" otherwise,
+- every upstream end junction needs an inflow (`[INFLOWS]` or `[DWF]`); SWMM5+ stops with "nJ1 should be converted to nBCup" otherwise. Mirab adds a zero baseline inflow to upstream ends that have none: it changes no flow, and runoff draining there still arrives,
+- a junction where links end and none leaves (a terminal junction) crashes SWMM5+; Mirab refuses the run and names the junctions, which can be made outfalls,
+- an inflow time series of `[INFLOWS]` must have data up to the end of the simulation; SWMM5+ stops with "Input file reader cannot find time past" otherwise. EPA SWMM takes such an inflow as zero after the last point, and Mirab continues the series with zero for SWMM5+, which gives the same inflow. Series read from a file are not checked,
+- when SWMM5+ stops the program at one of its other crash points, `mirab-cli` exits with code 3 instead of the 0 of SWMM5+'s Fortran `STOP`, and Mirab reports the run as failed,
 - dry-weather flow is applied at its average value: SWMM5+ 1.0 does not apply the time patterns of `[DWF]` (seen with hourly patterns; its log shows "unexpected else in interface_get_BC_resolution" for each inflow).

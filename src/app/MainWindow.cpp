@@ -706,7 +706,7 @@ void MainWindow::createMenus()
     project->addAction(icons::get("controls"), tr("Control &rules..."), this, [this] {
         openDataEditor(doc_->model().dialect() == Dialect::Swmm ? "CONTROLS" : "RULES", {});
     });
-    project->addAction(tr("Choose &MSX file..."), this, &MainWindow::chooseMsxFile);
+    msxFileAct_ = project->addAction(tr("Choose &MSX file..."), this, &MainWindow::chooseMsxFile);
     project->addSeparator();
     project->addAction(icons::get("scenarios"), tr("New &scenario..."), this, [this] {
         showDock("scenariosDock");
@@ -753,12 +753,18 @@ void MainWindow::createMenus()
         }
     });
 
-    // Analysis
+    // Analysis (the resilience analyses need EPANET hydraulics; topology works for both)
     QMenu* analysis = menuBar()->addMenu(tr("A&nalysis"));
-    analysis->addAction(icons::get("variability"), tr("&Resilience tools..."), this, [this] { showResilience(); });
-    analysis->addAction(icons::get("fireflow"), tr("&Fire flow capacity..."), this, [this] { showResilience("fireflow"); });
-    analysis->addAction(tr("Pipe &criticality..."), this, [this] { showResilience("criticality"); });
-    analysis->addAction(tr("Network &topology..."), this, [this] { showResilience("topology"); });
+    connect(analysis, &QMenu::aboutToShow, this, [this, analysis] {
+        analysis->clear();
+        if (doc_->model().dialect() == Dialect::Epanet)
+        {
+            analysis->addAction(icons::get("variability"), tr("&Resilience tools..."), this, [this] { showResilience(); });
+            analysis->addAction(icons::get("fireflow"), tr("&Fire flow capacity..."), this, [this] { showResilience("fireflow"); });
+            analysis->addAction(tr("Pipe &criticality..."), this, [this] { showResilience("criticality"); });
+        }
+        analysis->addAction(tr("Network &topology..."), this, [this] { showResilience("topology"); });
+    });
 
     // Tools
     QMenu* tools = menuBar()->addMenu(tr("&Tools"));
@@ -971,6 +977,12 @@ void MainWindow::updateStartPage()
     start_->setExamples(examples);
     start_->setRecent(QSettings().value("files/recent").toStringList());
     mapPage_->setStartVisible(empty);
+    // An import into the start-up model makes it the user's model.
+    if (modelChosen() != toolsForModel_)
+    {
+        rebuildForDialect();
+        updateCompatibility();
+    }
 }
 
 QString MainWindow::examplesDirectory() const
@@ -986,9 +998,17 @@ QString MainWindow::examplesDirectory() const
     return {};
 }
 
+bool MainWindow::modelChosen() const
+{
+    const auto& m = doc_->model();
+    return newProjectChosen_ || !doc_->path().isEmpty() || !m.nodes().empty() || !m.links().empty();
+}
+
 void MainWindow::rebuildForDialect()
 {
     const Dialect d = doc_->model().dialect();
+    const bool chosen = modelChosen();
+    toolsForModel_ = chosen;
     for (QAction* a : addActions_)
     {
         toolGroup_->removeAction(a);
@@ -1013,20 +1033,25 @@ void MainWindow::rebuildForDialect()
         mainBar_->insertAction(anchor, a);
         addActions_ << a;
     };
-    for (const auto& k : core::elementKinds(d, Category::Node))
-        addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddNode);
-    addMenu_->addSeparator();
-    for (const auto& k : core::elementKinds(d, Category::Link))
-        addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddLink);
-    if (d == Dialect::Swmm)
+    if (chosen)
     {
+        for (const auto& k : core::elementKinds(d, Category::Node))
+            addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddNode);
         addMenu_->addSeparator();
-        addTool("Subcatchment", tr("Subcatchment"), MapView::Tool::AddArea);
-        addTool("RainGage", tr("Rain gage"), MapView::Tool::AddGage);
+        for (const auto& k : core::elementKinds(d, Category::Link))
+            addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddLink);
+        if (d == Dialect::Swmm)
+        {
+            addMenu_->addSeparator();
+            addTool("Subcatchment", tr("Subcatchment"), MapView::Tool::AddArea);
+            addTool("RainGage", tr("Rain gage"), MapView::Tool::AddGage);
+        }
     }
+    addMenu_->menuAction()->setEnabled(chosen);
     selectAct_->setChecked(true);
     map_->setTool(MapView::Tool::Select);
-    msxAction_->setVisible(d == Dialect::Epanet);
+    msxAction_->setVisible(chosen && d == Dialect::Epanet);
+    msxFileAct_->setVisible(chosen && d == Dialect::Epanet);
     rebuildEngineChoices();
     if (!doc_->settings().backdropImage.empty() && !doc_->path().isEmpty())
     {
@@ -1063,6 +1088,16 @@ void MainWindow::rebuildEngineChoices()
     engineCombo_->blockSignals(true);
     msxCheck_->blockSignals(true);
     engineCombo_->clear();
+    engineCombo_->setEnabled(modelChosen());
+    if (!modelChosen())
+    {
+        // No item data: currentEngine() is null, so nothing can run until a model is chosen.
+        engineCombo_->addItem(tr("Open or create a model"));
+        msxCheck_->setChecked(false);
+        engineCombo_->blockSignals(false);
+        msxCheck_->blockSignals(false);
+        return;
+    }
     std::string wanted = doc_->engineChoice().engineId;
     if (const auto* desc = registry_.descriptor(wanted); desc && desc->multiSpecies)
         wanted = desc->baseEngineId;
@@ -1147,6 +1182,7 @@ void MainWindow::updateCompatibility()
     if (!desc)
     {
         compatibilityPass_ = false;
+        engineLabel_->clear();
         runAct_->setEnabled(false);
         return;
     }
@@ -1284,6 +1320,7 @@ void MainWindow::newProject(Dialect dialect)
     NewProjectDialog dlg(dialect, this);
     if (dlg.exec() != QDialog::Accepted)
         return;
+    newProjectChosen_ = true;
     doc_->newProject(dialect, dlg.flowUnits());
     tabs_->setCurrentWidget(mapPage_);
     mapPage_->setStartVisible(false);
@@ -2589,12 +2626,6 @@ bool MainWindow::exportReport(const QString& path)
 
 void MainWindow::showResilience(const QString& page)
 {
-    if (doc_->model().dialect() != Dialect::Epanet && page != "topology")
-    {
-        QMessageBox::information(this, tr("Resilience"),
-                                 tr("The resilience tools apply to water distribution (EPANET) models. "
-                                    "Network topology is available for both model types from this dialog."));
-    }
     const QString tmpDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
     const QString input = QDir(tmpDir).filePath("mirab-resilience-" + QString::number(QCoreApplication::applicationPid()) + ".inp");
     QFile f(input);
