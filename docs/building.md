@@ -59,7 +59,8 @@ The `.ts` files in `translations/` are compiled into the application together wi
 ## Continuous integration
 
 - `.github/workflows/ci.yml` builds and tests on Windows, macOS and Linux for every push and pull request, and checks license headers.
-- `.github/workflows/release.yml` runs on version tags (`v*`) and attaches the Windows installer and ZIP, the macOS DMG, and the Linux AppImage and tarball to a GitHub release.
+- `.github/workflows/release.yml` runs on version tags (`v*`) and attaches the Windows installer and ZIP, the macOS DMGs, and the Linux AppImage and tarball to a GitHub release, together with `Mirab-<version>-SHA256SUMS.txt` and a signed build provenance attestation for every file. Releases are immutable once published; a tag with a hyphen (`v0.3.0-rc1`) therefore becomes a draft prerelease, to be published by hand after checking it. Running the workflow by hand (*Actions > Release > Run workflow*) builds every package without publishing anything.
+- Every action is pinned to a commit, and the linuxdeploy tools to a release and checksum. Dependabot proposes action updates once a month; to move linuxdeploy, change the tags and checksums at the top of `release.yml`.
 
 ## License headers
 

@@ -27,18 +27,24 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Only the publish job writes; it asks for its own permissions.
 permissions:
-  contents: write
+  contents: read
 
 env:
   QT_VERSION: "6.8.3"
+  # linuxdeploy and its Qt plugin at fixed releases, checked before they run.
+  LINUXDEPLOY_TAG: "1-alpha-20251107-1"
+  LINUXDEPLOY_SHA256: "c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d"
+  LINUXDEPLOY_QT_TAG: "1-alpha-20250213-1"
+  LINUXDEPLOY_QT_SHA256: "15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724"
 
 jobs:
   windows:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
-      - uses: jurplel/install-qt-action@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: ${{ env.QT_VERSION }}
           arch: win64_mingw
@@ -61,7 +67,7 @@ jobs:
           export PATH="$QT_ROOT_DIR/bin:$PATH"
           ctest --preset release
       - run: cmake --build --preset release --target package
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows
           path: |
@@ -75,9 +81,9 @@ jobs:
         os: [macos-15, macos-15-intel] # Apple silicon, Intel
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: brew install ninja
-      - uses: jurplel/install-qt-action@v4
+      - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: ${{ env.QT_VERSION }}
           arch: clang_64
@@ -86,7 +92,7 @@ jobs:
       - run: cmake --build --preset release
       - run: ctest --preset release
       - run: cmake --build --preset release --target package
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ matrix.os }}
           path: build/release/Mirab-*.dmg
@@ -94,13 +100,13 @@ jobs:
   linux:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: System packages
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build libgl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-0 \
             libxcb-cursor0 libfontconfig1-dev libfreetype-dev libegl1 libfuse2 file
-      - uses: jurplel/install-qt-action@v4
+      - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: ${{ env.QT_VERSION }}
           arch: linux_gcc_64
@@ -113,8 +119,10 @@ jobs:
         run: |
           # Qt's deploy step ignores DESTDIR, so install with an explicit prefix.
           cmake --install build/release --prefix "$PWD/AppDir/usr"
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/${LINUXDEPLOY_TAG}/linuxdeploy-x86_64.AppImage"
+          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/${LINUXDEPLOY_QT_TAG}/linuxdeploy-plugin-qt-x86_64.AppImage"
+          echo "${LINUXDEPLOY_SHA256}  linuxdeploy-x86_64.AppImage" | sha256sum -c
+          echo "${LINUXDEPLOY_QT_SHA256}  linuxdeploy-plugin-qt-x86_64.AppImage" | sha256sum -c
           chmod +x linuxdeploy*.AppImage
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
           export LD_LIBRARY_PATH="$QT_ROOT_DIR/lib:$PWD/AppDir/usr/lib:$LD_LIBRARY_PATH"
@@ -125,7 +133,7 @@ jobs:
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/mirab.png \
             --executable AppDir/usr/bin/mirab
           mv Mirab-*.AppImage "build/release/Mirab-${VERSION}-linux-x86_64.AppImage"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: linux
           path: |
@@ -136,13 +144,28 @@ jobs:
     needs: [windows, macos, linux]
     runs-on: ubuntu-24.04
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write      # create the release
+      id-token: write      # sign the build provenance
+      attestations: write  # store it with the repository
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: dist
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum Mirab-* > "Mirab-${GITHUB_REF_NAME#v}-SHA256SUMS.txt"
+      # Lets anyone check that a download was built here from this tag:
+      #   gh attestation verify <file> --repo ehsanMa86/Mirab
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/Mirab-*
+      # Releases are immutable once published, so prereleases, which the action
+      # would publish before uploading, are left as drafts to publish by hand.
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: dist/*
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+          draft: ${{ contains(github.ref_name, '-') }}
