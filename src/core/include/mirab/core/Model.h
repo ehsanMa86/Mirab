@@ -261,6 +261,8 @@ private:
 
 /// Days since 1970-01-01 for a civil date (proleptic Gregorian).
 long long daysFromCivil(int year, int month, int day);
+/// The civil date of a number of days since 1970-01-01.
+void civilFromDays(long long days, int& year, int& month, int& day);
 /// Parses "MM/DD/YYYY" (SWMM) into days since 1970-01-01.
 bool parseSwmmDate(std::string_view text, long long& days);
 

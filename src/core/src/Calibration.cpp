@@ -170,20 +170,6 @@ std::optional<long long> parseDate(std::string_view s, DateOrder order)
     return daysFromCivil(year, month, day);
 }
 
-void civilFromDays(long long z, int& y, int& m, int& d)
-{
-    z += 719468;
-    const long long era = (z >= 0 ? z : z - 146096) / 146097;
-    const unsigned doe = static_cast<unsigned>(z - era * 146097);
-    const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    const long long yy = static_cast<long long>(yoe) + era * 400;
-    const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    const unsigned mp = (5 * doy + 2) / 153;
-    d = static_cast<int>(doy - (153 * mp + 2) / 5 + 1);
-    m = static_cast<int>(mp < 10 ? mp + 3 : mp - 9);
-    y = static_cast<int>(yy + (m <= 2));
-}
-
 bool isMissing(const std::string& cell, const std::string& noData)
 {
     const std::string t = text::trim(cell);
