@@ -46,6 +46,8 @@ Installers for Windows (`.exe` and `.zip`), macOS (`.dmg` for Apple silicon and 
 
 SWMM5+ is an optional engine for Windows, macOS and Linux, published separately by [swmm5plus-capi](https://github.com/ehsanMa86/swmm5plus-capi). Install it from *Project > Simulation engines > Install SWMM5+*, with `mirab --install-engine swmm5plus` in a deployment script, or with `mirab-cli engines install <manifest.json>` for offline use. See [docs/engines.md](docs/engines.md#installing-swmm5).
 
+![SWMM5+ routing a sewer model, paused mid-run with live results on the map and chart](docs/images/swmm5plus-live.jpg)
+
 ## Command line
 
 Every capability is also available from `mirab-cli`, which ships next to the application:

@@ -176,12 +176,16 @@ The engine box on the tool bar lists the engines for the model type. Engines tha
 
 SWMM5+ is an optional engine. Open *Project > Simulation engines* and click *Install SWMM5+*: Mirab downloads it, checks every file and adds it to the engine box. Without internet access, download the files for your computer from the swmm5plus-capi release page and use *Install from file...*. See [engines.md](engines.md#installing-swmm5) for details.
 
+![A finished SWMM5+ run of a sewer model](images/swmm5plus-final.jpg)
+
 - **MSX:** for EPANET models, tick *MSX* to run EPANET-MSX on top of the selected EPANET engine, and choose the `.msx` file.
 - **Messages:** the panel always shows how the project fits the selected engine.
   - **Information:** the project is fully supported.
   - **Warning:** this engine ignores a feature. Mirab removes it from the copy sent to the engine and tells you.
   - **Error:** the engine cannot run the project, and the Run button is disabled.
 - **Greyed-out data:** data the selected engine does not model is greyed out in *Properties*. For example, the `[LEAKAGE]` rows of a pipe are greyed out under EPA EPANET 2.2, and PCV is not offered as a valve type.
+
+![FAVAD leakage of pipe P5 under OWA EPANET 2.3: its leak area and expansion, and the leakage computed at the end of the day](images/epanet-owa-leakage.jpg)
 
 The choice of engine, the MSX file, the coordinate system, the basemap (with the definition of a custom map service), the raster layers, the backdrop, and the observed data and calibration set-up are saved next to the model in `<model>.inp.mirab.json`.
 
@@ -193,6 +197,10 @@ Press `F5` or *Run*. The engine runs in a separate process, so you can keep work
 - **Pause:** `F6` or *Pause* holds the engine between two time steps; the status bar shows *Paused at* the simulation time reached. Press it again to resume.
 - **Stop:** *Stop* ends the run. The periods computed so far stay on the map, marked *Partial results (cancelled at ...)*. Partial results are not saved; the `.anr` file of the last complete run is kept.
 
+![SWMM5+ paused at 19:00; the map, Properties and the chart show the periods computed so far](images/swmm5plus-live.jpg)
+
+![OWA EPANET 2.3 paused on day 14 of a 30-day run; the map shows the pressures computed so far](images/epanet-owa-live.jpg)
+
 When the run finishes:
 
 - **Map colors:** the map colors nodes, links and subcatchments by the results chosen on the map bar, with a legend and flow-direction arrows.
@@ -201,6 +209,10 @@ When the run finishes:
 - **Properties:** *Properties* lists the selected element's results under its input data.
 - **Time series:** the Time series panel plots the selected element over time. Right-click the chart to copy it, save it as an image or copy its data.
 - **Saved results:** results are saved as `<model>.anr` and reload when the model is opened again.
+
+![OWA EPANET 2.3 pressures over an elevation hillshade and OpenStreetMap](images/epanet-owa-run.jpg)
+
+![The pressure at J5 over a 30-day OWA EPANET 2.3 run](images/epanet-owa-30days.jpg)
 
 *Simulation > Load results* also opens binary output files (`.out`) written by EPANET or SWMM elsewhere.
 
@@ -224,6 +236,8 @@ The *Reports* menu and tool bar button open report tabs. Each report follows new
 *Reports > Fire flow analysis* opens the fire-flow capacity analysis of the resilience tools.
 
 ![Profile plot](images/report-profile.png)
+
+![Network tables with the node results of a SWMM5+ run](images/swmm5plus-tables.jpg)
 
 ## Scenarios
 
@@ -283,6 +297,8 @@ Basemap tiles are downloaded at the resolution of the output before the file is 
 
 ![Print layout](images/print-layout.jpg)
 
+![A layout exported as PNG: SWMM5+ depths in a sewer model](images/swmm5plus-layout.jpg)
+
 ### Report document
 
 *Report document* assembles a multi-page document with a cover, a table of contents and numbered sections. Tick the sections to include:
@@ -300,6 +316,8 @@ Basemap tiles are downloaded at the resolution of the output before the file is 
 
 - **Animated GIF**: one palette of up to 255 colors shared by all frames, optional dithering so basemap imagery keeps its shading (the flat colors of the network are never dithered), and only the changed part of each frame is stored, so files stay small. The animation loops.
 - **PNG image sequence**: numbered files `name_0001.png`, `name_0002.png`, ... for video editors and slides.
+
+![Pressures over a day, exported as an animated GIF](images/map-animation.gif)
 
 Choose the periods (from, to and every n-th), the speed in frames per second, the size (the map view or a fixed size such as 1280 x 720) and whether to show the basemap. The frames are drawn a few at a time while a background thread writes the file, so the window stays responsive; *Cancel* stops the export and removes the partial output.
 
@@ -376,9 +394,13 @@ Mirab compares simulations with measurements and can adjust model inputs until t
 
 Each column or location becomes a series linked to an element type (node, link or subcatchment), an element ID and a result, such as junction `J5` *Pressure*, pipe `P12` *Flow*, SWMM node *Depth* or outfall *Total Inflow*. Mirab proposes the links from column names such as `J5 Pressure (psi)` or `P1_flow`. Give the unit of the measurements when it differs from the model's (`psi`, `kPa`, `bar`, `m`, `ft`, `in`, `mm`; `GPM`, `LPS`, `L/s`, `CFS`, `CMS`, `m3/s`, `MGD`, `MLD`, `CMH`, `m3/h`; `m/s`, `ft/s`); pressures and heads convert through metres of water. The weight sets how much a series counts in the calibration objective. The preview shows the selected series over the simulated result.
 
+![Observed pressures at J5 and J9 linked to the model, with the J5 preview](images/calibration-observed.png)
+
 Times have no time zone. Dated measurements are placed on the simulation clock with the start date: SWMM models use `START_DATE` and `START_TIME`; EPANET models start at their start clock time on the day of the first measurement, unless you enter *Simulation starts at*. Measurements outside the simulated period are left out.
 
 The list is saved with the project in `<model>.inp.mirab.json`, with file paths relative to the model. Once linked, measurements appear as markers in the Time series panel and the Time series report.
+
+![Simulated and observed pressure at junction J5 in the Time series panel](images/calibration-timeseries.png)
 
 ### Goodness of fit
 
@@ -507,6 +529,10 @@ The link is one-way: the water model sets the sewer inflows. A coupled simulatio
 Mirab speaks English, Persian (فارسی), Arabic (العربية), Hebrew (עברית), Spanish (Español), Portuguese (Português do Brasil), French (Français), Italian (Italiano), German (Deutsch), Simplified Chinese (简体中文) and Traditional Chinese (繁體中文). Choose the language with the globe button at the bottom of the window, or in *Tools > Settings > Language*, and restart Mirab when asked (*Restart now* reopens the project). Every language is listed with its English name too, for example "فارسی (Persian)", so a language chosen by mistake is easy to change back; *System default* follows the language of the operating system and falls back to English. `mirab --language fa` (or `ar`, `he`, `es`, `pt_BR`, `fr`, `it`, `de`, `zh_CN`, `zh_TW`, `en`) starts once in a given language without changing the setting. Qt's own dialogs and buttons (file dialogs, *OK*, *Cancel*) follow the same language.
 
 Persian and Arabic use the Vazirmatn font, which is part of Mirab; Hebrew uses the fonts of the operating system. In these three languages the window is laid out from right to left: menus, docks, forms and tables are mirrored. The map, charts, profiles, the LID cross-section and print layouts keep their left-to-right geometry (east and time to the right), and numbers, IDs and values in tables read left to right. The input file text, control rules and query expressions stay left to right too.
+
+![Mirab in Persian, laid out from right to left](images/language-fa.png)
+
+Screenshots of the main window in the other languages: [Arabic](images/language-ar.png), [Hebrew](images/language-he.png), [Spanish](images/language-es.png), [Portuguese](images/language-pt_BR.png), [French](images/language-fr.png), [Italian](images/language-it.png), [German](images/language-de.png), [Simplified Chinese](images/language-zh_CN.png), [Traditional Chinese](images/language-zh_TW.png).
 
 Some names stay in English in every language because they are part of the data: input column names (`Elevation`, `Diameter`, `InitLevel`) and result variable names (`Pressure`, `Flow`, `Depth`), which are also the names used in query expressions such as `Diameter < 200 AND Pressure < 20` and in CSV and GIS exports; `.inp` section and keyword names; unit symbols; and messages that name elements or lines of the input file. `mirab-cli` always prints English.
 
