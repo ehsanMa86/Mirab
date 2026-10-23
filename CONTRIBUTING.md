@@ -13,13 +13,15 @@ Open an issue with the bug report form. It asks for:
 
 ## Contributing code
 
-1. Fork the repository and create a branch from `main`.
+Development happens on the `develop` branch. `main` is the stable branch: it only receives tested work from `develop` and every release is tagged from it.
+
+1. Fork the repository and create a branch from `develop`.
 2. Build with `cmake --preset debug` and make sure `ctest --preset release` (or the debug equivalent) passes.
 3. Start every new source file with a one-line header marker, for example
    `// @mirab-header Short description of the file.`
    and run `python tools/license_headers.py --apply`. The tool expands the marker into the standard copyright and license header. CI runs `--check` and fails when a file has no header.
 4. Keep engine sources untouched. Engine differences belong in the adapters (`src/engine`) and in the capability manifest (`src/engine/src/EngineRegistry.cpp`).
-5. Open a pull request that explains the change and how you tested it.
+5. Open a pull request against `develop` that explains the change and how you tested it.
 
 ## Contributor agreement
 
