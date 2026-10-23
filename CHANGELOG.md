@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2 (2026-10-23)
+
+- Installers for Intel Macs (`Mirab-<version>-macos-x86_64.dmg`) next to the Apple silicon ones.
+- Every release carries SHA-256 checksums and a signed build provenance attestation for each file (`gh attestation verify <file> --repo ehsanMa86/Mirab`).
+- The desktop packages include the full LGPL-3.0 text of Qt, and the notices name the Qt version shipped (6.8.3) and its source archive.
+- The source code is public: issue forms for bug reports and feature requests, a security policy and contribution guidelines.
+
 ## 0.2.1 (2026-10-22)
 
 - Fix: SWMM5+ runs started from the application never finished on Windows. The solver process waited for standard input while SWMM5+ inspected it; commands are now read only when they arrive.

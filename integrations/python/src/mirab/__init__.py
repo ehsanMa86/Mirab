@@ -43,7 +43,7 @@ from .project import Element, ElementCollection, Project, edit, open_project, op
 from .results import Results, Table, Variable, has_numpy, load_results
 from .simulation import Event, FrameEvent, RunResult, Simulation, decode_frame, run
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 __all__ = [
     "Case", "CaseResult", "Cli", "CliError", "CliNotFoundError", "Element", "ElementCollection", "Event",
