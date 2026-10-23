@@ -26,6 +26,10 @@
 
 #include "mirab/core/Text.h"
 
+#include <algorithm>
+#include <map>
+#include <set>
+
 namespace mirab::core
 {
 
@@ -67,6 +71,10 @@ const char* featureName(Feature f)
         return "Inertial damping (PARTIAL or FULL)";
     case Feature::SwmmControls:
         return "Control rules";
+    case Feature::SwmmDeadEndJunctions:
+        return "Dead-end junctions without inflow";
+    case Feature::SwmmTerminalJunctions:
+        return "Terminal junctions";
     }
     return "?";
 }
@@ -84,7 +92,64 @@ std::string firstWord(const std::string& value)
     const auto t = text::splitInpLine(value).tokens;
     return t.empty() ? std::string() : text::toUpper(t[0]);
 }
+
+/// "J1, J4" or "J1, J2, J3, J4, J5 and 3 more".
+std::string idList(const std::vector<std::string>& ids)
+{
+    std::string s;
+    const std::size_t shown = std::min<std::size_t>(ids.size(), 5);
+    for (std::size_t i = 0; i < shown; ++i)
+        s += (i ? ", " : "") + ids[i];
+    if (ids.size() > shown)
+        s += " and " + std::to_string(ids.size() - shown) + " more";
+    return s;
+}
+
+int nodeRow(const Model& model, const std::string& id)
+{
+    const NodeItem* n = model.findNode(id);
+    return n ? n->row : -1;
+}
 } // namespace
+
+DeadEndJunctions deadEndJunctions(const Model& model)
+{
+    DeadEndJunctions out;
+    if (model.dialect() != Dialect::Swmm)
+        return out;
+    std::map<std::string, int> leaving, ending;
+    for (const auto& l : model.links())
+    {
+        ++leaving[text::toUpper(l.from)];
+        ++ending[text::toUpper(l.to)];
+    }
+    std::set<std::string> inflow;
+    for (const char* s : {"INFLOWS", "DWF"})
+    {
+        if (const InpSection* sec = model.document().find(s))
+        {
+            for (const auto& t : sec->allRowTokens())
+            {
+                if (t.size() > 1 && text::iequals(t[1], "FLOW"))
+                    inflow.insert(text::toUpper(t[0]));
+            }
+        }
+    }
+    for (const auto& n : model.nodes())
+    {
+        if (n.kind != "Junction")
+            continue;
+        // SWMM IDs are not case sensitive.
+        const std::string key = text::toUpper(n.id);
+        const int leaves = leaving.count(key) ? leaving[key] : 0;
+        const int ends = ending.count(key) ? ending[key] : 0;
+        if (leaves == 1 && ends == 0 && !inflow.count(key))
+            out.withoutInflow.push_back(n.id);
+        else if (leaves == 0 && ends == 1)
+            out.terminal.push_back(n.id);
+    }
+    return out;
+}
 
 std::vector<FeatureUse> detectFeatures(const Model& model)
 {
@@ -151,6 +216,13 @@ std::vector<FeatureUse> detectFeatures(const Model& model)
                            "OPTIONS", -1});
         if (hasRows(doc, "CONTROLS"))
             out.push_back({Feature::SwmmControls, "control rules", "CONTROLS", 0});
+        const auto ends = deadEndJunctions(model);
+        if (!ends.withoutInflow.empty())
+            out.push_back({Feature::SwmmDeadEndJunctions, idList(ends.withoutInflow), "JUNCTIONS",
+                           nodeRow(model, ends.withoutInflow.front())});
+        if (!ends.terminal.empty())
+            out.push_back({Feature::SwmmTerminalJunctions, idList(ends.terminal), "JUNCTIONS",
+                           nodeRow(model, ends.terminal.front())});
     }
     return out;
 }
