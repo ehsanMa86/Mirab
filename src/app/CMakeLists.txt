@@ -92,7 +92,7 @@ install(FILES "${PROJECT_SOURCE_DIR}/third_party/qt/LGPL-3.0.txt"
 # Qt's own translations of the same languages, so no package carries extra
 # files. "cmake --build <dir> --target update_translations" refreshes the
 # .ts files from the sources.
-set(MIRAB_LANGUAGES fa ar es zh_CN)
+set(MIRAB_LANGUAGES fa ar he es pt_BR fr it de zh_CN zh_TW)
 if(TARGET Qt6::lrelease AND TARGET Qt6::lupdate)
     set(_ts_files)
     foreach(_lang IN LISTS MIRAB_LANGUAGES)

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Interface in Hebrew (right to left), Brazilian Portuguese, French, Italian, German and Traditional Chinese.
+
 ## 0.2.2 (2026-10-23)
 
 - Installers for Intel Macs (`Mirab-<version>-macos-x64.dmg`) next to the Apple silicon ones.

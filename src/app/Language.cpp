@@ -47,6 +47,11 @@ QString& current()
 
 bool rightToLeft(const QString& code)
 {
+    return code == "fa" || code == "ar" || code == "he";
+}
+
+bool arabicScript(const QString& code)
+{
     return code == "fa" || code == "ar";
 }
 
@@ -113,8 +118,14 @@ QList<UiLanguage> uiLanguages()
             {"en", QStringLiteral("English"), QStringLiteral("English")},
             {"fa", QStringLiteral(u"فارسی"), QStringLiteral("Persian")},
             {"ar", QStringLiteral(u"العربية"), QStringLiteral("Arabic")},
+            {"he", QStringLiteral(u"עברית"), QStringLiteral("Hebrew")},
             {"es", QStringLiteral(u"Español"), QStringLiteral("Spanish")},
-            {"zh_CN", QStringLiteral(u"简体中文"), QStringLiteral("Chinese, Simplified")}};
+            {"pt_BR", QStringLiteral(u"Português (Brasil)"), QStringLiteral("Portuguese, Brazil")},
+            {"fr", QStringLiteral(u"Français"), QStringLiteral("French")},
+            {"it", QStringLiteral("Italiano"), QStringLiteral("Italian")},
+            {"de", QStringLiteral(u"Deutsch"), QStringLiteral("German")},
+            {"zh_CN", QStringLiteral(u"简体中文"), QStringLiteral("Chinese, Simplified")},
+            {"zh_TW", QStringLiteral(u"繁體中文"), QStringLiteral("Chinese, Traditional")}};
 }
 
 QString languageLabel(const UiLanguage& language)
@@ -174,7 +185,8 @@ QString installTranslations(const QString& code)
         lang = QStringLiteral("en");
         for (const QString& ui : QLocale::system().uiLanguages())
         {
-            const QString name = QLocale(ui).name(); // "fa_IR", "zh_CN", "es_ES", ...
+            const QLocale locale(ui);
+            const QString name = locale.name(); // "fa_IR", "zh_CN", "es_ES", ...
             QString match;
             for (const UiLanguage& l : uiLanguages())
             {
@@ -182,8 +194,14 @@ QString installTranslations(const QString& code)
                     continue;
                 if (name == l.code || (!l.code.contains('_') && name.section('_', 0, 0) == l.code))
                     match = l.code;
+                // Portuguese of Portugal and elsewhere reads the Brazilian translation.
+                if (l.code == "pt_BR" && name.section('_', 0, 0) == "pt")
+                    match = l.code;
+                // Hong Kong, Macau and any other Traditional script read the Taiwan translation.
+                if (l.code == "zh_TW" && locale.language() == QLocale::Chinese &&
+                    locale.script() == QLocale::TraditionalChineseScript)
+                    match = l.code;
             }
-            // Traditional Chinese has no translation; it stays in English.
             if (!match.isEmpty() || name.startsWith("en"))
             {
                 if (!match.isEmpty())
@@ -207,10 +225,10 @@ QString installTranslations(const QString& code)
     }
     QGuiApplication::setLayoutDirection(rightToLeft(current()) ? Qt::RightToLeft : Qt::LeftToRight);
     if (rightToLeft(current()))
-    {
         qApp->installEventFilter(new DataTables(qApp));
+    // Hebrew reads well in the system fonts.
+    if (arabicScript(current()))
         useArabicScriptFont();
-    }
     return current();
 }
 
