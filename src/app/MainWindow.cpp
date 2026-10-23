@@ -977,6 +977,12 @@ void MainWindow::updateStartPage()
     start_->setExamples(examples);
     start_->setRecent(QSettings().value("files/recent").toStringList());
     mapPage_->setStartVisible(empty);
+    // An import into the start-up model makes it the user's model.
+    if (modelChosen() != toolsForModel_)
+    {
+        rebuildForDialect();
+        updateCompatibility();
+    }
 }
 
 QString MainWindow::examplesDirectory() const
@@ -992,9 +998,17 @@ QString MainWindow::examplesDirectory() const
     return {};
 }
 
+bool MainWindow::modelChosen() const
+{
+    const auto& m = doc_->model();
+    return newProjectChosen_ || !doc_->path().isEmpty() || !m.nodes().empty() || !m.links().empty();
+}
+
 void MainWindow::rebuildForDialect()
 {
     const Dialect d = doc_->model().dialect();
+    const bool chosen = modelChosen();
+    toolsForModel_ = chosen;
     for (QAction* a : addActions_)
     {
         toolGroup_->removeAction(a);
@@ -1019,21 +1033,25 @@ void MainWindow::rebuildForDialect()
         mainBar_->insertAction(anchor, a);
         addActions_ << a;
     };
-    for (const auto& k : core::elementKinds(d, Category::Node))
-        addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddNode);
-    addMenu_->addSeparator();
-    for (const auto& k : core::elementKinds(d, Category::Link))
-        addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddLink);
-    if (d == Dialect::Swmm)
+    if (chosen)
     {
+        for (const auto& k : core::elementKinds(d, Category::Node))
+            addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddNode);
         addMenu_->addSeparator();
-        addTool("Subcatchment", tr("Subcatchment"), MapView::Tool::AddArea);
-        addTool("RainGage", tr("Rain gage"), MapView::Tool::AddGage);
+        for (const auto& k : core::elementKinds(d, Category::Link))
+            addTool(QString::fromStdString(k), coreText(k), MapView::Tool::AddLink);
+        if (d == Dialect::Swmm)
+        {
+            addMenu_->addSeparator();
+            addTool("Subcatchment", tr("Subcatchment"), MapView::Tool::AddArea);
+            addTool("RainGage", tr("Rain gage"), MapView::Tool::AddGage);
+        }
     }
+    addMenu_->menuAction()->setEnabled(chosen);
     selectAct_->setChecked(true);
     map_->setTool(MapView::Tool::Select);
-    msxAction_->setVisible(d == Dialect::Epanet);
-    msxFileAct_->setVisible(d == Dialect::Epanet);
+    msxAction_->setVisible(chosen && d == Dialect::Epanet);
+    msxFileAct_->setVisible(chosen && d == Dialect::Epanet);
     rebuildEngineChoices();
     if (!doc_->settings().backdropImage.empty() && !doc_->path().isEmpty())
     {
@@ -1070,6 +1088,16 @@ void MainWindow::rebuildEngineChoices()
     engineCombo_->blockSignals(true);
     msxCheck_->blockSignals(true);
     engineCombo_->clear();
+    engineCombo_->setEnabled(modelChosen());
+    if (!modelChosen())
+    {
+        // No item data: currentEngine() is null, so nothing can run until a model is chosen.
+        engineCombo_->addItem(tr("Open or create a model"));
+        msxCheck_->setChecked(false);
+        engineCombo_->blockSignals(false);
+        msxCheck_->blockSignals(false);
+        return;
+    }
     std::string wanted = doc_->engineChoice().engineId;
     if (const auto* desc = registry_.descriptor(wanted); desc && desc->multiSpecies)
         wanted = desc->baseEngineId;
@@ -1154,6 +1182,7 @@ void MainWindow::updateCompatibility()
     if (!desc)
     {
         compatibilityPass_ = false;
+        engineLabel_->clear();
         runAct_->setEnabled(false);
         return;
     }
@@ -1291,6 +1320,7 @@ void MainWindow::newProject(Dialect dialect)
     NewProjectDialog dlg(dialect, this);
     if (dlg.exec() != QDialog::Accepted)
         return;
+    newProjectChosen_ = true;
     doc_->newProject(dialect, dlg.flowUnits());
     tabs_->setCurrentWidget(mapPage_);
     mapPage_->setStartVisible(false);

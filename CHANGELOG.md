@@ -4,6 +4,7 @@
 
 - Interface in Hebrew (right to left), Brazilian Portuguese, French, Italian, German and Traditional Chinese.
 - Fix: a SWMM model no longer lists the EPANET-only analyses (resilience tools, fire flow, pipe criticality) or the MSX file choice; *Analysis* offers network topology only.
+- Until a model is created or opened, the engine list reads "Open or create a model" and the MSX option and drawing tools are hidden, instead of offering EPANET engines before a model type is chosen.
 
 ## 0.2.2 (2026-10-23)
 
