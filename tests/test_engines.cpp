@@ -371,6 +371,60 @@ TEST_CASE("engines: SWMM5+ gets inflows at dead-end junctions and refuses termin
     CHECK(engine::checkCompatibility(terminal, *registry().descriptor("swmm-5.2-epa")).runnable());
 }
 
+TEST_CASE("engines: SWMM5+ gets inflow time series that reach the end of the simulation")
+{
+    // Inflow1 ends at 6:00 in a 12 h simulation; SWMM5+ stops when an inflow
+    // has no data up to the end, EPA SWMM takes it as zero after its last point.
+    const fs::path original = example("swmm/mirab-quality.inp");
+    const auto model = core::Model::fromFile(original);
+    const auto series = core::shortInflowSeries(model);
+    CHECK_EQ(series.size(), std::size_t(1));
+    CHECK_EQ(series.at(0).name, std::string("Inflow1"));
+    CHECK_NEAR(series.at(0).endSeconds, 6 * 3600.0, 1e-9);
+    // Its last value is already zero: one row an hour past the end is enough.
+    CHECK(series.at(0).zeroRows == std::vector<std::vector<std::string>>({{"Inflow1", "13", "0"}}));
+
+    const auto* s5p = registry().descriptor("swmm5plus-1.0");
+    CHECK(core::shortInflowSeries(core::Model::fromText(engine::prepareInput(model, *s5p))).empty());
+
+    // With only this change, the same model as EPA SWMM reads it: identical results.
+    engine::EngineDescriptor seriesOnly = *registry().descriptor("swmm-5.2-epa");
+    seriesOnly.support = {{core::Feature::SwmmShortInflowSeries, engine::Support::Ignored}};
+    const std::string text = engine::prepareInput(model, seriesOnly);
+    const fs::path prepared = scratch("quality-continued.inp");
+    std::ofstream(prepared, std::ios::binary) << text;
+    const auto a = run("swmm-5.2-epa", original);
+    const auto b = run("swmm-5.2-epa", prepared);
+    CHECK_EQ(a.periodCount(), b.periodCount());
+    const auto* la = a.table("link");
+    const auto* lb = b.table("link");
+    const int flow = la->variableIndex("Flow");
+    for (const char* id : {"C1", "C2", "C3", "C4", "C5"})
+    {
+        for (int p = 0; p < a.periodCount(); ++p)
+            CHECK_NEAR(la->value(p, flow, la->elementIndex(id)), lb->value(p, flow, lb->elementIndex(id)), 1e-6);
+    }
+
+    // A dated series that ends on a non-zero value drops to zero a second
+    // later, and keeps its date format.
+    std::string dated = model.toText();
+    const auto at = dated.find("Inflow1          0:00");
+    dated.insert(at, "Dated1 01/01/2026 00:00 0.02\nDated1 01/01/2026 04:30 0.03\n");
+    const auto inflow = dated.find("J2               TSS");
+    dated.insert(inflow, "J3               FLOW             Dated1           FLOW     1.0      1.0      0\n");
+    bool found = false;
+    for (const auto& s : core::shortInflowSeries(core::Model::fromText(dated)))
+    {
+        if (s.name != "Dated1")
+            continue;
+        found = true;
+        CHECK_NEAR(s.endSeconds, 4.5 * 3600.0, 1e-9);
+        CHECK(s.zeroRows == std::vector<std::vector<std::string>>(
+                                {{"Dated1", "01/01/2026", "04:30:01", "0"}, {"Dated1", "01/01/2026", "13:00:00", "0"}}));
+    }
+    CHECK(found);
+}
+
 namespace
 {
 /// Values of one period, table by table (the order of a frame event).

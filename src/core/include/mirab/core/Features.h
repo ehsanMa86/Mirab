@@ -54,8 +54,9 @@ enum class Feature
     SwmmNonDynamicRouting,
     SwmmInertialDamping,
     SwmmControls,
-    SwmmDeadEndJunctions, ///< upstream end junctions with no inflow of their own
-    SwmmTerminalJunctions ///< junctions where a link ends and no other link leaves
+    SwmmDeadEndJunctions,  ///< upstream end junctions with no inflow of their own
+    SwmmTerminalJunctions, ///< junctions where a link ends and no other link leaves
+    SwmmShortInflowSeries  ///< [INFLOWS] time series that end before the simulation
 };
 
 const char* featureName(Feature f);
@@ -77,6 +78,19 @@ struct DeadEndJunctions
     std::vector<std::string> terminal;      ///< the link ends at them
 };
 DeadEndJunctions deadEndJunctions(const Model& model);
+
+/// An inflow time series (inline data of [TIMESERIES]) whose last point lies
+/// before the end of the simulation. EPA SWMM takes such an inflow as zero
+/// after the last point.
+struct ShortInflowSeries
+{
+    std::string name;
+    double endSeconds = 0.0; ///< last point, from the simulation start
+    /// [TIMESERIES] rows that continue the series with zero past the end of
+    /// the simulation, in the series' own time format.
+    std::vector<std::vector<std::string>> zeroRows;
+};
+std::vector<ShortInflowSeries> shortInflowSeries(const Model& model);
 
 /// Feature that the data of a section needs, e.g. [POLLUTANTS] needs SWMM
 /// water quality. @p tokens refines the answer for rows whose meaning depends

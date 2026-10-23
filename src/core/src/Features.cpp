@@ -27,6 +27,8 @@
 #include "mirab/core/Text.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <map>
 #include <set>
 
@@ -75,6 +77,8 @@ const char* featureName(Feature f)
         return "Dead-end junctions without inflow";
     case Feature::SwmmTerminalJunctions:
         return "Terminal junctions";
+    case Feature::SwmmShortInflowSeries:
+        return "Inflow time series shorter than the simulation";
     }
     return "?";
 }
@@ -151,6 +155,106 @@ DeadEndJunctions deadEndJunctions(const Model& model)
     return out;
 }
 
+std::vector<ShortInflowSeries> shortInflowSeries(const Model& model)
+{
+    std::vector<ShortInflowSeries> out;
+    const InpDocument& doc = model.document();
+    const InpSection* inflows = doc.find("INFLOWS");
+    const InpSection* series = doc.find("TIMESERIES");
+    const double duration = model.durationSeconds();
+    if (model.dialect() != Dialect::Swmm || !inflows || !series || duration <= 0.0)
+        return out;
+    std::set<std::string> used;
+    for (const auto& t : inflows->allRowTokens())
+    {
+        if (t.size() > 2 && !t[2].empty() && t[2] != "\"\"")
+            used.insert(text::toUpper(t[2]));
+    }
+    // Dated points are compared with the simulation start.
+    long long startDays = 0;
+    const bool haveStart = parseSwmmDate(model.option("START_DATE"), startDays);
+    const double start = static_cast<double>(startDays) * 86400.0 +
+                         text::parseClockOrDuration(model.option("START_TIME")).value_or(0.0);
+
+    struct Points
+    {
+        std::string name;
+        bool readable = true; ///< inline data that parses
+        bool dated = false;
+        long long date = 0;  ///< carried from the last date token, as SWMM does
+        bool any = false;
+        double end = 0.0;
+        double last = 0.0;
+    };
+    std::vector<Points> all;
+    std::map<std::string, std::size_t> index;
+    for (const auto& t : series->allRowTokens())
+    {
+        if (t.empty() || !used.count(text::toUpper(t[0])))
+            continue;
+        auto [it, added] = index.emplace(text::toUpper(t[0]), all.size());
+        if (added)
+            all.push_back({t[0]});
+        Points& p = all[it->second];
+        if (t.size() > 1 && text::iequals(t[1], "FILE"))
+            p.readable = false;
+        for (std::size_t i = 1; p.readable && i < t.size();)
+        {
+            if (t[i].find('/') != std::string::npos)
+            {
+                p.readable = haveStart && parseSwmmDate(t[i], p.date);
+                p.dated = true;
+                ++i;
+                continue;
+            }
+            const auto clock = text::parseClockOrDuration(t[i]);
+            const auto value = i + 1 < t.size() ? text::toDouble(t[i + 1]) : std::nullopt;
+            if (!clock || !value)
+            {
+                p.readable = false;
+                break;
+            }
+            p.end = p.dated ? static_cast<double>(p.date) * 86400.0 + *clock - start : *clock;
+            p.last = *value;
+            p.any = true;
+            i += 2;
+        }
+    }
+    auto timeTokens = [&](const Points& p, double seconds) {
+        if (!p.dated)
+            return std::vector<std::string>{text::formatDouble(seconds / 3600.0)};
+        const double at = start + seconds;
+        const long long days = static_cast<long long>(std::floor(at / 86400.0));
+        const int clock = static_cast<int>(std::lround(at - static_cast<double>(days) * 86400.0));
+        int y = 0, m = 0, d = 0;
+        civilFromDays(days, y, m, d);
+        char date[16], time[16];
+        std::snprintf(date, sizeof date, "%02d/%02d/%04d", m, d, y);
+        std::snprintf(time, sizeof time, "%02d:%02d:%02d", clock / 3600, clock / 60 % 60, clock % 60);
+        return std::vector<std::string>{date, time};
+    };
+    for (const auto& p : all)
+    {
+        if (!p.readable || !p.any || p.end > duration)
+            continue;
+        ShortInflowSeries s{p.name, p.end, {}};
+        auto row = [&](double seconds) {
+            std::vector<std::string> r{p.name};
+            for (auto& tok : timeTokens(p, seconds))
+                r.push_back(tok);
+            r.push_back("0");
+            s.zeroRows.push_back(r);
+        };
+        // The inflow drops to zero right after the last point, then stays
+        // there an hour past the end of the simulation.
+        if (p.last != 0.0)
+            row(p.end + 1.0);
+        row(duration + 3600.0);
+        out.push_back(std::move(s));
+    }
+    return out;
+}
+
 std::vector<FeatureUse> detectFeatures(const Model& model)
 {
     std::vector<FeatureUse> out;
@@ -223,6 +327,11 @@ std::vector<FeatureUse> detectFeatures(const Model& model)
         if (!ends.terminal.empty())
             out.push_back({Feature::SwmmTerminalJunctions, idList(ends.terminal), "JUNCTIONS",
                            nodeRow(model, ends.terminal.front())});
+        std::vector<std::string> shortSeries;
+        for (const auto& s : shortInflowSeries(model))
+            shortSeries.push_back(s.name + " ends at " + text::formatDuration(s.endSeconds));
+        if (!shortSeries.empty())
+            out.push_back({Feature::SwmmShortInflowSeries, idList(shortSeries), "TIMESERIES", 0});
     }
     return out;
 }

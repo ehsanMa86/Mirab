@@ -96,7 +96,6 @@ void exitDuringRun()
 {
     if (!g_running.load())
         return;
-    // SWMM5+'s own messages may still be buffered and follow this line.
     std::fputs("\nerror: SWMM5+ stopped the program during the simulation; its messages give the cause\n",
                stderr);
     std::fflush(stderr);
@@ -282,6 +281,17 @@ public:
 
     bool load(std::string* error) override
     {
+        // SWMM5+ writes its messages with Fortran PRINT. Unbuffered, they
+        // are not lost when it stops the program (see exitDuringRun). The
+        // Fortran runtime reads this when the library loads.
+        if (!std::getenv("GFORTRAN_UNBUFFERED_PRECONNECTED"))
+        {
+#if defined(_WIN32)
+            _putenv_s("GFORTRAN_UNBUFFERED_PRECONNECTED", "y");
+#else
+            setenv("GFORTRAN_UNBUFFERED_PRECONNECTED", "y", 0);
+#endif
+        }
         if (!lib_.open(libraryPath_, error))
             return false;
         std::string missing;
