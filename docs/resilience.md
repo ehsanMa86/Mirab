@@ -1,6 +1,6 @@
 # Resilience tools
 
-Mirab implements five analyses natively in C++. They are available in *Analysis > Resilience tools* and through `mirab-cli resilience`. All pressures and flows are in the units of the model.
+Mirab implements five analyses natively in C++. They are available in *Analysis > Resilience tools* and through `mirab-cli resilience`. All pressures and flows are in the units of the model. With a SWMM model open, only the network topology analysis is offered (*Analysis > Network topology*); the others need EPANET hydraulics.
 
 ## Todini resilience index
 
