@@ -149,7 +149,7 @@ DeadEndJunctions deadEndJunctions(const Model& model)
         const int ends = ending.count(key) ? ending[key] : 0;
         if (leaves == 1 && ends == 0 && !inflow.count(key))
             out.withoutInflow.push_back(n.id);
-        else if (leaves == 0 && ends == 1)
+        else if (leaves == 0 && ends >= 1)
             out.terminal.push_back(n.id);
     }
     return out;
@@ -167,7 +167,8 @@ std::vector<ShortInflowSeries> shortInflowSeries(const Model& model)
     std::set<std::string> used;
     for (const auto& t : inflows->allRowTokens())
     {
-        if (t.size() > 2 && !t[2].empty() && t[2] != "\"\"")
+        // Pollutant rows are left out: SWMM5+ does not model pollutants.
+        if (t.size() > 2 && text::iequals(t[1], "FLOW") && !t[2].empty() && t[2] != "\"\"")
             used.insert(text::toUpper(t[2]));
     }
     // Dated points are compared with the simulation start.
@@ -200,7 +201,8 @@ std::vector<ShortInflowSeries> shortInflowSeries(const Model& model)
             p.readable = false;
         for (std::size_t i = 1; p.readable && i < t.size();)
         {
-            if (t[i].find('/') != std::string::npos)
+            // SWMM writes dates with '/' or '-'; times never contain either.
+            if (t[i].find_first_of("/-") != std::string::npos)
             {
                 p.readable = haveStart && parseSwmmDate(t[i], p.date);
                 p.dated = true;

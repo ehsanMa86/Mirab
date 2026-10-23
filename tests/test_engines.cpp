@@ -369,6 +369,13 @@ TEST_CASE("engines: SWMM5+ gets inflows at dead-end junctions and refuses termin
         named |= i.level == engine::Support::Unsupported && i.message.find("J6") != std::string::npos;
     CHECK(named);
     CHECK(engine::checkCompatibility(terminal, *registry().descriptor("swmm-5.2-epa")).runnable());
+
+    // Two links ending at the junction crash SWMM5+ too ("unexpected null link").
+    insertAfter("[CONDUITS]", "C7 J3 J6 90 0.013 0 0 0 0");
+    insertAfter("[XSECTIONS]", "C7 CIRCULAR 0.3 0 0 0 1");
+    const auto twoIn = core::Model::fromText(text);
+    CHECK(core::deadEndJunctions(twoIn).terminal == std::vector<std::string>({"J6"}));
+    CHECK(!engine::checkCompatibility(twoIn, *s5p).runnable());
 }
 
 TEST_CASE("engines: SWMM5+ gets inflow time series that reach the end of the simulation")
@@ -406,15 +413,18 @@ TEST_CASE("engines: SWMM5+ gets inflow time series that reach the end of the sim
     }
 
     // A dated series that ends on a non-zero value drops to zero a second
-    // later, and keeps its date format.
+    // later, and keeps its date format; SWMM also writes dates with '-'.
+    // A series that only a pollutant uses is left alone.
     std::string dated = model.toText();
     const auto at = dated.find("Inflow1          0:00");
-    dated.insert(at, "Dated1 01/01/2026 00:00 0.02\nDated1 01/01/2026 04:30 0.03\n");
+    dated.insert(at, "Dated1 01/01/2026 00:00 0.02\nDated1 01-01-2026 04:30 0.03\nTss1 0:00 10\nTss1 1:00 20\n");
     const auto inflow = dated.find("J2               TSS");
-    dated.insert(inflow, "J3               FLOW             Dated1           FLOW     1.0      1.0      0\n");
+    dated.insert(inflow, "J3               FLOW             Dated1           FLOW     1.0      1.0      0\n"
+                         "J3               TSS              Tss1             CONCEN   1.0      1.0      0\n");
     bool found = false;
     for (const auto& s : core::shortInflowSeries(core::Model::fromText(dated)))
     {
+        CHECK(s.name != "Tss1");
         if (s.name != "Dated1")
             continue;
         found = true;

@@ -71,11 +71,13 @@ struct FeatureUse
 
 std::vector<FeatureUse> detectFeatures(const Model& model);
 
-/// SWMM junctions connected to a single link.
+/// SWMM junctions where the network stops.
 struct DeadEndJunctions
 {
-    std::vector<std::string> withoutInflow; ///< the link leaves them; no FLOW row in [INFLOWS] or [DWF]
-    std::vector<std::string> terminal;      ///< the link ends at them
+    /// One link, which leaves them, and no FLOW row in [INFLOWS] or [DWF].
+    std::vector<std::string> withoutInflow;
+    /// Links end at them and none leaves.
+    std::vector<std::string> terminal;
 };
 DeadEndJunctions deadEndJunctions(const Model& model);
 
