@@ -53,7 +53,9 @@ enum class Feature
     SwmmStreetsAndInlets,
     SwmmNonDynamicRouting,
     SwmmInertialDamping,
-    SwmmControls
+    SwmmControls,
+    SwmmDeadEndJunctions, ///< upstream end junctions with no inflow of their own
+    SwmmTerminalJunctions ///< junctions where a link ends and no other link leaves
 };
 
 const char* featureName(Feature f);
@@ -67,6 +69,14 @@ struct FeatureUse
 };
 
 std::vector<FeatureUse> detectFeatures(const Model& model);
+
+/// SWMM junctions connected to a single link.
+struct DeadEndJunctions
+{
+    std::vector<std::string> withoutInflow; ///< the link leaves them; no FLOW row in [INFLOWS] or [DWF]
+    std::vector<std::string> terminal;      ///< the link ends at them
+};
+DeadEndJunctions deadEndJunctions(const Model& model);
 
 /// Feature that the data of a section needs, e.g. [POLLUTANTS] needs SWMM
 /// water quality. @p tokens refines the answer for rows whose meaning depends

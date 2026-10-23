@@ -323,6 +323,54 @@ TEST_CASE("engines: SWMM5+ manifest adapts SWMM 5.2 models")
     CHECK(engine::checkCompatibility(model, *swmm).issues.empty());
 }
 
+TEST_CASE("engines: SWMM5+ gets inflows at dead-end junctions and refuses terminal ones")
+{
+    // J1 and J4 start a branch and receive only runoff. SWMM5+ turns a
+    // dead-end junction into an upstream boundary only when it has an
+    // inflow, and stops the program otherwise.
+    const auto model = core::Model::fromFile(example("swmm/mirab-urban.inp"));
+    const auto ends = core::deadEndJunctions(model);
+    CHECK(ends.withoutInflow == std::vector<std::string>({"J1", "J4"}));
+    CHECK(ends.terminal.empty());
+
+    const auto* s5p = registry().descriptor("swmm5plus-1.0");
+    std::vector<std::string> notes;
+    const auto prepared = core::Model::fromText(engine::prepareInput(model, *s5p, &notes));
+    const auto* inflows = prepared.document().find("INFLOWS");
+    CHECK(inflows != nullptr);
+    CHECK_EQ(inflows->rowCount(), 2);
+    for (int r = 0; r < inflows->rowCount(); ++r)
+    {
+        const auto t = inflows->rowTokens(r);
+        CHECK_EQ(t.at(1), std::string("FLOW"));
+        CHECK_EQ(std::stod(t.at(6)), 0.0);
+    }
+    CHECK(core::deadEndJunctions(prepared).withoutInflow.empty());
+    std::string all;
+    for (const auto& n : notes)
+        all += n + "\n";
+    CHECK(all.find("J1, J4") != std::string::npos);
+
+    // A conduit that ends at a junction: SWMM5+ cannot run it, SWMM 5.2 can.
+    std::string text = model.toText();
+    const auto insertAfter = [&](const std::string& header, const std::string& row) {
+        const auto at = text.find('\n', text.find(header)) + 1;
+        text.insert(at, row + "\n");
+    };
+    insertAfter("[JUNCTIONS]", "J6 97.5 3 0 0 0");
+    insertAfter("[CONDUITS]", "C6 J5 J6 80 0.013 0 0 0 0");
+    insertAfter("[XSECTIONS]", "C6 CIRCULAR 0.3 0 0 0 1");
+    const auto terminal = core::Model::fromText(text);
+    CHECK(core::deadEndJunctions(terminal).terminal == std::vector<std::string>({"J6"}));
+    const auto report = engine::checkCompatibility(terminal, *s5p);
+    CHECK(!report.runnable());
+    bool named = false;
+    for (const auto& i : report.issues)
+        named |= i.level == engine::Support::Unsupported && i.message.find("J6") != std::string::npos;
+    CHECK(named);
+    CHECK(engine::checkCompatibility(terminal, *registry().descriptor("swmm-5.2-epa")).runnable());
+}
+
 namespace
 {
 /// Values of one period, table by table (the order of a frame event).
@@ -698,8 +746,10 @@ TEST_CASE("engines: SWMM5+ input preparation removes every ignored feature")
     for (const char* s : {"POLLUTANTS", "LANDUSES", "COVERAGES", "LOADINGS", "BUILDUP", "WASHOFF", "TREATMENT",
                           "LID_CONTROLS", "LID_USAGE"})
         CHECK(!doc.has(s));
-    CHECK_EQ(doc.find("INFLOWS")->rowCount(), 1);
+    // J1's flow inflow stays; the dead-end J4 has none and gets a zero one.
+    CHECK_EQ(doc.find("INFLOWS")->rowCount(), 2);
     CHECK_EQ(doc.find("INFLOWS")->rowTokens(0).at(1), std::string("FLOW"));
+    CHECK_EQ(doc.find("INFLOWS")->rowTokens(1).at(0), std::string("J4"));
     CHECK_EQ(doc.find("DWF")->rowCount(), 1);
     CHECK_EQ(text::splitInpLine(prepared.option("FLOW_ROUTING")).tokens.at(0), std::string("DYNWAVE"));
     CHECK_EQ(text::splitInpLine(prepared.option("INERTIAL_DAMPING")).tokens.at(0), std::string("NONE"));

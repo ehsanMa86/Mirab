@@ -198,7 +198,7 @@ std::vector<std::string> coreStrings()
             add(t.description);
         }
     }
-    for (int f = 0; f <= static_cast<int>(core::Feature::SwmmControls); ++f)
+    for (int f = 0; f <= static_cast<int>(core::Feature::SwmmTerminalJunctions); ++f)
         add(core::featureName(static_cast<core::Feature>(f)));
     for (const auto& e : engine::builtinDescriptors())
         add(e.description);
