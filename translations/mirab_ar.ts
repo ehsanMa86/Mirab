@@ -8984,6 +8984,18 @@ pervious</source>
         <source>Time</source>
         <translation>الزمن</translation>
     </message>
+    <message>
+        <source>Second result to plot; a result in another unit uses the right axis</source>
+        <translation>نتيجة ثانية للرسم؛ تستخدم النتيجة ذات الوحدة المختلفة المحور الأيمن</translation>
+    </message>
+    <message>
+        <source>No second result</source>
+        <translation>بدون نتيجة ثانية</translation>
+    </message>
+    <message>
+        <source>%1 observed</source>
+        <translation>‏%1 (مرصود)</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::RowForm</name>
@@ -9867,10 +9879,6 @@ pervious</source>
         <translation>السلاسل الزمنية</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs.</source>
-        <translation>قارن نتيجة واحدة لعدة عناصر على مدى المحاكاة. أضف العنصر المحدد على الخريطة، أو اكتب المعرّفات.</translation>
-    </message>
-    <message>
         <source>Export CSV</source>
         <translation>تصدير CSV</translation>
     </message>
@@ -9903,10 +9911,6 @@ pervious</source>
         <translation>العناصر</translation>
     </message>
     <message>
-        <source>Result</source>
-        <translation>النتيجة</translation>
-    </message>
-    <message>
         <source>Run a simulation to plot results.</source>
         <translation>شغّل محاكاة لرسم النتائج.</translation>
     </message>
@@ -9923,10 +9927,6 @@ pervious</source>
         <translation>الزمن</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
-        <translation>قارن نتيجة واحدة لعدة عناصر على مدى المحاكاة. أضف العنصر المحدد على الخريطة، أو اكتب المعرّفات. يعرض «النظام» مجاميع النموذج بأكمله.</translation>
-    </message>
-    <message>
         <source>System</source>
         <translation>النظام</translation>
     </message>
@@ -9937,6 +9937,30 @@ pervious</source>
     <message>
         <source>%1 is available when the simulation ends.</source>
         <translation>يتوفر %1 عند انتهاء المحاكاة.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis. System shows the totals of the whole model.</source>
+        <translation>ارسم نتائج عدة عناصر على مدى المحاكاة. أضف العنصر المحدد على الخريطة أو اكتب المعرّفات، ثم حدّد النتائج المراد رسمها؛ تستخدم الوحدة الثانية المحور الأيمن. يعرض «النظام» مجاميع النموذج بأكمله.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis.</source>
+        <translation>ارسم نتائج عدة عناصر على مدى المحاكاة. أضف العنصر المحدد على الخريطة أو اكتب المعرّفات، ثم حدّد النتائج المراد رسمها؛ تستخدم الوحدة الثانية المحور الأيمن.</translation>
+    </message>
+    <message>
+        <source>Results to plot: one unit on the left axis and a second one on the right</source>
+        <translation>النتائج المراد رسمها: وحدة على المحور الأيسر ووحدة ثانية على المحور الأيمن</translation>
+    </message>
+    <message>
+        <source>Results</source>
+        <translation>النتائج</translation>
+    </message>
+    <message>
+        <source>Two units are plotted already. Uncheck a result to choose one in another unit.</source>
+        <translation>تم رسم وحدتين بالفعل. ألغِ تحديد إحدى النتائج لاختيار نتيجة بوحدة أخرى.</translation>
+    </message>
+    <message>
+        <source>Check a result to plot.</source>
+        <translation>حدّد نتيجة لرسمها.</translation>
     </message>
 </context>
 <context>

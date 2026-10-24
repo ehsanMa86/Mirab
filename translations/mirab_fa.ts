@@ -8824,6 +8824,18 @@ pervious</source>
         <source>Time</source>
         <translation>زمان</translation>
     </message>
+    <message>
+        <source>Second result to plot; a result in another unit uses the right axis</source>
+        <translation>نتیجه دوم برای رسم؛ نتیجه‌ای با واحد دیگر از محور سمت راست استفاده می‌کند</translation>
+    </message>
+    <message>
+        <source>No second result</source>
+        <translation>بدون نتیجه دوم</translation>
+    </message>
+    <message>
+        <source>%1 observed</source>
+        <translation>‏%1 مشاهده‌شده</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::RowForm</name>
@@ -9687,10 +9699,6 @@ pervious</source>
         <translation>سری زمانی</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs.</source>
-        <translation>مقایسه یک نتیجه برای چند عنصر در طول شبیه‌سازی. عنصر انتخاب‌شده روی نقشه را اضافه کنید یا شناسه‌ها را تایپ کنید.</translation>
-    </message>
-    <message>
         <source>Export CSV</source>
         <translation>خروجی CSV</translation>
     </message>
@@ -9723,10 +9731,6 @@ pervious</source>
         <translation>عناصر</translation>
     </message>
     <message>
-        <source>Result</source>
-        <translation>نتیجه</translation>
-    </message>
-    <message>
         <source>Run a simulation to plot results.</source>
         <translation>برای رسم نتایج، یک شبیه‌سازی اجرا کنید.</translation>
     </message>
@@ -9743,10 +9747,6 @@ pervious</source>
         <translation>زمان</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
-        <translation>مقایسه یک نتیجه برای چند عنصر در طول شبیه‌سازی. عنصر انتخاب‌شده روی نقشه را اضافه کنید یا شناسه‌ها را تایپ کنید. «سیستم» مجموع‌های کل مدل را نشان می‌دهد.</translation>
-    </message>
-    <message>
         <source>System</source>
         <translation>سیستم</translation>
     </message>
@@ -9757,6 +9757,30 @@ pervious</source>
     <message>
         <source>%1 is available when the simulation ends.</source>
         <translation>‏%1 پس از پایان شبیه‌سازی در دسترس است.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis. System shows the totals of the whole model.</source>
+        <translation>نتایج چند عنصر را در طول شبیه‌سازی رسم کنید. عنصر انتخاب‌شده روی نقشه را اضافه کنید یا شناسه‌ها را تایپ کنید، سپس نتایج موردنظر را علامت بزنید؛ واحد دوم روی محور سمت راست نمایش داده می‌شود. «سیستم» مجموع‌های کل مدل را نشان می‌دهد.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis.</source>
+        <translation>نتایج چند عنصر را در طول شبیه‌سازی رسم کنید. عنصر انتخاب‌شده روی نقشه را اضافه کنید یا شناسه‌ها را تایپ کنید، سپس نتایج موردنظر را علامت بزنید؛ واحد دوم روی محور سمت راست نمایش داده می‌شود.</translation>
+    </message>
+    <message>
+        <source>Results to plot: one unit on the left axis and a second one on the right</source>
+        <translation>نتایج برای رسم: یک واحد روی محور چپ و واحد دوم روی محور راست</translation>
+    </message>
+    <message>
+        <source>Results</source>
+        <translation>نتایج</translation>
+    </message>
+    <message>
+        <source>Two units are plotted already. Uncheck a result to choose one in another unit.</source>
+        <translation>دو واحد از قبل رسم شده‌اند. برای انتخاب نتیجه‌ای با واحد دیگر، علامت یکی از نتایج را بردارید.</translation>
+    </message>
+    <message>
+        <source>Check a result to plot.</source>
+        <translation>یک نتیجه را برای رسم علامت بزنید.</translation>
     </message>
 </context>
 <context>

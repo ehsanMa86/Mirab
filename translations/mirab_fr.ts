@@ -8856,6 +8856,18 @@ perméable</translation>
         <source>Time</source>
         <translation>Temps</translation>
     </message>
+    <message>
+        <source>Second result to plot; a result in another unit uses the right axis</source>
+        <translation>Second résultat à tracer&#xa0;; un résultat dans une autre unité utilise l&apos;axe de droite</translation>
+    </message>
+    <message>
+        <source>No second result</source>
+        <translation>Aucun second résultat</translation>
+    </message>
+    <message>
+        <source>%1 observed</source>
+        <translation>%1 observé</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::RowForm</name>
@@ -9723,10 +9735,6 @@ perméable</translation>
         <translation>Séries temporelles</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs.</source>
-        <translation>Comparez un résultat pour plusieurs éléments au cours de la simulation. Ajoutez l&apos;élément sélectionné sur la carte ou saisissez des ID.</translation>
-    </message>
-    <message>
         <source>Export CSV</source>
         <translation>Exporter en CSV</translation>
     </message>
@@ -9759,10 +9767,6 @@ perméable</translation>
         <translation>Éléments</translation>
     </message>
     <message>
-        <source>Result</source>
-        <translation>Résultat</translation>
-    </message>
-    <message>
         <source>Run a simulation to plot results.</source>
         <translation>Lancez une simulation pour représenter des résultats.</translation>
     </message>
@@ -9779,10 +9783,6 @@ perméable</translation>
         <translation>Temps</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
-        <translation>Comparez un résultat pour plusieurs éléments au cours de la simulation. Ajoutez l&apos;élément sélectionné sur la carte ou saisissez des ID. Système affiche les totaux de tout le modèle.</translation>
-    </message>
-    <message>
         <source>System</source>
         <translation>Système</translation>
     </message>
@@ -9793,6 +9793,30 @@ perméable</translation>
     <message>
         <source>%1 is available when the simulation ends.</source>
         <translation>%1 sera disponible à la fin de la simulation.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis. System shows the totals of the whole model.</source>
+        <translation>Tracez les résultats de plusieurs éléments au cours de la simulation. Ajoutez l&apos;élément sélectionné sur la carte ou saisissez des ID, puis cochez les résultats à tracer&#xa0;; une seconde unité utilise l&apos;axe de droite. Système affiche les totaux de tout le modèle.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis.</source>
+        <translation>Tracez les résultats de plusieurs éléments au cours de la simulation. Ajoutez l&apos;élément sélectionné sur la carte ou saisissez des ID, puis cochez les résultats à tracer&#xa0;; une seconde unité utilise l&apos;axe de droite.</translation>
+    </message>
+    <message>
+        <source>Results to plot: one unit on the left axis and a second one on the right</source>
+        <translation>Résultats à tracer&#xa0;: une unité sur l&apos;axe de gauche et une seconde sur celui de droite</translation>
+    </message>
+    <message>
+        <source>Results</source>
+        <translation>Résultats</translation>
+    </message>
+    <message>
+        <source>Two units are plotted already. Uncheck a result to choose one in another unit.</source>
+        <translation>Deux unités sont déjà tracées. Décochez un résultat pour en choisir un dans une autre unité.</translation>
+    </message>
+    <message>
+        <source>Check a result to plot.</source>
+        <translation>Cochez un résultat à tracer.</translation>
     </message>
 </context>
 <context>
