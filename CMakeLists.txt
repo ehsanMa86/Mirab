@@ -23,7 +23,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(Mirab
-    VERSION 0.2.2
+    VERSION 0.2.4
     DESCRIPTION "Unified modeling environment for water distribution and stormwater systems"
     HOMEPAGE_URL "https://github.com/ehsanMa86/Mirab"
     LANGUAGES C CXX)
