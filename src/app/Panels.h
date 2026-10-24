@@ -62,6 +62,7 @@ private:
 
     ProjectDocument* doc_;
     QComboBox* chartVar_;
+    QComboBox* chartVar2_; ///< optional second result
     QLabel* title_;
     ChartWidget* chart_;
 };

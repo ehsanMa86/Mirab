@@ -8856,6 +8856,18 @@ permeável</translation>
         <source>Time</source>
         <translation>Tempo</translation>
     </message>
+    <message>
+        <source>Second result to plot; a result in another unit uses the right axis</source>
+        <translation>Segundo resultado a plotar; um resultado em outra unidade usa o eixo direito</translation>
+    </message>
+    <message>
+        <source>No second result</source>
+        <translation>Sem segundo resultado</translation>
+    </message>
+    <message>
+        <source>%1 observed</source>
+        <translation>%1 observado</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::RowForm</name>
@@ -9723,10 +9735,6 @@ permeável</translation>
         <translation>Séries temporais</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs.</source>
-        <translation>Compare um resultado de vários elementos ao longo da simulação. Adicione o elemento selecionado no mapa ou digite IDs.</translation>
-    </message>
-    <message>
         <source>Export CSV</source>
         <translation>Exportar CSV</translation>
     </message>
@@ -9759,10 +9767,6 @@ permeável</translation>
         <translation>Elementos</translation>
     </message>
     <message>
-        <source>Result</source>
-        <translation>Resultado</translation>
-    </message>
-    <message>
         <source>Run a simulation to plot results.</source>
         <translation>Execute uma simulação para plotar resultados.</translation>
     </message>
@@ -9777,6 +9781,42 @@ permeável</translation>
     <message>
         <source>Time</source>
         <translation>Tempo</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>Sistema</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>Estes resultados não têm totais do sistema.</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>%1 estará disponível quando a simulação terminar.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis. System shows the totals of the whole model.</source>
+        <translation>Plote resultados de vários elementos ao longo da simulação. Adicione o elemento selecionado no mapa ou digite IDs e marque os resultados a plotar; uma segunda unidade usa o eixo direito. Sistema mostra os totais do modelo inteiro.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis.</source>
+        <translation>Plote resultados de vários elementos ao longo da simulação. Adicione o elemento selecionado no mapa ou digite IDs e marque os resultados a plotar; uma segunda unidade usa o eixo direito.</translation>
+    </message>
+    <message>
+        <source>Results to plot: one unit on the left axis and a second one on the right</source>
+        <translation>Resultados a plotar: uma unidade no eixo esquerdo e outra no direito</translation>
+    </message>
+    <message>
+        <source>Results</source>
+        <translation>Resultados</translation>
+    </message>
+    <message>
+        <source>Two units are plotted already. Uncheck a result to choose one in another unit.</source>
+        <translation>Já há duas unidades no gráfico. Desmarque um resultado para escolher um em outra unidade.</translation>
+    </message>
+    <message>
+        <source>Check a result to plot.</source>
+        <translation>Marque um resultado para plotar.</translation>
     </message>
 </context>
 <context>

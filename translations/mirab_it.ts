@@ -8856,6 +8856,18 @@ permeabile</translation>
         <source>Time</source>
         <translation>Tempo</translation>
     </message>
+    <message>
+        <source>Second result to plot; a result in another unit uses the right axis</source>
+        <translation>Secondo risultato da tracciare; un risultato in un&apos;altra unità usa l&apos;asse destro</translation>
+    </message>
+    <message>
+        <source>No second result</source>
+        <translation>Nessun secondo risultato</translation>
+    </message>
+    <message>
+        <source>%1 observed</source>
+        <translation>%1 osservato</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::RowForm</name>
@@ -9723,10 +9735,6 @@ permeabile</translation>
         <translation>Serie temporali</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs.</source>
-        <translation>Confronta un risultato per più elementi nel corso della simulazione. Aggiungere l&apos;elemento selezionato sulla mappa o digitare gli ID.</translation>
-    </message>
-    <message>
         <source>Export CSV</source>
         <translation>Esporta CSV</translation>
     </message>
@@ -9759,10 +9767,6 @@ permeabile</translation>
         <translation>Elementi</translation>
     </message>
     <message>
-        <source>Result</source>
-        <translation>Risultato</translation>
-    </message>
-    <message>
         <source>Run a simulation to plot results.</source>
         <translation>Eseguire una simulazione per rappresentare i risultati.</translation>
     </message>
@@ -9777,6 +9781,42 @@ permeabile</translation>
     <message>
         <source>Time</source>
         <translation>Tempo</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>Sistema</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>Questi risultati non contengono totali di sistema.</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>%1 sarà disponibile al termine della simulazione.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis. System shows the totals of the whole model.</source>
+        <translation>Traccia i risultati di più elementi nel corso della simulazione. Aggiungere l&apos;elemento selezionato sulla mappa o digitare gli ID, quindi spuntare i risultati da tracciare; una seconda unità usa l&apos;asse destro. Sistema mostra i totali di tutto il modello.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis.</source>
+        <translation>Traccia i risultati di più elementi nel corso della simulazione. Aggiungere l&apos;elemento selezionato sulla mappa o digitare gli ID, quindi spuntare i risultati da tracciare; una seconda unità usa l&apos;asse destro.</translation>
+    </message>
+    <message>
+        <source>Results to plot: one unit on the left axis and a second one on the right</source>
+        <translation>Risultati da tracciare: un&apos;unità sull&apos;asse sinistro e una seconda su quello destro</translation>
+    </message>
+    <message>
+        <source>Results</source>
+        <translation>Risultati</translation>
+    </message>
+    <message>
+        <source>Two units are plotted already. Uncheck a result to choose one in another unit.</source>
+        <translation>Sono già tracciate due unità. Deselezionare un risultato per sceglierne uno in un&apos;altra unità.</translation>
+    </message>
+    <message>
+        <source>Check a result to plot.</source>
+        <translation>Spuntare un risultato da tracciare.</translation>
     </message>
 </context>
 <context>

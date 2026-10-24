@@ -8856,6 +8856,18 @@ durchl. Fläche</translation>
         <source>Time</source>
         <translation>Zeit</translation>
     </message>
+    <message>
+        <source>Second result to plot; a result in another unit uses the right axis</source>
+        <translation>Zweites darzustellendes Ergebnis; ein Ergebnis in einer anderen Einheit verwendet die rechte Achse</translation>
+    </message>
+    <message>
+        <source>No second result</source>
+        <translation>Kein zweites Ergebnis</translation>
+    </message>
+    <message>
+        <source>%1 observed</source>
+        <translation>%1 gemessen</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::RowForm</name>
@@ -9723,10 +9735,6 @@ durchl. Fläche</translation>
         <translation>Zeitreihen</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs.</source>
-        <translation>Vergleichen Sie ein Ergebnis für mehrere Elemente über die Simulation. Fügen Sie das auf der Karte ausgewählte Element hinzu oder geben Sie IDs ein.</translation>
-    </message>
-    <message>
         <source>Export CSV</source>
         <translation>CSV exportieren</translation>
     </message>
@@ -9759,10 +9767,6 @@ durchl. Fläche</translation>
         <translation>Elemente</translation>
     </message>
     <message>
-        <source>Result</source>
-        <translation>Ergebnis</translation>
-    </message>
-    <message>
         <source>Run a simulation to plot results.</source>
         <translation>Führen Sie eine Simulation aus, um Ergebnisse darzustellen.</translation>
     </message>
@@ -9777,6 +9781,42 @@ durchl. Fläche</translation>
     <message>
         <source>Time</source>
         <translation>Zeit</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>System</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>Diese Ergebnisse enthalten keine Systemsummen.</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>%1 ist verfügbar, wenn die Simulation endet.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis. System shows the totals of the whole model.</source>
+        <translation>Stellen Sie Ergebnisse mehrerer Elemente über die Simulation dar. Fügen Sie das auf der Karte ausgewählte Element hinzu oder geben Sie IDs ein, und markieren Sie die darzustellenden Ergebnisse; eine zweite Einheit verwendet die rechte Achse. System zeigt die Summen des gesamten Modells.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis.</source>
+        <translation>Stellen Sie Ergebnisse mehrerer Elemente über die Simulation dar. Fügen Sie das auf der Karte ausgewählte Element hinzu oder geben Sie IDs ein, und markieren Sie die darzustellenden Ergebnisse; eine zweite Einheit verwendet die rechte Achse.</translation>
+    </message>
+    <message>
+        <source>Results to plot: one unit on the left axis and a second one on the right</source>
+        <translation>Darzustellende Ergebnisse: eine Einheit auf der linken Achse, eine zweite auf der rechten</translation>
+    </message>
+    <message>
+        <source>Results</source>
+        <translation>Ergebnisse</translation>
+    </message>
+    <message>
+        <source>Two units are plotted already. Uncheck a result to choose one in another unit.</source>
+        <translation>Es werden bereits zwei Einheiten dargestellt. Heben Sie die Markierung eines Ergebnisses auf, um eines in einer anderen Einheit zu wählen.</translation>
+    </message>
+    <message>
+        <source>Check a result to plot.</source>
+        <translation>Markieren Sie ein Ergebnis, um es darzustellen.</translation>
     </message>
 </context>
 <context>

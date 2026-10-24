@@ -230,6 +230,32 @@ TEST_CASE("results: .anr files round trip")
     CHECK_NEAR(back.times[2], 1200.0, 1e-9);
 }
 
+TEST_CASE("results: SWMM system totals carry the units of the binary output")
+{
+    auto unitOf = [](const std::vector<core::Variable>& vars, const std::string& name) {
+        for (const auto& v : vars)
+        {
+            if (v.name == name)
+                return v.unit;
+        }
+        return std::string("missing");
+    };
+    const auto us = core::swmmVariables("CFS", {}, {});
+    CHECK_EQ(us.system.size(), std::size_t(15));
+    CHECK_EQ(unitOf(us.system, "Rainfall"), std::string("in/hr"));
+    CHECK_EQ(unitOf(us.system, "Snow Depth"), std::string("in"));
+    CHECK_EQ(unitOf(us.system, "Runoff"), std::string("cfs"));
+    CHECK_EQ(unitOf(us.system, "Outflow"), std::string("cfs"));
+    CHECK_EQ(unitOf(us.system, "Storage Volume"), std::string("ft3"));
+    CHECK_EQ(unitOf(us.system, "Evaporation"), std::string("in/day"));
+    CHECK_EQ(unitOf(us.subcatchment, "Evaporation Loss"), std::string("in/day"));
+    const auto si = core::swmmVariables("LPS", {}, {});
+    CHECK_EQ(unitOf(si.system, "Infiltration"), std::string("mm/hr"));
+    CHECK_EQ(unitOf(si.system, "Flooding"), std::string("LPS"));
+    CHECK_EQ(unitOf(si.system, "Potential ET"), std::string("mm/day"));
+    CHECK_EQ(unitOf(si.system, "Air Temperature"), std::string("\xC2\xB0" "C"));
+}
+
 TEST_CASE("results: base64 matches RFC 4648")
 {
     const char* plain[] = {"", "f", "fo", "foo", "foob", "fooba", "foobar"};

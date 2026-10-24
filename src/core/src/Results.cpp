@@ -485,8 +485,8 @@ SwmmVariables swmmVariables(const std::string& flowUnits,
     const std::string fl = units.label("flow");
     SwmmVariables v;
     v.subcatchment = {{"Rainfall", units.label("rainfall")},
-                      {"Snow Depth", units.system == UnitSystem::SI ? "mm" : "in"},
-                      {"Evaporation Loss", units.label("rainfall")},
+                      {"Snow Depth", units.label("smalldepth")},
+                      {"Evaporation Loss", units.label("evaporation")},
                       {"Infiltration Loss", units.label("rainfall")},
                       {"Runoff", fl},
                       {"Groundwater Flow", fl},
@@ -506,13 +506,22 @@ SwmmVariables swmmVariables(const std::string& flowUnits,
         v.node.push_back({pollutants[i], unit});
         v.link.push_back({pollutants[i], unit});
     }
-    static const char* sysNames[] = {"Air Temperature", "Rainfall",        "Snow Depth",
-                                     "Infiltration",    "Runoff",          "Dry Weather Inflow",
-                                     "Groundwater Inflow", "RDII Inflow",  "External Inflow",
-                                     "Total Lateral Inflow", "Flooding",   "Outflow",
-                                     "Storage Volume",  "Evaporation",     "Potential ET"};
-    for (const char* n : sysNames)
-        v.system.push_back({n, ""});
+    // System totals in the order and units of the SWMM 5.2 binary output.
+    v.system = {{"Air Temperature", units.label("temperature")},
+                {"Rainfall", units.label("rainfall")},
+                {"Snow Depth", units.label("smalldepth")},
+                {"Infiltration", units.label("rate")},
+                {"Runoff", fl},
+                {"Dry Weather Inflow", fl},
+                {"Groundwater Inflow", fl},
+                {"RDII Inflow", fl},
+                {"External Inflow", fl},
+                {"Total Lateral Inflow", fl},
+                {"Flooding", fl},
+                {"Outflow", fl},
+                {"Storage Volume", units.label("volume")},
+                {"Evaporation", units.label("evaporation")},
+                {"Potential ET", units.label("evaporation")}};
     return v;
 }
 

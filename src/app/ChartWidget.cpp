@@ -83,10 +83,12 @@ ChartWidget::ChartWidget(QWidget* parent) : QWidget(parent)
     d_.xLabel = tr("Time");
 }
 
-void ChartWidget::setSeries(const QVector<Series>& series, const QString& yLabel, const QString& title)
+void ChartWidget::setSeries(const QVector<Series>& series, const QString& yLabel, const QString& title,
+                            const QString& y2Label)
 {
     d_.series = series;
     d_.yLabel = yLabel;
+    d_.y2Label = y2Label;
     d_.title = title;
     update();
 }
@@ -198,10 +200,13 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
         return c.isValid() ? c : kColors[index % 8];
     };
 
+    // Ranges of the left axis and of the right axis (series with rightAxis).
     double xmin = std::numeric_limits<double>::max(), xmax = std::numeric_limits<double>::lowest();
-    double ymin = xmin, ymax = xmax;
+    double ymin = xmin, ymax = xmax, y2min = xmin, y2max = xmax;
     for (const auto& s : d.series)
     {
+        double& lo = s.rightAxis ? y2min : ymin;
+        double& hi = s.rightAxis ? y2max : ymax;
         for (const auto* pts : {&s.points, &s.upper})
         {
             for (const auto& pt : *pts)
@@ -210,11 +215,20 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
                     continue;
                 xmin = std::min(xmin, pt.x());
                 xmax = std::max(xmax, pt.x());
-                ymin = std::min(ymin, pt.y());
-                ymax = std::max(ymax, pt.y());
+                lo = std::min(lo, pt.y());
+                hi = std::max(hi, pt.y());
             }
         }
     }
+    // Without a series on the left, the right axis moves to the left.
+    QString yLabel = d.yLabel;
+    if (ymin > ymax)
+    {
+        std::swap(ymin, y2min);
+        std::swap(ymax, y2max);
+        yLabel = d.y2Label;
+    }
+    const bool right = y2min <= y2max;
     if (xmin > xmax)
     {
         p.setPen(muted);
@@ -227,24 +241,33 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
     for (const auto& s : d.series)
     {
         if (s.style == Series::Style::Bars)
-            ymin = std::min(ymin, 0.0);
+        {
+            double& lo = s.rightAxis && right ? y2min : ymin;
+            lo = std::min(lo, 0.0);
+        }
     }
-    if (d.yMin)
-        ymin = *d.yMin;
-    if (d.yMax)
-        ymax = *d.yMax;
     if (xmax - xmin < 1e-9)
         xmax = xmin + (d.timeAxis ? 3600.0 : 1.0);
-    if (ymax - ymin < 1e-9)
+    auto fitAxis = [](double& lo, double& hi, std::optional<double> fixedLo, std::optional<double> fixedHi)
     {
-        ymin -= 1.0;
-        ymax += 1.0;
-    }
-    const double ystep = niceStep(ymax - ymin, 5);
-    if (!d.yMin)
-        ymin = std::floor(ymin / ystep) * ystep;
-    if (!d.yMax)
-        ymax = std::ceil(ymax / ystep) * ystep;
+        if (fixedLo)
+            lo = *fixedLo;
+        if (fixedHi)
+            hi = *fixedHi;
+        if (hi - lo < 1e-9)
+        {
+            lo -= 1.0;
+            hi += 1.0;
+        }
+        const double step = niceStep(hi - lo, 5);
+        if (!fixedLo)
+            lo = std::floor(lo / step) * step;
+        if (!fixedHi)
+            hi = std::ceil(hi / step) * step;
+        return step;
+    };
+    const double ystep = fitAxis(ymin, ymax, d.yMin, d.yMax);
+    const double y2step = right ? fitAxis(y2min, y2max, std::nullopt, std::nullopt) : 1.0;
     const bool hours = (xmax - xmin) <= 4 * 86400.0;
     const double xUnit = d.timeAxis ? (hours ? 3600.0 : 86400.0) : 1.0;
     const double xstep = niceStep((xmax - xmin) / xUnit, 8) * xUnit;
@@ -252,15 +275,21 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
     double labelW = 0;
     for (double y = ymin; y <= ymax + ystep * 0.5; y += ystep)
         labelW = std::max(labelW, fm.horizontalAdvance(num(y, 6)));
+    double label2W = 0;
+    for (double y = y2min; right && y <= y2max + y2step * 0.5; y += y2step)
+        label2W = std::max(label2W, fm.horizontalAdvance(num(y, 6)));
     const double left = r.left() + labelW + fm.height() + 16;
+    const double rightMargin = right ? label2W + fm.height() + 20 : 16;
     const double top =
         r.top() + (d.title.isEmpty() ? std::max(10.0, fm.height() * 0.8) : fm.height() + 16);
     const double bottom = 2 * fm.height() + 14 + (d.annotations.isEmpty() ? 0 : fm.height() + 4);
-    const QRectF plot(left, top, r.right() - left - 16, r.bottom() - top - bottom);
+    const QRectF plot(left, top, r.right() - left - rightMargin, r.bottom() - top - bottom);
     if (plot.width() < 40 || plot.height() < 30)
         return;
     auto X = [&](double x) { return plot.left() + (x - xmin) / (xmax - xmin) * plot.width(); };
     auto Y = [&](double y) { return plot.bottom() - (y - ymin) / (ymax - ymin) * plot.height(); };
+    auto Y2 = [&](double y) { return plot.bottom() - (y - y2min) / (y2max - y2min) * plot.height(); };
+    auto SY = [&](const Series& s, double y) { return s.rightAxis && right ? Y2(y) : Y(y); };
 
     if (!d.title.isEmpty())
     {
@@ -293,8 +322,26 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
     p.translate(r.left() + fm.height() / 2 + 4, plot.center().y());
     p.rotate(-90);
     p.drawText(QRectF(-plot.height() / 2, -fm.height() / 2, plot.height(), fm.height()),
-               Qt::AlignCenter, d.yLabel);
+               Qt::AlignCenter, fm.elidedText(yLabel, Qt::ElideRight, plot.height()));
     p.restore();
+    if (right)
+    {
+        p.setPen(QPen(theme::kBorderStrong, 1));
+        p.drawLine(plot.bottomRight(), plot.topRight());
+        p.setPen(muted);
+        for (double y = y2min; y <= y2max + y2step * 0.5; y += y2step)
+        {
+            p.drawLine(QPointF(plot.right(), Y2(y)), QPointF(plot.right() + 4, Y2(y)));
+            p.drawText(QRectF(plot.right() + 8, Y2(y) - fm.height() / 2.0, label2W + 4, fm.height()),
+                       Qt::AlignLeft | Qt::AlignVCenter, num(y, 6));
+        }
+        p.save();
+        p.translate(r.right() - fm.height() / 2 - 4, plot.center().y());
+        p.rotate(90);
+        p.drawText(QRectF(-plot.height() / 2, -fm.height() / 2, plot.height(), fm.height()),
+                   Qt::AlignCenter, fm.elidedText(d.y2Label, Qt::ElideRight, plot.height()));
+        p.restore();
+    }
 
     // Annotations (profile node IDs)
     if (!d.annotations.isEmpty())
@@ -328,11 +375,11 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
         {
         case Series::Style::Band:
         {
-            QPainterPath band(QPointF(X(s.points[0].x()), Y(s.points[0].y())));
+            QPainterPath band(QPointF(X(s.points[0].x()), SY(s, s.points[0].y())));
             for (int k = 1; k < s.points.size(); ++k)
-                band.lineTo(X(s.points[k].x()), Y(s.points[k].y()));
+                band.lineTo(X(s.points[k].x()), SY(s, s.points[k].y()));
             for (int k = s.upper.size() - 1; k >= 0; --k)
-                band.lineTo(X(s.upper[k].x()), Y(s.upper[k].y()));
+                band.lineTo(X(s.upper[k].x()), SY(s, s.upper[k].y()));
             band.closeSubpath();
             QColor fill = c;
             fill.setAlpha(55);
@@ -346,9 +393,10 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
             const double bw = std::max(2.0, plot.width() / std::max(1.0, static_cast<double>(s.points.size())) * 0.7);
             p.setPen(Qt::NoPen);
             p.setBrush(c);
+            const double base = SY(s, std::max(0.0, s.rightAxis && right ? y2min : ymin));
             for (const auto& pt : s.points)
             {
-                const QRectF bar(QPointF(X(pt.x()) - bw / 2, Y(pt.y())), QPointF(X(pt.x()) + bw / 2, Y(std::max(0.0, ymin))));
+                const QRectF bar(QPointF(X(pt.x()) - bw / 2, SY(s, pt.y())), QPointF(X(pt.x()) + bw / 2, base));
                 p.drawRect(bar.normalized());
             }
             break;
@@ -357,16 +405,16 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
             p.setPen(QPen(c.darker(115), 1));
             p.setBrush(c);
             for (const auto& pt : s.points)
-                p.drawEllipse(QPointF(X(pt.x()), Y(pt.y())), 3, 3);
+                p.drawEllipse(QPointF(X(pt.x()), SY(s, pt.y())), 3, 3);
             break;
         default:
         {
-            QPainterPath path(QPointF(X(s.points[0].x()), Y(s.points[0].y())));
+            QPainterPath path(QPointF(X(s.points[0].x()), SY(s, s.points[0].y())));
             for (int k = 1; k < s.points.size(); ++k)
             {
                 if (s.style == Series::Style::Step)
-                    path.lineTo(X(s.points[k].x()), Y(s.points[k - 1].y()));
-                path.lineTo(X(s.points[k].x()), Y(s.points[k].y()));
+                    path.lineTo(X(s.points[k].x()), SY(s, s.points[k - 1].y()));
+                path.lineTo(X(s.points[k].x()), SY(s, s.points[k].y()));
             }
             if (s.style == Series::Style::Area)
             {
@@ -469,7 +517,7 @@ void ChartWidget::draw(QPainter& p, const QRectF& r, const QFont& font, const Da
             colors << colorOf(i);
             p.setPen(QPen(colorOf(i).darker(110), 1.5));
             p.setBrush(Qt::white);
-            p.drawEllipse(QPointF(X(s.points[k].x()), Y(s.points[k].y())), 3.5, 3.5);
+            p.drawEllipse(QPointF(X(s.points[k].x()), SY(s, s.points[k].y())), 3.5, 3.5);
         }
         double w = 0;
         for (const auto& l : lines)

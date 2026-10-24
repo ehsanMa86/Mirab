@@ -8856,6 +8856,18 @@ pervious</source>
         <source>Time</source>
         <translation>זמן</translation>
     </message>
+    <message>
+        <source>Second result to plot; a result in another unit uses the right axis</source>
+        <translation>תוצאה שנייה להצגה; תוצאה ביחידה אחרת משתמשת בציר הימני</translation>
+    </message>
+    <message>
+        <source>No second result</source>
+        <translation>ללא תוצאה שנייה</translation>
+    </message>
+    <message>
+        <source>%1 observed</source>
+        <translation>‏%1 נמדד</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::RowForm</name>
@@ -9723,10 +9735,6 @@ pervious</source>
         <translation>סדרות עתיות</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs.</source>
-        <translation>השוואת תוצאה אחת עבור כמה רכיבים לאורך הסימולציה. הוסף את הרכיב שנבחר במפה, או הקלד מזהים.</translation>
-    </message>
-    <message>
         <source>Export CSV</source>
         <translation>ייצוא CSV</translation>
     </message>
@@ -9759,10 +9767,6 @@ pervious</source>
         <translation>רכיבים</translation>
     </message>
     <message>
-        <source>Result</source>
-        <translation>תוצאה</translation>
-    </message>
-    <message>
         <source>Run a simulation to plot results.</source>
         <translation>יש להריץ סימולציה כדי להציג תוצאות בגרף.</translation>
     </message>
@@ -9777,6 +9781,42 @@ pervious</source>
     <message>
         <source>Time</source>
         <translation>זמן</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>מערכת</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>בתוצאות אלה אין סיכומי מערכת.</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>‏%1 יהיה זמין כשהסימולציה תסתיים.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis. System shows the totals of the whole model.</source>
+        <translation>הצגת תוצאות של כמה רכיבים לאורך הסימולציה. הוסף את הרכיב שנבחר במפה, או הקלד מזהים, וסמן את התוצאות להצגה; יחידה שנייה משתמשת בציר הימני. &quot;מערכת&quot; מציגה את הסיכומים של המודל כולו.</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis.</source>
+        <translation>הצגת תוצאות של כמה רכיבים לאורך הסימולציה. הוסף את הרכיב שנבחר במפה, או הקלד מזהים, וסמן את התוצאות להצגה; יחידה שנייה משתמשת בציר הימני.</translation>
+    </message>
+    <message>
+        <source>Results to plot: one unit on the left axis and a second one on the right</source>
+        <translation>תוצאות להצגה: יחידה אחת על הציר השמאלי ויחידה שנייה על הימני</translation>
+    </message>
+    <message>
+        <source>Results</source>
+        <translation>תוצאות</translation>
+    </message>
+    <message>
+        <source>Two units are plotted already. Uncheck a result to choose one in another unit.</source>
+        <translation>כבר מוצגות שתי יחידות. בטל את הסימון של אחת התוצאות כדי לבחור תוצאה ביחידה אחרת.</translation>
+    </message>
+    <message>
+        <source>Check a result to plot.</source>
+        <translation>סמן תוצאה להצגה.</translation>
     </message>
 </context>
 <context>
