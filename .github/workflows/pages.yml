@@ -1,0 +1,90 @@
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
+#
+# File:    .github/workflows/pages.yml
+# Purpose: Builds the Mirab website from docs/ with MkDocs and publishes it on GitHub Pages from main.
+#
+# Copyright (C) 2026 Ehsan Madadi
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "CHANGELOG.md"
+      - "tools/mkdocs_hooks.py"
+      - "tools/website-requirements.txt"
+      - ".github/workflows/pages.yml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "CHANGELOG.md"
+      - "tools/mkdocs_hooks.py"
+      - "tools/website-requirements.txt"
+      - ".github/workflows/pages.yml"
+  # Run by hand after a change to the SWMM5+ C interface reference in swmm5plus-capi.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      # Both repositories side by side, as in a local checkout, so that the
+      # site can include swmm5plus-capi/docs/api.md.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: Mirab
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ehsanMa86/swmm5plus-capi
+          ref: main
+          path: swmm5plus-capi
+      - name: MkDocs
+        working-directory: Mirab
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -r tools/website-requirements.txt
+          .venv/bin/mkdocs build --strict
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: Mirab/site
+
+  deploy:
+    # Pull requests and other branches only check that the site builds.
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
