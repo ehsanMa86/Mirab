@@ -2813,6 +2813,18 @@
         <source>Emitter and leakage flows are left out of the delivered demand.</source>
         <translation>تُستبعد تدفقات البواعث والتسرب من الطلب المُسلَّم.</translation>
     </message>
+    <message>
+        <source>Dead-end junctions without inflow</source>
+        <translation>تقاطعات طرفية بدون تدفق داخل</translation>
+    </message>
+    <message>
+        <source>Terminal junctions</source>
+        <translation>تقاطعات نهائية</translation>
+    </message>
+    <message>
+        <source>Inflow time series shorter than the simulation</source>
+        <translation>سلسلة زمنية للتدفق الداخل أقصر من المحاكاة</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app</name>
@@ -6386,14 +6398,6 @@ pervious</source>
         <translation>تم حفظ التقرير في %1</translation>
     </message>
     <message>
-        <source>Resilience</source>
-        <translation>المرونة</translation>
-    </message>
-    <message>
-        <source>The resilience tools apply to water distribution (EPANET) models. Network topology is available for both model types from this dialog.</source>
-        <translation>تنطبق أدوات المرونة على نماذج شبكات توزيع المياه (EPANET). طوبولوجيا الشبكة متاحة لكلا نوعي النماذج من هذا الحوار.</translation>
-    </message>
-    <message>
         <source>Plugin %1 was not loaded: %2</source>
         <translation>لم يُحمَّل المكوّن الإضافي %1: %2</translation>
     </message>
@@ -6444,6 +6448,10 @@ pervious</source>
     <message>
         <source>Interface language</source>
         <translation>لغة الواجهة</translation>
+    </message>
+    <message>
+        <source>Open or create a model</source>
+        <translation>افتح نموذجًا أو أنشئ نموذجًا</translation>
     </message>
 </context>
 <context>

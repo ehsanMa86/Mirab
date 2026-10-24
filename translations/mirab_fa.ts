@@ -2778,6 +2778,18 @@
         <source>Emitter and leakage flows are left out of the delivered demand.</source>
         <translation>دبی افشانه‌ها و نشت از تقاضای تحویلی کنار گذاشته می‌شود.</translation>
     </message>
+    <message>
+        <source>Dead-end junctions without inflow</source>
+        <translation>اتصال‌های بن‌بست بدون جریان ورودی</translation>
+    </message>
+    <message>
+        <source>Terminal junctions</source>
+        <translation>اتصال‌های پایانی</translation>
+    </message>
+    <message>
+        <source>Inflow time series shorter than the simulation</source>
+        <translation>سری زمانی جریان ورودی کوتاه‌تر از شبیه‌سازی</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app</name>
@@ -6266,14 +6278,6 @@ pervious</source>
         <translation>گزارش در %1 ذخیره شد</translation>
     </message>
     <message>
-        <source>Resilience</source>
-        <translation>تاب‌آوری</translation>
-    </message>
-    <message>
-        <source>The resilience tools apply to water distribution (EPANET) models. Network topology is available for both model types from this dialog.</source>
-        <translation>ابزارهای تاب‌آوری مخصوص مدل‌های توزیع آب (EPANET) هستند. توپولوژی شبکه برای هر دو نوع مدل از همین پنجره در دسترس است.</translation>
-    </message>
-    <message>
         <source>Plugin %1 was not loaded: %2</source>
         <translation>افزونه %1 بارگذاری نشد: %2</translation>
     </message>
@@ -6324,6 +6328,10 @@ pervious</source>
     <message>
         <source>Interface language</source>
         <translation>زبان رابط کاربری</translation>
+    </message>
+    <message>
+        <source>Open or create a model</source>
+        <translation>یک مدل باز یا ایجاد کنید</translation>
     </message>
 </context>
 <context>
