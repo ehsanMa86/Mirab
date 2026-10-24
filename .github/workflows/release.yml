@@ -43,7 +43,7 @@ jobs:
   windows:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: ${{ env.QT_VERSION }}
@@ -67,7 +67,7 @@ jobs:
           export PATH="$QT_ROOT_DIR/bin:$PATH"
           ctest --preset release
       - run: cmake --build --preset release --target package
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows
           path: |
@@ -81,7 +81,7 @@ jobs:
         os: [macos-15, macos-15-intel] # Apple silicon, Intel
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: brew install ninja
       - uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
@@ -92,7 +92,7 @@ jobs:
       - run: cmake --build --preset release
       - run: ctest --preset release
       - run: cmake --build --preset release --target package
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.os }}
           path: build/release/Mirab-*.dmg
@@ -100,7 +100,7 @@ jobs:
   linux:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: System packages
         run: |
           sudo apt-get update
@@ -133,7 +133,7 @@ jobs:
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/mirab.png \
             --executable AppDir/usr/bin/mirab
           mv Mirab-*.AppImage "build/release/Mirab-${VERSION}-linux-x86_64.AppImage"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux
           path: |
@@ -149,7 +149,7 @@ jobs:
       id-token: write      # sign the build provenance
       attestations: write  # store it with the repository
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
@@ -163,7 +163,7 @@ jobs:
           subject-path: dist/Mirab-*
       # Releases are immutable once published, so prereleases, which the action
       # would publish before uploading, are left as drafts to publish by hand.
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: dist/*
           generate_release_notes: true
