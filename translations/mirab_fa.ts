@@ -9742,6 +9742,22 @@ pervious</source>
         <source>Time</source>
         <translation>زمان</translation>
     </message>
+    <message>
+        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
+        <translation>مقایسه یک نتیجه برای چند عنصر در طول شبیه‌سازی. عنصر انتخاب‌شده روی نقشه را اضافه کنید یا شناسه‌ها را تایپ کنید. «سیستم» مجموع‌های کل مدل را نشان می‌دهد.</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>سیستم</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>این نتایج مجموع‌های سیستم را ندارند.</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>‏%1 پس از پایان شبیه‌سازی در دسترس است.</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::TransectEditor</name>

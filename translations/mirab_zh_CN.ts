@@ -9742,6 +9742,22 @@ pervious</source>
         <source>Time</source>
         <translation>时间</translation>
     </message>
+    <message>
+        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
+        <translation>比较多个元素在模拟期间的同一项结果。可添加地图上所选的元素，或输入 ID。“系统”显示整个模型的总量。</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>系统</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>这些结果不含系统总量。</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>模拟结束后才能获得%1。</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::TransectEditor</name>
