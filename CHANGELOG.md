@@ -1,12 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.2.4 (2026-10-23)
 
+- Several results in one chart: the *Time series* report plots every result checked in its list, for each element; results in a second unit use a y axis on the right. The chart under the map takes a second result too, for example the depth and the total inflow of a junction.
+- System graphs for SWMM: *System* in the *Time series* report plots the totals of the whole model (rainfall, runoff, flooding, outflow, storage, evaporation and the others), with their units.
+- Fix: the evaporation loss of subcatchments is labelled in in/day or mm/day, as SWMM reports it, instead of a rainfall rate.
 - Interface in Hebrew (right to left), Brazilian Portuguese, French, Italian, German and Traditional Chinese.
 - Fix: a SWMM model no longer lists the EPANET-only analyses (resilience tools, fire flow, pipe criticality) or the MSX file choice; *Analysis* offers network topology only.
 - Until a model is created or opened, the engine list reads "Open or create a model" and the MSX option and drawing tools are hidden, instead of offering EPANET engines before a model type is chosen.
 - Fix: SWMM5+ stopped on models whose upstream end junctions receive only runoff, such as the urban and water quality examples, and `mirab-cli` reported success. Mirab now adds a zero inflow at those junctions for SWMM5+, refuses terminal junctions before the run, and exits with code 3 when SWMM5+ stops the program.
 - Fix: SWMM5+ stopped when an inflow time series ended before the simulation, as in the water quality example. Mirab continues such series with zero for SWMM5+, the inflow EPA SWMM uses after their last point, and SWMM5+'s messages are no longer lost when it stops the program on Linux and macOS.
+
+The release tagged v0.2.3 was published from the changes from Hebrew to the inflow time series above, with its packages and version still named 0.2.2; 0.2.4 is the first release that carries them under its own version.
 
 ## 0.2.2 (2026-10-23)
 
