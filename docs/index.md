@@ -1,5 +1,4 @@
 ---
-title: Mirab
 description: Free desktop application for modeling water distribution and stormwater systems with EPANET, SWMM and SWMM5+.
 hide:
   - navigation
