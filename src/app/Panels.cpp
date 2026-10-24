@@ -75,8 +75,12 @@ ResultsPanel::ResultsPanel(ProjectDocument* doc, QWidget* parent) : QWidget(pare
     chartVar_ = new QComboBox(this);
     chartVar_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     chartVar_->setToolTip(tr("Result to plot for the selected element"));
+    chartVar2_ = new QComboBox(this);
+    chartVar2_->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    chartVar2_->setToolTip(tr("Second result to plot; a result in another unit uses the right axis"));
     row->addWidget(title_, 1);
     row->addWidget(chartVar_);
+    row->addWidget(chartVar2_);
     layout->addLayout(row);
     chart_ = new ChartWidget(this);
     layout->addWidget(chart_, 1);
@@ -86,6 +90,7 @@ ResultsPanel::ResultsPanel(ProjectDocument* doc, QWidget* parent) : QWidget(pare
             chart_->setMarker(doc_->results()->times[static_cast<std::size_t>(p)]);
     });
     connect(chartVar_, &QComboBox::currentTextChanged, this, &ResultsPanel::refreshChart);
+    connect(chartVar2_, &QComboBox::currentIndexChanged, this, &ResultsPanel::plot);
     connect(doc_, &ProjectDocument::resultsChanged, this, &ResultsPanel::refreshChart);
     connect(doc_, &ProjectDocument::liveResultsUpdated, this, &ResultsPanel::plot);
     connect(doc_, &ProjectDocument::selectionChanged, this, &ResultsPanel::refreshChart);
@@ -102,8 +107,11 @@ void ResultsPanel::refreshChart()
                         : sel.category == Category::Area ? "subcatchment"
                                                          : nullptr;
     const QString keep = chartVar_->currentText();
+    const QString keep2 = chartVar2_->currentData().toString();
     chartVar_->blockSignals(true);
+    chartVar2_->blockSignals(true);
     chartVar_->clear();
+    chartVar2_->clear();
     const core::ResultTable* t = (r && table) ? r->table(table) : nullptr;
     if (t)
     {
@@ -113,9 +121,19 @@ void ResultsPanel::refreshChart()
         if (idx < 0)
             idx = std::max(0, chartVar_->findText(sel.category == Category::Link ? "Flow" : "Pressure"));
         chartVar_->setCurrentIndex(idx);
+        chartVar2_->addItem(tr("No second result"));
+        for (const auto& v : t->variables)
+        {
+            const QString name = QString::fromStdString(v.name);
+            if (name != chartVar_->currentText())
+                chartVar2_->addItem(name, name);
+        }
+        chartVar2_->setCurrentIndex(std::max(0, chartVar2_->findData(keep2)));
     }
     chartVar_->setVisible(t != nullptr);
+    chartVar2_->setVisible(t != nullptr);
     chartVar_->blockSignals(false);
+    chartVar2_->blockSignals(false);
     plot();
 }
 
@@ -147,37 +165,55 @@ void ResultsPanel::plot()
         chart_->clear(tr("No results for %1.").arg(sel.id));
         return;
     }
-    ChartWidget::Series s;
-    s.name = sel.id;
-    for (int p = 0; p < r->periodCount(); ++p)
-    {
-        const float y = t->value(p, v, e);
-        if (!std::isnan(y)) // not available while the simulation runs
-            s.points.append(QPointF(r->times[static_cast<std::size_t>(p)], y));
-    }
     const auto& var = t->variables[static_cast<std::size_t>(v)];
-    if (s.points.isEmpty())
+    const QString name = QString::fromStdString(var.name);
+    const int v2 = t->variableIndex(chartVar2_->currentData().toString().toStdString());
+    const core::Variable* var2 = v2 >= 0 && v2 != v ? &t->variables[static_cast<std::size_t>(v2)] : nullptr;
+    // A second result in another unit is drawn against the right axis.
+    const bool right = var2 && var2->unit != var.unit;
+    title_->setText(sel.id + "  ·  " + name + (var2 ? ", " + QString::fromStdString(var2->name) : QString()));
+    QVector<ChartWidget::Series> series;
+    auto add = [&](int index, const core::Variable& x, bool rightAxis, const QColor& observedColor) {
+        ChartWidget::Series s;
+        s.name = var2 ? QString::fromStdString(x.name) : sel.id;
+        s.rightAxis = rightAxis;
+        for (int p = 0; p < r->periodCount(); ++p)
+        {
+            const float y = t->value(p, index, e);
+            if (!std::isnan(y)) // not available while the simulation runs
+                s.points.append(QPointF(r->times[static_cast<std::size_t>(p)], y));
+        }
+        if (s.points.isEmpty())
+            return false;
+        series << s;
+        // Measurements linked to the element are drawn as markers.
+        ChartWidget::Series observed;
+        observed.points = ObservedData::of(doc_)->pointsFor(sel.category, sel.id, QString::fromStdString(x.name),
+                                                            QString::fromStdString(x.unit));
+        if (!observed.points.isEmpty())
+        {
+            observed.name = var2 ? tr("%1 observed").arg(s.name) : tr("Observed");
+            observed.style = ChartWidget::Series::Style::Points;
+            observed.color = observedColor;
+            observed.rightAxis = rightAxis;
+            series << observed;
+        }
+        return true;
+    };
+    if (!add(v, var, false, QColor(224, 82, 60)))
     {
-        title_->setText(sel.id + "  ·  " + QString::fromStdString(var.name));
-        chart_->clear(
-            tr("%1 is available when the simulation ends.").arg(QString::fromStdString(var.name)));
+        chart_->clear(tr("%1 is available when the simulation ends.").arg(name));
         return;
     }
-    title_->setText(sel.id + "  ·  " + QString::fromStdString(var.name));
-    QVector<ChartWidget::Series> series = {s};
-    // Measurements linked to the element are drawn as markers.
-    ChartWidget::Series observed;
-    observed.points = ObservedData::of(doc_)->pointsFor(sel.category, sel.id, QString::fromStdString(var.name),
-                                                        QString::fromStdString(var.unit));
-    if (!observed.points.isEmpty())
-    {
-        observed.name = tr("Observed");
-        observed.style = ChartWidget::Series::Style::Points;
-        observed.color = QColor(224, 82, 60);
-        series << observed;
-    }
+    if (var2)
+        add(v2, *var2, right, QColor(232, 160, 20));
+    auto label = [](const QString& names, const std::string& unit) {
+        return names + (unit.empty() ? QString() : " (" + QString::fromStdString(unit) + ")");
+    };
+    const QString y1 = var2 && !right ? label(name + ", " + QString::fromStdString(var2->name), var.unit)
+                                      : label(name, var.unit);
     chart_->setXAxis(tr("Time"), true);
-    chart_->setSeries(series, QString::fromStdString(var.name) + (var.unit.empty() ? QString() : " (" + QString::fromStdString(var.unit) + ")"));
+    chart_->setSeries(series, y1, {}, right ? label(QString::fromStdString(var2->name), var2->unit) : QString());
     chart_->setMarker(r->times[static_cast<std::size_t>(doc_->period())]);
 }
 

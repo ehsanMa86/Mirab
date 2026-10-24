@@ -8824,6 +8824,18 @@ pervious</source>
         <source>Time</source>
         <translation>時間</translation>
     </message>
+    <message>
+        <source>Second result to plot; a result in another unit uses the right axis</source>
+        <translation>要繪製的第二個結果；單位不同的結果使用右側座標軸</translation>
+    </message>
+    <message>
+        <source>No second result</source>
+        <translation>無第二個結果</translation>
+    </message>
+    <message>
+        <source>%1 observed</source>
+        <translation>%1 觀測值</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::RowForm</name>
@@ -9687,10 +9699,6 @@ pervious</source>
         <translation>時間序列</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs.</source>
-        <translation>比較多個元素在模擬期間的同一項結果。可新增地圖上所選的元素，或輸入 ID。</translation>
-    </message>
-    <message>
         <source>Export CSV</source>
         <translation>匯出 CSV</translation>
     </message>
@@ -9723,10 +9731,6 @@ pervious</source>
         <translation>元素</translation>
     </message>
     <message>
-        <source>Result</source>
-        <translation>結果</translation>
-    </message>
-    <message>
         <source>Run a simulation to plot results.</source>
         <translation>執行模擬以繪製結果。</translation>
     </message>
@@ -9743,10 +9747,6 @@ pervious</source>
         <translation>時間</translation>
     </message>
     <message>
-        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
-        <translation>比較多個元素在模擬期間的同一項結果。可新增地圖上所選的元素，或輸入 ID。「系統」顯示整個模型的總量。</translation>
-    </message>
-    <message>
         <source>System</source>
         <translation>系統</translation>
     </message>
@@ -9757,6 +9757,30 @@ pervious</source>
     <message>
         <source>%1 is available when the simulation ends.</source>
         <translation>模擬結束後才能取得%1。</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis. System shows the totals of the whole model.</source>
+        <translation>繪製多個元素在模擬期間的結果。可新增地圖上所選的元素，或輸入 ID，然後勾選要繪製的結果；第二種單位使用右側座標軸。「系統」顯示整個模型的總量。</translation>
+    </message>
+    <message>
+        <source>Plot results of several elements over the simulation. Add the element selected on the map, or type IDs, and check the results to plot; a second unit uses the right axis.</source>
+        <translation>繪製多個元素在模擬期間的結果。可新增地圖上所選的元素，或輸入 ID，然後勾選要繪製的結果；第二種單位使用右側座標軸。</translation>
+    </message>
+    <message>
+        <source>Results to plot: one unit on the left axis and a second one on the right</source>
+        <translation>要繪製的結果：一種單位使用左側座標軸，第二種使用右側座標軸</translation>
+    </message>
+    <message>
+        <source>Results</source>
+        <translation>結果</translation>
+    </message>
+    <message>
+        <source>Two units are plotted already. Uncheck a result to choose one in another unit.</source>
+        <translation>已繪製兩種單位。取消勾選一個結果後，才能選擇其他單位的結果。</translation>
+    </message>
+    <message>
+        <source>Check a result to plot.</source>
+        <translation>請勾選要繪製的結果。</translation>
     </message>
 </context>
 <context>

@@ -62,6 +62,7 @@ public:
         double width = 2.0;
         bool dashed = false;
         bool inLegend = true;
+        bool rightAxis = false; ///< drawn against the second y axis, on the right
     };
 
     /// Everything a chart shows; copied for printing and documents.
@@ -69,6 +70,7 @@ public:
     {
         QVector<Series> series;
         QString yLabel;
+        QString y2Label; ///< label of the right y axis, used by series with rightAxis
         QString title;
         QString xLabel;
         bool timeAxis = true;
@@ -81,7 +83,8 @@ public:
     };
 
     explicit ChartWidget(QWidget* parent = nullptr);
-    void setSeries(const QVector<Series>& series, const QString& yLabel, const QString& title = {});
+    void setSeries(const QVector<Series>& series, const QString& yLabel, const QString& title = {},
+                   const QString& y2Label = {});
     /// Time axis (seconds shown as hours or days) or a plain numeric axis.
     void setXAxis(const QString& label, bool time);
     /// Labels drawn at given x positions (profile plots: node IDs).

@@ -552,11 +552,13 @@ public:
         QHBoxLayout* actions = nullptr;
         const bool swmm = doc_->model().dialect() == core::Dialect::Swmm;
         layout_->addWidget(reportHeader(tr("Time series"),
-                                        swmm ? tr("Compare one result for several elements over the simulation. Add the "
-                                                  "element selected on the map, or type IDs. System shows the totals of "
-                                                  "the whole model.")
-                                             : tr("Compare one result for several elements over the simulation. Add the "
-                                                  "element selected on the map, or type IDs."),
+                                        swmm ? tr("Plot results of several elements over the simulation. Add the element "
+                                                  "selected on the map, or type IDs, and check the results to plot; a "
+                                                  "second unit uses the right axis. System shows the totals of the whole "
+                                                  "model.")
+                                             : tr("Plot results of several elements over the simulation. Add the element "
+                                                  "selected on the map, or type IDs, and check the results to plot; a "
+                                                  "second unit uses the right axis."),
                                         this, &actions));
         auto* exportBtn = actionButton("export", tr("Export CSV"), this);
         actions->addWidget(exportBtn);
@@ -575,7 +577,8 @@ public:
             // Category::None stands for the system totals of the SWMM results.
             category_->addItem(tr("System"), static_cast<int>(Category::None));
         }
-        variable_ = new QComboBox(side);
+        variables_ = new QListWidget(side);
+        variables_->setToolTip(tr("Results to plot: one unit on the left axis and a second one on the right"));
         list_ = new QListWidget(side);
         list_->setSelectionMode(QAbstractItemView::ExtendedSelection);
         auto* idEdit = new QLineEdit(side);
@@ -592,9 +595,8 @@ public:
         sl->addWidget(list_, 1);
         sl->addWidget(idEdit);
         sl->addWidget(buttons);
-        sl->addWidget(new QLabel(tr("Result"), side));
-        sl->addWidget(variable_);
-        sl->addStretch(0); // takes the free space while the element list is hidden
+        sl->addWidget(new QLabel(tr("Results"), side));
+        sl->addWidget(variables_, 1);
         elementWidgets_ = {list_, idEdit, buttons};
         chart_ = new ChartWidget(split);
         split->addWidget(side);
@@ -609,7 +611,10 @@ public:
                 w->setVisible(!system());
             refresh();
         });
-        connect(variable_, &QComboBox::currentTextChanged, this, [this] { plot(); });
+        connect(variables_, &QListWidget::itemChanged, this, [this] {
+            limitUnits();
+            plot();
+        });
         connect(addSel, &QPushButton::clicked, this, [this] {
             const Selection s = doc_->selection();
             if (!s.isEmpty())
@@ -672,20 +677,66 @@ protected:
         plot();
     }
 
+    QStringList checkedResults() const
+    {
+        QStringList names;
+        for (int i = 0; i < variables_->count(); ++i)
+        {
+            if (variables_->item(i)->checkState() == Qt::Checked)
+                names << variables_->item(i)->data(kNameRole).toString();
+        }
+        return names;
+    }
+
+    /// Results in a third unit cannot be checked: the chart has two y axes.
+    void limitUnits()
+    {
+        QStringList units;
+        for (int i = 0; i < variables_->count(); ++i)
+        {
+            const auto* item = variables_->item(i);
+            const QString unit = item->data(kUnitRole).toString();
+            if (item->checkState() == Qt::Checked && !units.contains(unit))
+                units << unit;
+        }
+        const QSignalBlocker block(variables_);
+        for (int i = 0; i < variables_->count(); ++i)
+        {
+            auto* item = variables_->item(i);
+            const bool enabled = item->checkState() == Qt::Checked || units.size() < 2 ||
+                                 units.contains(item->data(kUnitRole).toString());
+            item->setFlags(enabled ? item->flags() | Qt::ItemIsEnabled : item->flags() & ~Qt::ItemIsEnabled);
+            item->setForeground(enabled ? QBrush() : QBrush(QColor(154, 165, 177)));
+            item->setToolTip(enabled ? QString()
+                                     : tr("Two units are plotted already. Uncheck a result to choose one in "
+                                          "another unit."));
+        }
+    }
+
     void refresh() override
     {
         const auto* t = table();
-        const QString keep = variable_->currentText();
-        variable_->blockSignals(true);
-        variable_->clear();
-        if (t)
-            for (const auto& v : t->variables)
-                variable_->addItem(QString::fromStdString(v.name));
-        int idx = variable_->findText(keep);
-        if (idx < 0 && system())
-            idx = variable_->findText("Runoff");
-        variable_->setCurrentIndex(idx >= 0 ? idx : 0);
-        variable_->blockSignals(false);
+        const QStringList keep = checkedResults();
+        {
+            const QSignalBlocker block(variables_);
+            variables_->clear();
+            QListWidgetItem* first = nullptr;
+            for (std::size_t i = 0; t && i < t->variables.size(); ++i)
+            {
+                const auto& v = t->variables[i];
+                const QString name = QString::fromStdString(v.name);
+                auto* item = new QListWidgetItem(varLabel(v), variables_);
+                item->setData(kNameRole, name);
+                item->setData(kUnitRole, QString::fromStdString(v.unit));
+                item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+                item->setCheckState(keep.contains(name) ? Qt::Checked : Qt::Unchecked);
+                if (!first || (system() && name == "Runoff"))
+                    first = item;
+            }
+            if (first && checkedResults().isEmpty())
+                first->setCheckState(Qt::Checked);
+        }
+        limitUnits();
         plot();
     }
 
@@ -699,76 +750,111 @@ protected:
                                         : tr("Run a simulation to plot results."));
             return;
         }
-        const int v = t->variableIndex(variable_->currentText().toStdString());
-        if (system())
+        // The first unit is drawn against the left axis, a second one against the right.
+        QVector<int> vars;
+        QStringList units;
+        for (const QString& name : checkedResults())
         {
-            plotSystem(*r, *t, v);
+            const int v = t->variableIndex(name.toStdString());
+            if (v < 0)
+                continue;
+            const QString unit = QString::fromStdString(t->variables[static_cast<std::size_t>(v)].unit);
+            if (!units.contains(unit))
+            {
+                if (units.size() == 2)
+                    continue;
+                units << unit;
+            }
+            vars << v;
+        }
+        if (vars.isEmpty())
+        {
+            chart_->clear(tr("Check a result to plot."));
             return;
         }
-        QVector<ChartWidget::Series> series;
-        for (int i = 0; i < list_->count() && v >= 0; ++i)
+        QVector<std::pair<QString, int>> elements;
+        if (system())
+            elements.append({QString(), 0});
+        for (int i = 0; i < list_->count() && !system(); ++i)
         {
             const int e = t->elementIndex(list_->item(i)->text().toStdString());
-            if (e < 0)
-                continue;
-            ChartWidget::Series s;
-            s.name = list_->item(i)->text();
-            for (int p = 0; p < r->periodCount(); ++p)
-                s.points.append(QPointF(r->times[static_cast<std::size_t>(p)], t->value(p, v, e)));
-            series << s;
-            // Measurements linked to the element are drawn as markers.
-            ChartWidget::Series o;
-            o.points = ObservedData::of(doc_)->pointsFor(static_cast<Category>(category_->currentData().toInt()), s.name,
-                                                         variable_->currentText(),
-                                                         QString::fromStdString(t->variables[static_cast<std::size_t>(v)].unit));
-            if (!o.points.isEmpty())
-            {
-                o.name = tr("%1 observed").arg(s.name);
-                o.style = ChartWidget::Series::Style::Points;
-                series << o;
-            }
+            if (e >= 0)
+                elements.append({list_->item(i)->text(), e});
         }
-        if (series.isEmpty())
+        if (elements.isEmpty())
         {
             chart_->clear(tr("Add elements to compare."));
             return;
         }
+        const auto category = static_cast<Category>(category_->currentData().toInt());
+        QVector<ChartWidget::Series> series;
+        QStringList names;
+        for (const auto& [id, e] : elements)
+        {
+            for (int v : vars)
+            {
+                const auto& var = t->variables[static_cast<std::size_t>(v)];
+                const QString varName = QString::fromStdString(var.name);
+                const bool right = units.indexOf(QString::fromStdString(var.unit)) == 1;
+                ChartWidget::Series s;
+                s.name = id.isEmpty() ? varName : vars.size() == 1 ? id : id + " · " + varName;
+                s.rightAxis = right;
+                for (int p = 0; p < r->periodCount(); ++p)
+                {
+                    const float y = t->value(p, v, e);
+                    if (!std::isnan(y)) // not available while the simulation runs
+                        s.points.append(QPointF(r->times[static_cast<std::size_t>(p)], y));
+                }
+                if (s.points.isEmpty())
+                {
+                    if (!names.contains(varName))
+                        names << varName;
+                    continue;
+                }
+                series << s;
+                if (id.isEmpty())
+                    continue;
+                // Measurements linked to the element are drawn as markers.
+                ChartWidget::Series o;
+                o.points = ObservedData::of(doc_)->pointsFor(category, id, varName, QString::fromStdString(var.unit));
+                if (!o.points.isEmpty())
+                {
+                    o.name = tr("%1 observed").arg(s.name);
+                    o.style = ChartWidget::Series::Style::Points;
+                    o.rightAxis = right;
+                    series << o;
+                }
+            }
+        }
+        if (series.isEmpty())
+        {
+            chart_->clear(tr("%1 is available when the simulation ends.").arg(names.join(", ")));
+            return;
+        }
+        // Each axis is labelled with the results drawn against it.
+        auto axisLabel = [&](int axis) {
+            if (axis >= units.size())
+                return QString();
+            QStringList labels;
+            for (int v : vars)
+            {
+                const auto& var = t->variables[static_cast<std::size_t>(v)];
+                if (QString::fromStdString(var.unit) == units[axis])
+                    labels << QString::fromStdString(var.name);
+            }
+            return labels.join(", ") + (units[axis].isEmpty() ? QString() : " (" + units[axis] + ")");
+        };
         chart_->setXAxis(tr("Time"), true);
-        chart_->setSeries(series, varLabel(t->variables[static_cast<std::size_t>(v)]));
+        chart_->setSeries(series, axisLabel(0), system() ? tr("System") : QString(), axisLabel(1));
         chart_->setMarker(r->times[static_cast<std::size_t>(doc_->period())]);
-    }
-
-    /// One curve of the system totals; values not reported yet are left out.
-    void plotSystem(const core::ResultSet& r, const core::ResultTable& t, int v)
-    {
-        if (v < 0 || t.elementCount() < 1)
-        {
-            chart_->clear(tr("These results have no system totals."));
-            return;
-        }
-        const auto& var = t.variables[static_cast<std::size_t>(v)];
-        ChartWidget::Series s;
-        s.name = QString::fromStdString(var.name);
-        for (int p = 0; p < r.periodCount(); ++p)
-        {
-            const float y = t.value(p, v, 0);
-            if (!std::isnan(y))
-                s.points.append(QPointF(r.times[static_cast<std::size_t>(p)], y));
-        }
-        if (s.points.isEmpty())
-        {
-            chart_->clear(tr("%1 is available when the simulation ends.").arg(s.name));
-            return;
-        }
-        chart_->setXAxis(tr("Time"), true);
-        chart_->setSeries({s}, varLabel(var), tr("System"));
-        chart_->setMarker(r.times[static_cast<std::size_t>(doc_->period())]);
     }
 
     void snapshot(ReportSnapshot& s) const override { addChart(s, chart_); }
 
+    static constexpr int kNameRole = Qt::UserRole;     ///< result variable name
+    static constexpr int kUnitRole = Qt::UserRole + 1; ///< its unit
     QComboBox* category_;
-    QComboBox* variable_;
+    QListWidget* variables_;
     QListWidget* list_;
     ChartWidget* chart_;
     QList<QWidget*> elementWidgets_; ///< hidden for the system totals
