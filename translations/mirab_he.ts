@@ -9778,6 +9778,22 @@ pervious</source>
         <source>Time</source>
         <translation>זמן</translation>
     </message>
+    <message>
+        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
+        <translation>השוואת תוצאה אחת עבור כמה רכיבים לאורך הסימולציה. הוסף את הרכיב שנבחר במפה, או הקלד מזהים. &quot;מערכת&quot; מציגה את הסיכומים של המודל כולו.</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>מערכת</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>בתוצאות אלה אין סיכומי מערכת.</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>‏%1 יהיה זמין כשהסימולציה תסתיים.</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::TransectEditor</name>

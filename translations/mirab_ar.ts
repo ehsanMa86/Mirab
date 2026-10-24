@@ -9922,6 +9922,22 @@ pervious</source>
         <source>Time</source>
         <translation>الزمن</translation>
     </message>
+    <message>
+        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
+        <translation>قارن نتيجة واحدة لعدة عناصر على مدى المحاكاة. أضف العنصر المحدد على الخريطة، أو اكتب المعرّفات. يعرض «النظام» مجاميع النموذج بأكمله.</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>النظام</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>لا تحتوي هذه النتائج على مجاميع النظام.</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>يتوفر %1 عند انتهاء المحاكاة.</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::TransectEditor</name>

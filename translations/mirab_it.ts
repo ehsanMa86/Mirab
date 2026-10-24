@@ -9778,6 +9778,22 @@ permeabile</translation>
         <source>Time</source>
         <translation>Tempo</translation>
     </message>
+    <message>
+        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
+        <translation>Confronta un risultato per più elementi nel corso della simulazione. Aggiungere l&apos;elemento selezionato sulla mappa o digitare gli ID. Sistema mostra i totali di tutto il modello.</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>Sistema</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>Questi risultati non contengono totali di sistema.</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>%1 sarà disponibile al termine della simulazione.</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::TransectEditor</name>

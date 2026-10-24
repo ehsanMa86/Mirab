@@ -9778,6 +9778,22 @@ durchl. Fläche</translation>
         <source>Time</source>
         <translation>Zeit</translation>
     </message>
+    <message>
+        <source>Compare one result for several elements over the simulation. Add the element selected on the map, or type IDs. System shows the totals of the whole model.</source>
+        <translation>Vergleichen Sie ein Ergebnis für mehrere Elemente über die Simulation. Fügen Sie das auf der Karte ausgewählte Element hinzu oder geben Sie IDs ein. System zeigt die Summen des gesamten Modells.</translation>
+    </message>
+    <message>
+        <source>System</source>
+        <translation>System</translation>
+    </message>
+    <message>
+        <source>These results have no system totals.</source>
+        <translation>Diese Ergebnisse enthalten keine Systemsummen.</translation>
+    </message>
+    <message>
+        <source>%1 is available when the simulation ends.</source>
+        <translation>%1 ist verfügbar, wenn die Simulation endet.</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app::TransectEditor</name>

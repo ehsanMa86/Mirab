@@ -550,9 +550,13 @@ public:
     TimeSeriesReport(ProjectDocument* doc, QWidget* parent) : ReportPage(doc, parent)
     {
         QHBoxLayout* actions = nullptr;
+        const bool swmm = doc_->model().dialect() == core::Dialect::Swmm;
         layout_->addWidget(reportHeader(tr("Time series"),
-                                        tr("Compare one result for several elements over the simulation. Add the "
-                                           "element selected on the map, or type IDs."),
+                                        swmm ? tr("Compare one result for several elements over the simulation. Add the "
+                                                  "element selected on the map, or type IDs. System shows the totals of "
+                                                  "the whole model.")
+                                             : tr("Compare one result for several elements over the simulation. Add the "
+                                                  "element selected on the map, or type IDs."),
                                         this, &actions));
         auto* exportBtn = actionButton("export", tr("Export CSV"), this);
         actions->addWidget(exportBtn);
@@ -565,8 +569,12 @@ public:
         category_ = new QComboBox(side);
         category_->addItem(tr("Nodes"), static_cast<int>(Category::Node));
         category_->addItem(tr("Links"), static_cast<int>(Category::Link));
-        if (doc_->model().dialect() == core::Dialect::Swmm)
+        if (swmm)
+        {
             category_->addItem(tr("Subcatchments"), static_cast<int>(Category::Area));
+            // Category::None stands for the system totals of the SWMM results.
+            category_->addItem(tr("System"), static_cast<int>(Category::None));
+        }
         variable_ = new QComboBox(side);
         list_ = new QListWidget(side);
         list_->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -574,16 +582,20 @@ public:
         idEdit->setPlaceholderText(tr("Add by ID and press Enter"));
         auto* addSel = actionButton("new", tr("Add selected"), side);
         auto* remove = actionButton("delete", tr("Remove"), side);
-        auto* buttons = new QHBoxLayout;
-        buttons->addWidget(addSel);
-        buttons->addWidget(remove);
+        auto* buttons = new QWidget(side);
+        auto* buttonRow = new QHBoxLayout(buttons);
+        buttonRow->setContentsMargins(0, 0, 0, 0);
+        buttonRow->addWidget(addSel);
+        buttonRow->addWidget(remove);
         sl->addWidget(new QLabel(tr("Elements"), side));
         sl->addWidget(category_);
         sl->addWidget(list_, 1);
         sl->addWidget(idEdit);
-        sl->addLayout(buttons);
+        sl->addWidget(buttons);
         sl->addWidget(new QLabel(tr("Result"), side));
         sl->addWidget(variable_);
+        sl->addStretch(0); // takes the free space while the element list is hidden
+        elementWidgets_ = {list_, idEdit, buttons};
         chart_ = new ChartWidget(split);
         split->addWidget(side);
         split->addWidget(chart_);
@@ -593,6 +605,8 @@ public:
 
         connect(category_, &QComboBox::currentIndexChanged, this, [this] {
             list_->clear();
+            for (QWidget* w : elementWidgets_)
+                w->setVisible(!system());
             refresh();
         });
         connect(variable_, &QComboBox::currentTextChanged, this, [this] { plot(); });
@@ -618,7 +632,7 @@ public:
         });
         watch(false);
         const Selection s = doc_->selection();
-        if (!s.isEmpty() && s.category != Category::Gage)
+        if (!s.isEmpty() && s.category != Category::Gage && s.category != Category::None)
         {
             const int idx = category_->findData(static_cast<int>(s.category));
             if (idx >= 0)
@@ -629,8 +643,22 @@ public:
     }
 
 protected:
+    bool system() const { return static_cast<Category>(category_->currentData().toInt()) == Category::None; }
+
+    const core::ResultTable* table() const
+    {
+        const auto* r = doc_->results();
+        if (!r)
+            return nullptr;
+        if (system())
+            return r->table("system");
+        return r->table(tableName(static_cast<Category>(category_->currentData().toInt())));
+    }
+
     void addElement(Category c, const QString& id)
     {
+        if (c == Category::None || c == Category::Gage)
+            return;
         if (static_cast<int>(c) != category_->currentData().toInt())
         {
             const int idx = category_->findData(static_cast<int>(c));
@@ -646,15 +674,16 @@ protected:
 
     void refresh() override
     {
-        const auto* r = doc_->results();
-        const auto* t = r ? r->table(tableName(static_cast<Category>(category_->currentData().toInt()))) : nullptr;
+        const auto* t = table();
         const QString keep = variable_->currentText();
         variable_->blockSignals(true);
         variable_->clear();
         if (t)
             for (const auto& v : t->variables)
                 variable_->addItem(QString::fromStdString(v.name));
-        const int idx = variable_->findText(keep);
+        int idx = variable_->findText(keep);
+        if (idx < 0 && system())
+            idx = variable_->findText("Runoff");
         variable_->setCurrentIndex(idx >= 0 ? idx : 0);
         variable_->blockSignals(false);
         plot();
@@ -663,13 +692,19 @@ protected:
     void plot()
     {
         const auto* r = doc_->results();
-        const auto* t = r ? r->table(tableName(static_cast<Category>(category_->currentData().toInt()))) : nullptr;
+        const auto* t = table();
         if (!t)
         {
-            chart_->clear(tr("Run a simulation to plot results."));
+            chart_->clear(r && system() ? tr("These results have no system totals.")
+                                        : tr("Run a simulation to plot results."));
             return;
         }
         const int v = t->variableIndex(variable_->currentText().toStdString());
+        if (system())
+        {
+            plotSystem(*r, *t, v);
+            return;
+        }
         QVector<ChartWidget::Series> series;
         for (int i = 0; i < list_->count() && v >= 0; ++i)
         {
@@ -703,12 +738,40 @@ protected:
         chart_->setMarker(r->times[static_cast<std::size_t>(doc_->period())]);
     }
 
+    /// One curve of the system totals; values not reported yet are left out.
+    void plotSystem(const core::ResultSet& r, const core::ResultTable& t, int v)
+    {
+        if (v < 0 || t.elementCount() < 1)
+        {
+            chart_->clear(tr("These results have no system totals."));
+            return;
+        }
+        const auto& var = t.variables[static_cast<std::size_t>(v)];
+        ChartWidget::Series s;
+        s.name = QString::fromStdString(var.name);
+        for (int p = 0; p < r.periodCount(); ++p)
+        {
+            const float y = t.value(p, v, 0);
+            if (!std::isnan(y))
+                s.points.append(QPointF(r.times[static_cast<std::size_t>(p)], y));
+        }
+        if (s.points.isEmpty())
+        {
+            chart_->clear(tr("%1 is available when the simulation ends.").arg(s.name));
+            return;
+        }
+        chart_->setXAxis(tr("Time"), true);
+        chart_->setSeries({s}, varLabel(var), tr("System"));
+        chart_->setMarker(r.times[static_cast<std::size_t>(doc_->period())]);
+    }
+
     void snapshot(ReportSnapshot& s) const override { addChart(s, chart_); }
 
     QComboBox* category_;
     QComboBox* variable_;
     QListWidget* list_;
     ChartWidget* chart_;
+    QList<QWidget*> elementWidgets_; ///< hidden for the system totals
 };
 
 // ---------------------------------------------------------------------------
