@@ -2785,6 +2785,18 @@
         <source>Emitter and leakage flows are left out of the delivered demand.</source>
         <translation>Los caudales de emisores y de fugas no se incluyen en la demanda suministrada.</translation>
     </message>
+    <message>
+        <source>Dead-end junctions without inflow</source>
+        <translation>Uniones de cabecera sin caudal de entrada</translation>
+    </message>
+    <message>
+        <source>Terminal junctions</source>
+        <translation>Uniones terminales</translation>
+    </message>
+    <message>
+        <source>Inflow time series shorter than the simulation</source>
+        <translation>Serie temporal de caudal de entrada más corta que la simulación</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app</name>
@@ -6290,14 +6302,6 @@ permeable</translation>
         <translation>Se guardó el informe en %1</translation>
     </message>
     <message>
-        <source>Resilience</source>
-        <translation>Resiliencia</translation>
-    </message>
-    <message>
-        <source>The resilience tools apply to water distribution (EPANET) models. Network topology is available for both model types from this dialog.</source>
-        <translation>Las herramientas de resiliencia se aplican a modelos de distribución de agua (EPANET). La topología de la red está disponible para ambos tipos de modelo desde este diálogo.</translation>
-    </message>
-    <message>
         <source>Plugin %1 was not loaded: %2</source>
         <translation>No se cargó el complemento %1: %2</translation>
     </message>
@@ -6348,6 +6352,10 @@ permeable</translation>
     <message>
         <source>Interface language</source>
         <translation>Idioma de la interfaz</translation>
+    </message>
+    <message>
+        <source>Open or create a model</source>
+        <translation>Abra o cree un modelo</translation>
     </message>
 </context>
 <context>

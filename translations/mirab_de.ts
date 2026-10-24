@@ -2785,6 +2785,18 @@
         <source>Emitter and leakage flows are left out of the delivered demand.</source>
         <translation>Emitter- und Leckageabflüsse sind im gelieferten Bedarf nicht enthalten.</translation>
     </message>
+    <message>
+        <source>Dead-end junctions without inflow</source>
+        <translation>Anfangsknotenpunkte ohne Zufluss</translation>
+    </message>
+    <message>
+        <source>Terminal junctions</source>
+        <translation>Endknotenpunkte</translation>
+    </message>
+    <message>
+        <source>Inflow time series shorter than the simulation</source>
+        <translation>Zuflusszeitreihe kürzer als die Simulation</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app</name>
@@ -6326,14 +6338,6 @@ durchl. Fläche</translation>
         <translation>Bericht in %1 gespeichert</translation>
     </message>
     <message>
-        <source>Resilience</source>
-        <translation>Resilienz</translation>
-    </message>
-    <message>
-        <source>The resilience tools apply to water distribution (EPANET) models. Network topology is available for both model types from this dialog.</source>
-        <translation>Die Resilienzwerkzeuge gelten für Wasserverteilungsmodelle (EPANET). Die Netztopologie ist in diesem Dialog für beide Modelltypen verfügbar.</translation>
-    </message>
-    <message>
         <source>Plugin %1 was not loaded: %2</source>
         <translation>Plugin %1 wurde nicht geladen: %2</translation>
     </message>
@@ -6348,6 +6352,10 @@ durchl. Fläche</translation>
     <message>
         <source>Open plugin folder</source>
         <translation>Plugin-Ordner öffnen</translation>
+    </message>
+    <message>
+        <source>Open or create a model</source>
+        <translation>Modell öffnen oder erstellen</translation>
     </message>
 </context>
 <context>

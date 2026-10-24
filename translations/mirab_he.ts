@@ -2785,6 +2785,18 @@
         <source>Emitter and leakage flows are left out of the delivered demand.</source>
         <translation>ספיקות המתזים והדליפה אינן נכללות בצריכה שסופקה.</translation>
     </message>
+    <message>
+        <source>Dead-end junctions without inflow</source>
+        <translation>צומתי חיבור בקצה ללא זרימה נכנסת</translation>
+    </message>
+    <message>
+        <source>Terminal junctions</source>
+        <translation>צומתי חיבור סופיים</translation>
+    </message>
+    <message>
+        <source>Inflow time series shorter than the simulation</source>
+        <translation>סדרה עתית של זרימה נכנסת קצרה מהסימולציה</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app</name>
@@ -6326,14 +6338,6 @@ pervious</source>
         <translation>הדוח נשמר אל %1</translation>
     </message>
     <message>
-        <source>Resilience</source>
-        <translation>חוסן</translation>
-    </message>
-    <message>
-        <source>The resilience tools apply to water distribution (EPANET) models. Network topology is available for both model types from this dialog.</source>
-        <translation>כלי החוסן חלים על מודלים של אספקת מים (EPANET). טופולוגיית הרשת זמינה לשני סוגי המודלים מתיבת דו-שיח זו.</translation>
-    </message>
-    <message>
         <source>Plugin %1 was not loaded: %2</source>
         <translation>התוסף %1 לא נטען: %2</translation>
     </message>
@@ -6348,6 +6352,10 @@ pervious</source>
     <message>
         <source>Open plugin folder</source>
         <translation>פתח את תיקיית התוספים</translation>
+    </message>
+    <message>
+        <source>Open or create a model</source>
+        <translation>פתח או צור מודל</translation>
     </message>
 </context>
 <context>

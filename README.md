@@ -84,6 +84,8 @@ Use the `headless` preset to build the command-line tool and libraries without Q
 
 ## Documentation
 
+The documentation is also published as a website: <https://ehsanma86.github.io/Mirab/>.
+
 - [User guide](docs/user-guide.md)
 - [Engines and compatibility](docs/engines.md)
 - [Resilience tools](docs/resilience.md)

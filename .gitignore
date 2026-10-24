@@ -5,6 +5,9 @@
 /_deps/
 CMakeUserPresets.json
 
+# Website (mkdocs build)
+/site/
+
 # IDE and OS clutter
 .vs/
 .vscode/

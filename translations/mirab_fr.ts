@@ -2785,6 +2785,18 @@
         <source>Emitter and leakage flows are left out of the delivered demand.</source>
         <translation>Les débits des émetteurs et des fuites sont exclus de la demande satisfaite.</translation>
     </message>
+    <message>
+        <source>Dead-end junctions without inflow</source>
+        <translation>Nœuds de jonction en tête sans apport</translation>
+    </message>
+    <message>
+        <source>Terminal junctions</source>
+        <translation>Nœuds de jonction terminaux</translation>
+    </message>
+    <message>
+        <source>Inflow time series shorter than the simulation</source>
+        <translation>Série temporelle d&apos;apport plus courte que la simulation</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app</name>
@@ -6326,14 +6338,6 @@ perméable</translation>
         <translation>Rapport enregistré dans %1</translation>
     </message>
     <message>
-        <source>Resilience</source>
-        <translation>Résilience</translation>
-    </message>
-    <message>
-        <source>The resilience tools apply to water distribution (EPANET) models. Network topology is available for both model types from this dialog.</source>
-        <translation>Les outils de résilience s&apos;appliquent aux modèles de distribution d&apos;eau (EPANET). La topologie du réseau est disponible pour les deux types de modèle depuis cette boîte de dialogue.</translation>
-    </message>
-    <message>
         <source>Plugin %1 was not loaded: %2</source>
         <translation>L&apos;extension %1 n&apos;a pas été chargée&#xa0;: %2</translation>
     </message>
@@ -6348,6 +6352,10 @@ perméable</translation>
     <message>
         <source>Open plugin folder</source>
         <translation>Ouvrir le dossier des extensions</translation>
+    </message>
+    <message>
+        <source>Open or create a model</source>
+        <translation>Ouvrez ou créez un modèle</translation>
     </message>
 </context>
 <context>

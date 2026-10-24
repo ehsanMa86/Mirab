@@ -59,6 +59,9 @@ operating system's regional settings, as before.
 
 The `i18n-ts-files` test checks that every file is well formed, has no obsolete entries, and keeps the
 placeholders (`%1`, `%2`, `%n`) of each source text. It prints how many entries are finished per file.
+The `i18n-ts-current` test fails when a file lacks a text of the program or keeps one the program no
+longer has, that is when step 2 was forgotten after the sources changed. It refreshes copies of the
+files in the build directory and leaves the files themselves alone.
 
 ## Reviewing
 

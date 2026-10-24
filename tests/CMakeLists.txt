@@ -199,6 +199,25 @@ if(MIRAB_BUILD_GUI)
         COMMENT "Updating the list of library strings in src/app/CoreStrings.cpp")
     file(GLOB _ts_files "${PROJECT_SOURCE_DIR}/translations/*.ts")
     add_test(NAME i18n-ts-files COMMAND mirab-i18n-check ts ${_ts_files})
+    # The .ts files hold every text of the program and no other: update_translations was run
+    # after the sources changed. lupdate refreshes copies in the build directory.
+    set(_lupdate_script "${Qt6LinguistTools_DIR}/GenerateLUpdateProject.cmake")
+    get_property(_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+    if(TARGET Qt6::lupdate AND TARGET Mirab AND EXISTS "${_lupdate_script}" AND NOT _multi_config)
+        # Qt writes the project next to the top-level or the Mirab build directory.
+        set(_lupdate_projects "${PROJECT_BINARY_DIR}/.lupdate/Mirab_lupdate_project.cmake"
+                              "${PROJECT_BINARY_DIR}/src/app/.lupdate/Mirab_lupdate_project.cmake")
+        string(REPLACE ";" "|" _lupdate_projects "${_lupdate_projects}")
+        add_test(NAME i18n-ts-current
+            COMMAND "${CMAKE_COMMAND}"
+                    "-DLUPDATE=$<TARGET_FILE:Qt6::lupdate>"
+                    "-DPROJECT_SCRIPT=${_lupdate_script}"
+                    "-DPROJECTS=${_lupdate_projects}"
+                    "-DCHECK=$<TARGET_FILE:mirab-i18n-check>"
+                    "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/i18n-ts-current"
+                    "-DTS_DIR=${PROJECT_SOURCE_DIR}/translations"
+                    -P "${CMAKE_CURRENT_SOURCE_DIR}/translations_current.cmake")
+    endif()
     # The interface in each language (fails when its translation is not in the program).
     if(TARGET Qt6::lrelease)
         foreach(lang IN ITEMS fa ar he es pt_BR fr it de zh_CN zh_TW)

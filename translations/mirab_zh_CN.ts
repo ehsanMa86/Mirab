@@ -2778,6 +2778,18 @@
         <source>Emitter and leakage flows are left out of the delivered demand.</source>
         <translation>射流器流量和漏损流量不计入实际供给的需水量。</translation>
     </message>
+    <message>
+        <source>Dead-end junctions without inflow</source>
+        <translation>无入流的起端连接节点</translation>
+    </message>
+    <message>
+        <source>Terminal junctions</source>
+        <translation>末端连接节点</translation>
+    </message>
+    <message>
+        <source>Inflow time series shorter than the simulation</source>
+        <translation>入流时间序列短于模拟时长</translation>
+    </message>
 </context>
 <context>
     <name>mirab::app</name>
@@ -6266,14 +6278,6 @@ pervious</source>
         <translation>报告已保存到 %1</translation>
     </message>
     <message>
-        <source>Resilience</source>
-        <translation>韧性</translation>
-    </message>
-    <message>
-        <source>The resilience tools apply to water distribution (EPANET) models. Network topology is available for both model types from this dialog.</source>
-        <translation>韧性工具适用于供水管网（EPANET）模型。两种模型类型均可在此对话框中使用管网拓扑。</translation>
-    </message>
-    <message>
         <source>Plugin %1 was not loaded: %2</source>
         <translation>插件 %1 未加载：%2</translation>
     </message>
@@ -6324,6 +6328,10 @@ pervious</source>
     <message>
         <source>Interface language</source>
         <translation>界面语言</translation>
+    </message>
+    <message>
+        <source>Open or create a model</source>
+        <translation>打开或新建模型</translation>
     </message>
 </context>
 <context>

@@ -60,7 +60,22 @@ The `.ts` files in `translations/` are compiled into the application together wi
 
 - `.github/workflows/ci.yml` builds and tests on Windows, macOS and Linux for every push and pull request, and checks license headers.
 - `.github/workflows/release.yml` runs on version tags (`v*`) and attaches the Windows installer and ZIP, the macOS DMGs, and the Linux AppImage and tarball to a GitHub release, together with `Mirab-<version>-SHA256SUMS.txt` and a signed build provenance attestation for every file. Releases are immutable once published; a tag with a hyphen (`v0.3.0-rc1`) therefore becomes a draft prerelease, to be published by hand after checking it. Running the workflow by hand (*Actions > Release > Run workflow*) builds every package without publishing anything.
+- `.github/workflows/pages.yml` builds the website and publishes it on GitHub Pages when a change to the documentation reaches `main`; for pull requests it only checks that the site builds. See [Website](#website).
 - Every action is pinned to a commit, and the linuxdeploy tools to a release and checksum. Dependabot proposes action updates once a month; to move linuxdeploy, change the tags and checksums at the top of `release.yml`.
+
+## Website
+
+The website at <https://ehsanma86.github.io/Mirab/> is built with [MkDocs](https://www.mkdocs.org) and the Material theme from the pages in `docs/`, so the documentation is written once and reads the same on GitHub and on the website. `mkdocs.yml` holds the navigation and the address of the site; `docs/index.md` and `docs/download.md` are the home and download pages, and the download buttons find the files of the latest release when the page opens. The changelog and the [SWMM5+ C interface reference](https://github.com/ehsanMa86/swmm5plus-capi/blob/main/docs/api.md) are included at build time, the latter from a checkout of swmm5plus-capi next to this repository. Links from `docs/` to other files of the repository open them on GitHub.
+
+To preview the site, with swmm5plus-capi cloned next to Mirab:
+
+```
+python -m venv .venv
+.venv/bin/pip install -r tools/website-requirements.txt      # .venv\Scripts\pip on Windows
+.venv/bin/mkdocs serve                                       # http://127.0.0.1:8000/Mirab/
+```
+
+`mkdocs build --strict` fails on broken links and anchors, as the workflow does. The workflow publishes the site from `main`, so it always describes the latest release; run it by hand (*Actions > Website > Run workflow* on `main`) after a change to the C interface reference. Publishing needs *Settings > Pages > Source: GitHub Actions* once.
 
 ## License headers
 

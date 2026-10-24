@@ -1,0 +1,84 @@
+/*
+ * Mirab website: colors of the Mirab icon and the layout of the home and download pages.
+ */
+
+:root {
+  --md-primary-fg-color: #0b4f8a;
+  --md-primary-fg-color--light: #2f6fa6;
+  --md-primary-fg-color--dark: #083a66;
+  --md-accent-fg-color: #18a3a8;
+  --md-accent-fg-color--transparent: rgba(24, 163, 168, 0.1);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0b3f6e;
+  --md-typeset-a-color: #4cc3c7;
+}
+
+/* Outlined buttons take the primary color, too dark on the dark background. */
+[data-md-color-scheme="slate"] .md-typeset .md-button:not(.md-button--primary) {
+  color: #4cc3c7;
+  border-color: #4cc3c7;
+}
+
+/* Home page */
+.mirab-hero {
+  text-align: center;
+  padding: 1rem 0 0.5rem;
+}
+
+.mirab-hero h1 {
+  margin: 0.4rem 0 0.6rem;
+  font-weight: 700;
+  color: var(--md-default-fg-color);
+}
+
+.mirab-hero p {
+  max-width: 42rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.mirab-hero .md-button {
+  margin: 0.25rem;
+}
+
+.mirab-hero-icon {
+  width: 96px;
+  height: 96px;
+}
+
+.mirab-shot {
+  display: block;
+  margin: 1.5rem auto;
+  border-radius: 0.4rem;
+  box-shadow: var(--md-shadow-z2);
+}
+
+.md-typeset .grid.cards img {
+  border-radius: 0.2rem;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  width: 100%;
+}
+
+/* Download page */
+.mirab-release {
+  font-size: 0.85rem;
+}
+
+@media screen and (min-width: 45em) {
+  .md-typeset .grid.cards.mirab-downloads {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.md-typeset .mirab-downloads .md-button {
+  display: block;
+  margin: 0.4rem 0;
+  text-align: center;
+}
+
+.md-typeset .mirab-downloads .md-button.mirab-recommended {
+  box-shadow: 0 0 0 0.15rem var(--md-accent-fg-color);
+}

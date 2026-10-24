@@ -1,0 +1,117 @@
+# Mirab - Unified Water Infrastructure Modeling Environment
+# https://github.com/ehsanMa86/Mirab
+#
+# File:    mkdocs.yml
+# Purpose: Configuration of the Mirab website, built with MkDocs from docs/ and published on GitHub Pages.
+#
+# Copyright (C) 2026 Ehsan Madadi
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+site_name: Mirab
+site_description: Free desktop application for modeling water distribution and stormwater systems with EPANET, SWMM and SWMM5+.
+site_author: Ehsan Madadi
+# The only place that names the address of the website.
+site_url: https://ehsanma86.github.io/Mirab/
+repo_url: https://github.com/ehsanMa86/Mirab
+repo_name: ehsanMa86/Mirab
+edit_uri: edit/develop/docs/
+copyright: Copyright &copy; 2026 Ehsan Madadi. Mirab is free software under the GNU GPL, version 3 or later.
+
+docs_dir: docs
+
+theme:
+  name: material
+  logo: assets/mirab-128.png
+  favicon: assets/mirab-64.png
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+extra_css:
+  - assets/site.css
+extra_javascript:
+  - assets/download.js
+
+hooks:
+  - tools/mkdocs_hooks.py
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.snippets:
+      # The changelog lives at the top of the repository and the SWMM5+ C API
+      # reference in swmm5plus-capi, checked out next to this repository.
+      base_path: [".", ".."]
+      check_paths: true
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Download: download.md
+  - User guide: user-guide.md
+  - Reference:
+      - Engines and compatibility: engines.md
+      - Resilience tools: resilience.md
+      - Command line and JSON: cli.md
+      - Python scripting: python.md
+      - File formats and solver protocol: file-formats.md
+      - SWMM5+ C interface: swmm5plus-capi.md
+  - Development:
+      - Building and packaging: building.md
+      - Architecture: architecture.md
+      - Writing plugins: plugins.md
+  - Changelog: changelog.md

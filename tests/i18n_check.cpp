@@ -35,6 +35,11 @@
 //     begin with U+200F RIGHT-TO-LEFT MARK, and have no mnemonic "&": the
 //     underlined letter is drawn on its own, which breaks the joined letters
 //     of Persian and Arabic words.
+// mirab-i18n-check current <dir> <file.ts>...
+//     Compares the messages of each file with the file of the same name in
+//     <dir>, a copy lupdate refreshed from the sources: a text of the program
+//     the file lacks, or a text the file keeps that the program no longer
+//     has, means update_translations was not run after the sources changed.
 
 #include "mirab/core/ControlRules.h"
 #include "mirab/core/Features.h"
@@ -43,6 +48,7 @@
 #include "mirab/engine/EngineRegistry.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QMap>
@@ -54,6 +60,7 @@
 #include <cstdio>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace mirab;
@@ -438,6 +445,64 @@ int checkTs(const QString& path)
     return problems ? 1 : 0;
 }
 
+/// Context and source text of every message of a .ts file.
+bool readMessages(const QString& path, std::set<std::pair<QString, QString>>& out)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+    {
+        std::printf("%s: cannot be read\n", qPrintable(path));
+        return false;
+    }
+    QXmlStreamReader xml(&f);
+    QString context;
+    while (!xml.atEnd())
+    {
+        xml.readNext();
+        if (!xml.isStartElement())
+            continue;
+        if (xml.name() == QLatin1String("name"))
+            context = xml.readElementText();
+        else if (xml.name() == QLatin1String("source"))
+            out.insert({context, xml.readElementText()});
+    }
+    if (xml.hasError())
+    {
+        std::printf("%s: line %lld: %s\n", qPrintable(path),
+                    static_cast<long long>(xml.lineNumber()),
+                    qPrintable(xml.errorString()));
+        return false;
+    }
+    return true;
+}
+
+int checkCurrent(const QString& dir, const QString& path)
+{
+    const QString name = QFileInfo(path).fileName();
+    std::set<std::pair<QString, QString>> have, want;
+    if (!readMessages(path, have) || !readMessages(QDir(dir).filePath(name), want))
+        return 1;
+    int problems = 0;
+    auto report = [&](const std::pair<QString, QString>& m, const char* what) {
+        ++problems;
+        std::printf("%s: [%s] \"%s\": %s\n", qPrintable(name), qPrintable(m.first),
+                    qPrintable(m.second.left(80)), what);
+    };
+    for (const auto& m : want)
+        if (!have.count(m))
+            report(m, "not in the file");
+    for (const auto& m : have)
+        if (!want.count(m))
+            report(m, "no longer in the program");
+    if (problems)
+        std::printf("%s: %d difference(s); run the update_translations target and translate the "
+                    "new entries\n",
+                    qPrintable(name), problems);
+    else
+        std::printf("%s: up to date with the sources\n", qPrintable(name));
+    return problems ? 1 : 0;
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -453,7 +518,15 @@ int main(int argc, char* argv[])
             status |= checkTs(file);
         return status;
     }
+    if (args.size() >= 3 && args[0] == "current")
+    {
+        int status = 0;
+        for (const QString& file : args.mid(2))
+            status |= checkCurrent(args[1], file);
+        return status;
+    }
     std::fprintf(stderr, "usage: mirab-i18n-check core-strings <CoreStrings.cpp> [--write]\n"
-                         "       mirab-i18n-check ts <file.ts>...\n");
+                         "       mirab-i18n-check ts <file.ts>...\n"
+                         "       mirab-i18n-check current <dir> <file.ts>...\n");
     return 2;
 }
