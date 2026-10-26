@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.2.5 (2026-10-26)
 
+- SWMM5+ engine (swmm5plus-capi 0.2.3, fetched by *Install SWMM5+*): the total inflow of a junction between two conduits and of an outfall no longer counts its inflow or runoff twice, so the system outflow agrees with the runoff; a missing input or settings file is reported instead of ending the solver.
 - Fix: SWMM results whose reporting starts after the simulation start (REPORT_START_DATE and REPORT_START_TIME later than START) were placed too early, by the report start less one report step. The live view, the exports and calibration now agree with SWMM's report.
 - Fix: `mirab-cli resilience criticality` and `fireflow` solved the base model when `--scenario` was given; they now solve the scenario's model.
 - Fix: the WNTR import kept closed pipes, pumps and valves open, wrote `*` as the pattern of a demand category without one (EPANET error 205) and dropped the demand multiplier, emitter exponent, trials, accuracy, pattern start, quality time step, report start and start clock time. The export records whether a valve is open or closed instead of always active.
