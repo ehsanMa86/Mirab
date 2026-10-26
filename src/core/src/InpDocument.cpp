@@ -195,11 +195,17 @@ InpDocument InpDocument::parse(std::string_view text)
         const std::string name = canonicalSectionName(line);
         if (!name.empty())
         {
-            InpSection s;
-            s.name = name;
-            s.header = trim(line);
-            doc.sections.push_back(std::move(s));
-            current = &doc.sections.back();
+            // EPANET and SWMM keep reading a section whose header appears
+            // again, so its lines join the first one.
+            current = doc.find(name);
+            if (!current)
+            {
+                InpSection s;
+                s.name = name;
+                s.header = trim(line);
+                doc.sections.push_back(std::move(s));
+                current = &doc.sections.back();
+            }
         }
         else if (!(lastLine && line.empty()))
         {

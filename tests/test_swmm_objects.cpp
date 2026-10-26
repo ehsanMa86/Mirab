@@ -754,3 +754,30 @@ TEST_CASE("rules: EPANET rules and simple controls")
     CHECK(hasMessage(sm, 5, "ABOVE or BELOW"));
     CHECK(hasMessage(sm, 6, "A control has the form"));
 }
+
+TEST_CASE("rules: dates are read as SWMM reads them")
+{
+    const auto m = model();
+    const auto ctx = RuleContext::fromModel(m);
+    // "-" or "/" between the parts, the month as a number or a three-letter
+    // name (datetime_strToDate), for DATE and for DAYOFYEAR as month/day.
+    const std::vector<std::string> ok = {"RULE R1",
+                                         "IF SIMULATION DATE = 01-01-2020",
+                                         "AND SIMULATION DATE = JAN/01/2020",
+                                         "AND SIMULATION DATE = 1/1/2020",
+                                         "AND SIMULATION DAYOFYEAR = 01-01",
+                                         "AND SIMULATION DAYOFYEAR = jan-01",
+                                         "AND SIMULATION DAYOFYEAR = 6/15",
+                                         "THEN ORIFICE OR1 SETTING = 0.5"};
+    const auto msgs = validateRules(ok, RuleSyntax::Swmm, &ctx);
+    for (const auto& msg : msgs)
+        std::cout << "  line " << msg.line << ": " << msg.message << "\n";
+    CHECK(msgs.empty());
+    // SWMM reads month/day/year: a thirteenth month or a year-first date fails.
+    for (const char* bad : {"13/01/2020", "2020-01-01", "JANUARY/01/2020", "01/32/2020", "01-01"})
+    {
+        const std::vector<std::string> lines = {"RULE R2", std::string("IF SIMULATION DATE = ") + bad,
+                                                "THEN ORIFICE OR1 SETTING = 0.5"};
+        CHECK(!validateRules(lines, RuleSyntax::Swmm, &ctx).empty());
+    }
+}

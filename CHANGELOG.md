@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.5 (2026-10-26)
+
+- SWMM5+ engine (swmm5plus-capi 0.2.3, fetched by *Install SWMM5+*): the total inflow of a junction between two conduits and of an outfall no longer counts its inflow or runoff twice, so the system outflow agrees with the runoff; a missing input or settings file is reported instead of ending the solver.
+- Fix: SWMM results whose reporting starts after the simulation start (REPORT_START_DATE and REPORT_START_TIME later than START) were placed too early, by the report start less one report step. The live view, the exports and calibration now agree with SWMM's report.
+- Fix: `mirab-cli resilience criticality` and `fireflow` solved the base model when `--scenario` was given; they now solve the scenario's model.
+- Fix: the WNTR import kept closed pipes, pumps and valves open, wrote `*` as the pattern of a demand category without one (EPANET error 205) and dropped the demand multiplier, emitter exponent, trials, accuracy, pattern start, quality time step, report start and start clock time. The export records whether a valve is open or closed instead of always active.
+- Fix: water service availability counted emitter and leakage flow as delivered demand with OWA EPANET 2.3; it now uses the consumer demand delivered (the full demand less the deficit).
+- Fix: results of EPA EPANET 2.2 were labelled with the PRESSURE option where 2.2 overrides it; 2.2 reports psi with US flow units and never psi with SI units.
+- Fix: the head loss of pipes from an EPANET run was the loss across the pipe but labelled per 1000 ft or per km; it is now per 1000 length units, as in EPANET's report and binary output. Pumps and valves keep their head gain or loss.
+- Fix: the link status read from an EPANET binary output held EPANET's status codes, so a closed pipe counted as open in network tracing; it now holds 0 for closed and 1 for open, like the results of a run.
+- Fix: the control rule checker rejected SWMM dates with "-" between the parts or a month name (`01-01-2020`, `JAN/01/2020`), which SWMM accepts, so the rule editor could not keep such rules.
+- Fix: a section header that appears twice in an input file hid the elements after the second one; the lines of both now belong to the section, as in EPANET and SWMM.
+- Fix: `mirab-cli export --results R --period N` with N out of range wrote zeros for every result; it now reports the valid range.
+- Fix: the fire-flow time of day ignored the model's START CLOCKTIME and replaced its PATTERN START; the snapshot is now solved at that clock time of the model.
+- Engine manifests whose engine id is a path are rejected, so the install record cannot be written outside the engine folder.
+
 ## 0.2.4 (2026-10-23)
 
 - Several results in one chart: the *Time series* report plots every result checked in its list, for each element; results in a second unit use a y axis on the right. The chart under the map takes a second result too, for example the depth and the total inflow of a junction.

@@ -88,6 +88,16 @@ bool runEpanetLoop(EpanetSession& s, const std::filesystem::path& inputFile,
         if (!p.empty())
             pressure = text::toUpper(p[0]);
     }
+    // EPA EPANET 2.2 reports psi with US flow units whatever the option says,
+    // and never psi with SI units; OWA EPANET 2.3 honours the option.
+    if (!v23)
+    {
+        const bool si = core::ProjectUnits::fromFlowUnits(core::Dialect::Epanet, flow).system == core::UnitSystem::SI;
+        if (!si)
+            pressure = "PSI";
+        else if (pressure == "PSI")
+            pressure = "METERS";
+    }
     const auto units = core::ProjectUnits::fromFlowUnits(core::Dialect::Epanet, flow, pressure);
     r.flowUnits = units.flow;
     r.unitSystem = units.system == core::UnitSystem::SI ? "SI" : "US";
@@ -157,6 +167,17 @@ bool runEpanetLoop(EpanetSession& s, const std::filesystem::path& inputFile,
     auto& links = r.defineTable("link", linkIds, linkVars);
     (void)nodes;
     (void)links;
+    // EN_HEADLOSS is the loss across the link. For pipes the results carry it
+    // per 1000 length units, as EPANET's report and binary output do; pumps
+    // and valves keep the head gain or loss itself.
+    std::vector<double> headlossScale(static_cast<std::size_t>(nLinks) + 1, 1.0);
+    for (int i = 1; i <= nLinks; ++i)
+    {
+        if (s.linkType(i) > en::PIPE)
+            continue;
+        const double length = s.linkValue(i, en::LENGTH);
+        headlossScale[static_cast<std::size_t>(i)] = length > 0 ? 1000.0 / length : 0.0;
+    }
 
     const long duration = s.timeParam(en::DURATION);
     const long rstep = s.timeParam(en::REPORTSTEP);
@@ -196,6 +217,8 @@ bool runEpanetLoop(EpanetSession& s, const std::filesystem::path& inputFile,
                 {
                     double value = 0;
                     s.tryLinkValue(i, linkProbes[v].property, value);
+                    if (linkProbes[v].property == en::HEADLOSS)
+                        value *= headlossScale[static_cast<std::size_t>(i)];
                     lt->set(p, static_cast<int>(v), i - 1, static_cast<float>(value));
                 }
             }

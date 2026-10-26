@@ -181,17 +181,28 @@ ServiceResult waterServiceAvailability(const ResultSet& results)
         double d = 0.0, e = 0.0;
         for (int i = 0; i < n; ++i)
         {
-            const double q = nodes->value(p, vDemand, i);
+            // "Demand" is the whole flow leaving the node: consumer demand plus
+            // emitter and leakage flow. The consumer demand delivered is the full
+            // demand less the deficit (OWA EPANET 2.3 records both). EPA EPANET
+            // 2.2 records the deficit only, so there the demand stands in for the
+            // delivered flow; it includes emitter flow, which 2.2 cannot separate.
+            const double q = std::max(0.0, static_cast<double>(nodes->value(p, vDemand, i)));
             double full = q;
+            double got = q;
             if (vFull >= 0)
+            {
                 full = nodes->value(p, vFull, i);
+                got = vDeficit >= 0 ? std::max(0.0, full - nodes->value(p, vDeficit, i)) : std::min(q, full);
+            }
             else if (vDeficit >= 0)
+            {
                 full = q + nodes->value(p, vDeficit, i);
+            }
             if (full <= 0)
                 continue;
-            d += std::max(0.0, q);
+            d += got;
             e += full;
-            delivered[static_cast<std::size_t>(i)] += std::max(0.0, q);
+            delivered[static_cast<std::size_t>(i)] += got;
             expected[static_cast<std::size_t>(i)] += full;
         }
         out.times.push_back(results.times[static_cast<std::size_t>(p)]);
@@ -456,9 +467,15 @@ std::vector<FireFlowEntry> fireFlow(const engine::EpanetApi& api, const std::fil
 {
     engine::EpanetSession s(api);
     s.open(input);
-    // Single-period snapshot at the requested time of day.
+    // Single-period snapshot at the requested time of day. EPANET's pattern
+    // time at clock time T is the model's PATTERN START plus T less its START
+    // CLOCKTIME; a time of day before the start clock time falls on the next
+    // day. Patterns repeat, so the pattern time needs no wrapping.
     s.setTimeParam(engine::en::DURATION, 0);
-    s.setTimeParam(engine::en::PATTERNSTART, static_cast<long>(options.timeOfDay));
+    long offset = std::lround(options.timeOfDay) - s.timeParam(engine::en::STARTTIME);
+    while (offset < 0)
+        offset += 86400;
+    s.setTimeParam(engine::en::PATTERNSTART, s.timeParam(engine::en::PATTERNSTART) + offset);
     s.addPattern("MIRAB_FIRE", {1.0});
 
     std::vector<int> junctions;

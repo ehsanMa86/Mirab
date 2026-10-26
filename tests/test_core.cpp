@@ -130,6 +130,20 @@ TEST_CASE("inp: key/value options with multi-word keys")
     CHECK(doc.keyValue("OPTIONS", "PRESSURE EXPONENT"));
 }
 
+TEST_CASE("inp: a section header that appears again continues the section")
+{
+    // EPANET and SWMM keep reading into the same section, so the elements
+    // after the second header belong to the model.
+    const auto doc = core::InpDocument::parse("[JUNCTIONS]\nJ1 100 10\n\n[CONDUITS]\nC1 J1 J2 400 0.013\n\n"
+                                              "[JUNCTIONS]\nJ2 99 10\n");
+    CHECK_EQ(doc.sections.size(), std::size_t(2));
+    CHECK_EQ(doc.find("JUNCTIONS")->rowCount(), 2);
+    const core::Model m(doc, core::Dialect::Swmm);
+    CHECK(m.findNode("J1") != nullptr);
+    CHECK(m.findNode("J2") != nullptr);
+    CHECK_EQ(m.nodes().size(), std::size_t(2));
+}
+
 TEST_CASE("model: EPANET demo network structure")
 {
     const auto m = core::Model::fromFile(example("epanet/mirab-demo.inp"));

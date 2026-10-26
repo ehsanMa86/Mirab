@@ -86,7 +86,8 @@ enum TimeParameter
     PATTERNSTEP = 3,
     PATTERNSTART = 4,
     REPORTSTEP = 5,
-    REPORTSTART = 6
+    REPORTSTART = 6,
+    STARTTIME = 10 ///< START CLOCKTIME (7 is the rule step)
 };
 enum NodeType
 {

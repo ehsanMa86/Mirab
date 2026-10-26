@@ -1635,7 +1635,13 @@ bool MainWindow::loadResults(const QString& path)
 {
     try
     {
-        auto r = std::make_unique<core::ResultSet>(core::ResultSet::loadAny(std::filesystem::u8path(path.toStdString())));
+        // A SWMM binary output does not hold the simulation start when
+        // reporting starts later; the open model supplies its report start.
+        std::optional<double> swmmReportStart;
+        if (doc_->model().dialect() == core::Dialect::Swmm)
+            swmmReportStart = doc_->model().reportStartSeconds();
+        auto r = std::make_unique<core::ResultSet>(
+            core::ResultSet::loadAny(std::filesystem::u8path(path.toStdString()), swmmReportStart));
         doc_->setResults(std::move(r));
         statusBar()->showMessage(tr("Loaded results %1").arg(QFileInfo(path).fileName()), 5000);
         return true;

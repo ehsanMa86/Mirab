@@ -424,7 +424,10 @@ public:
         try
         {
             cb.report(0.98, "Reading results");
-            out.results = core::ResultSet::readSwmmOutput(binary);
+            // The model's report start places the periods on the simulation's
+            // time axis when reporting starts later than the simulation.
+            out.results = core::ResultSet::readSwmmOutput(
+                binary, model ? std::optional<double>(model->reportStartSeconds()) : std::nullopt);
         }
         catch (const std::exception& e)
         {

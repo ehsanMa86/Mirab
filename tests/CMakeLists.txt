@@ -91,6 +91,21 @@ if(MIRAB_BUILD_ENGINES)
         COMMAND mirab-cli batch "${scenario_dir}/mirab-demo.inp" --all --jobs 2)
     set_tests_properties(cli-scenarios-batch PROPERTIES FIXTURES_REQUIRED scenario-input
         PASS_REGULAR_EXPRESSION "[[]4/4[]]" FAIL_REGULAR_EXPRESSION "failed" TIMEOUT 120)
+    # The analyses solve the scenario's model: the base model has about
+    # 120 LPS available at J5, the grown demand about 89.
+    add_test(NAME cli-scenarios-fireflow
+        COMMAND mirab-cli resilience fireflow "${scenario_dir}/mirab-demo.inp" --flow 30 --nodes J5
+                --scenario "Demand growth" --json)
+    set_tests_properties(cli-scenarios-fireflow PROPERTIES FIXTURES_REQUIRED scenario-input
+        PASS_REGULAR_EXPRESSION "\"availableFlow\": ?8[0-9][.]"
+        FAIL_REGULAR_EXPRESSION "\"availableFlow\": ?1[0-9][0-9][.]")
+    # A results period out of range is refused instead of exported as zeros.
+    add_test(NAME cli-scenarios-export-period
+        COMMAND mirab-cli export geojson "${scenario_dir}/mirab-demo.inp"
+                --results "${scenario_dir}/mirab-demo.anr" --period 999
+                --out "${scenario_dir}/period.geojson")
+    set_tests_properties(cli-scenarios-export-period PROPERTIES FIXTURES_REQUIRED scenario-input
+        DEPENDS cli-scenarios-batch PASS_REGULAR_EXPRESSION "period must be between 0 and 24")
 endif()
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)

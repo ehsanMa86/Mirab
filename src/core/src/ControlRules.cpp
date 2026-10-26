@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <vector>
 
 namespace mirab::core
 {
@@ -66,21 +67,21 @@ bool isTime(std::string_view v)
     return text::parseClockOrDuration(v).has_value();
 }
 
+/// A date as SWMM reads it (datetime_strToDate): month, day and year separated
+/// by "/" or "-", the month as a number or a three-letter name.
 bool isDate(std::string_view v)
 {
-    int parts[3] = {0, 0, 0};
-    int n = 0;
+    static const char* const months[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                                         "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+    std::vector<std::string> parts;
     std::string cur;
     for (char c : std::string(v) + "/")
     {
-        if (c == '/')
+        if (c == '/' || c == '-')
         {
-            if (cur.empty() || n >= 3)
+            if (cur.empty() || parts.size() >= 3)
                 return false;
-            const auto x = text::toInt(cur);
-            if (!x)
-                return false;
-            parts[n++] = static_cast<int>(*x);
+            parts.push_back(cur);
             cur.clear();
         }
         else
@@ -88,7 +89,24 @@ bool isDate(std::string_view v)
             cur += c;
         }
     }
-    return n == 3 && parts[0] >= 1 && parts[0] <= 12 && parts[1] >= 1 && parts[1] <= 31;
+    if (parts.size() != 3)
+        return false;
+    int month = 0;
+    if (const auto m = text::toInt(parts[0]))
+    {
+        month = static_cast<int>(*m);
+    }
+    else
+    {
+        const std::string name = text::toUpper(parts[0]);
+        for (int i = 0; i < 12; ++i)
+        {
+            if (name == months[i])
+                month = i + 1;
+        }
+    }
+    const auto day = text::toInt(parts[1]);
+    return month >= 1 && month <= 12 && day && *day >= 1 && *day <= 31 && text::toInt(parts[2]).has_value();
 }
 
 /// Hours of a gage attribute like 6HR_PRECIP or 6-HR_PRECIP; 0 when it is not one.
@@ -289,7 +307,7 @@ public:
         else if (attr == "DAYOFYEAR")
         {
             const auto d = text::toDouble(v);
-            const bool md = v.find('/') != std::string::npos && isDate(v + "/1947");
+            const bool md = v.find_first_of("/-") != std::string::npos && isDate(v + "/1947");
             if (!md && (!d || *d < 1 || *d > 365))
                 err(line, "Day of the year must be from 1 to 365 or month/day.");
         }

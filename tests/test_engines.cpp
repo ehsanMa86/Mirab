@@ -42,6 +42,7 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <map>
 
 using namespace mirab;
 namespace fs = std::filesystem;
@@ -907,4 +908,300 @@ TEST_CASE("engines: packages install only when every checksum matches")
         threw = true;
     }
     CHECK(threw);
+
+    // So is an engine id that is a path: it names the install record.
+    for (const char* id : {"../../escaped", "/tmp/escaped", "C:\\escaped", "..", ""})
+    {
+        std::string text = manifestText(engine::platformId(), goodB, "b.so");
+        text.replace(text.find("swmm5plus-1.0"), 13, id);
+        threw = false;
+        try
+        {
+            engine::EngineManifest::parse(text);
+        }
+        catch (const std::exception&)
+        {
+            threw = true;
+        }
+        CHECK(threw);
+    }
+    CHECK_EQ(engine::EngineManifest::parse(manifestText(engine::platformId(), goodB, "b.so")).engine,
+             std::string("swmm5plus-1.0"));
+}
+
+TEST_CASE("engines: EPA SWMM 5.2 periods keep their times when reporting starts late")
+{
+    // Reporting starts six hours into the run. The binary output then holds
+    // the date one report step before the first period in its header, not
+    // the simulation start, so the periods are placed from the model.
+    const auto file = scratch("report-start.inp");
+    std::ofstream(file) << "[TITLE]\nReport start\n\n[OPTIONS]\nFLOW_UNITS CFS\nINFILTRATION HORTON\n"
+                           "FLOW_ROUTING DYNWAVE\nSTART_DATE 01/01/2026\nSTART_TIME 00:00:00\n"
+                           "REPORT_START_DATE 01/01/2026\nREPORT_START_TIME 06:00:00\nEND_DATE 01/01/2026\n"
+                           "END_TIME 12:00:00\nREPORT_STEP 01:00:00\nWET_STEP 00:05:00\nDRY_STEP 01:00:00\n"
+                           "ROUTING_STEP 0:00:05\n\n[JUNCTIONS]\nJ1 100 10 0 0 0\nJ2 99 10 0 0 0\n\n"
+                           "[OUTFALLS]\nO1 98 FREE\n\n[CONDUITS]\nC1 J1 J2 400 0.013 0 0 0 0\n"
+                           "C2 J2 O1 400 0.013 0 0 0 0\n\n[XSECTIONS]\nC1 CIRCULAR 1.5 0 0 0 1\n"
+                           "C2 CIRCULAR 1.5 0 0 0 1\n\n[INFLOWS]\nJ1 FLOW TS1 FLOW 1.0 1.0\n\n[REPORT]\n"
+                           "NODES ALL\nLINKS ALL\n\n[COORDINATES]\nJ1 0 0\nJ2 100 0\nO1 200 0\n\n"
+                           "[TIMESERIES]\nTS1 0:00 1.0\nTS1 7:59 1.0\nTS1 8:00 5.0\nTS1 12:00 5.0\n";
+    const auto r = run("swmm-5.2-epa", file);
+    CHECK_EQ(r.periodCount(), 7);
+    CHECK_NEAR(r.reportStart, 21600.0, 1e-9);
+    CHECK_NEAR(r.times.front(), 21600.0, 1e-9);
+    CHECK_NEAR(r.times.back(), 43200.0, 1e-9);
+    CHECK_NEAR(r.reportStep, 3600.0, 1e-9);
+    // The inflow steps from 1 to 5 cfs at 08:00, the third period.
+    CHECK(value(r, "node", "Total Inflow", "J1", 1) < 1.5);
+    CHECK(value(r, "node", "Total Inflow", "J1", 2) > 4.0);
+}
+
+TEST_CASE("engines: EPA 2.2 labels pressure as it reports it, OWA 2.3 as the PRESSURE option says")
+{
+    auto net = [&](const char* name, const char* units, const char* pressure) {
+        const auto file = scratch(name);
+        std::ofstream(file) << "[JUNCTIONS]\n J1 0 1\n\n[RESERVOIRS]\n R1 50\n\n[PIPES]\n"
+                               " P1 R1 J1 100 150 100 0 Open\n\n[OPTIONS]\n Units "
+                            << units << "\n Pressure " << pressure
+                            << "\n Headloss H-W\n\n[TIMES]\n Duration 0\n\n[COORDINATES]\n J1 0 0\n R1 -100 0\n";
+        return file;
+    };
+    auto unit = [](const core::ResultSet& r) {
+        const auto* t = r.table("node");
+        return t->variables[static_cast<std::size_t>(t->variableIndex("Pressure"))].unit;
+    };
+    // EPA 2.2 reports psi with US units and never psi with SI units, whatever
+    // the option says; OWA 2.3 follows the option.
+    const auto us = net("pressure-us.inp", "GPM", "METERS");
+    const auto si = net("pressure-si.inp", "LPS", "PSI");
+    const auto us22 = run("epanet-2.2-epa", us);
+    const auto us23 = run("epanet-2.3-owa", us);
+    const auto si22 = run("epanet-2.2-epa", si);
+    const auto si23 = run("epanet-2.3-owa", si);
+    CHECK_EQ(unit(us22), std::string("psi"));
+    CHECK_EQ(unit(us23), std::string("m"));
+    CHECK_EQ(unit(si22), std::string("m"));
+    CHECK_EQ(unit(si23), std::string("psi"));
+    // The labels fit the numbers: one metre of head is 1.422 psi.
+    CHECK_NEAR(value(us22, "node", "Pressure", "J1", 0), 1.4220 * value(us23, "node", "Pressure", "J1", 0), 0.05);
+    CHECK_NEAR(value(si23, "node", "Pressure", "J1", 0), 1.4220 * value(si22, "node", "Pressure", "J1", 0), 0.05);
+}
+
+TEST_CASE("engines: pipe headloss from a run is per 1000 length units, as in the binary output")
+{
+    const auto model = core::Model::fromFile(example("epanet/mirab-demo.inp"));
+    const auto r = run("epanet-2.3-owa", example("epanet/mirab-demo.inp"));
+    const auto* pipes = model.document().find("PIPES");
+    for (const char* id : {"P1", "P2", "P13"})
+    {
+        const auto* link = model.findLink(id);
+        CHECK(link != nullptr);
+        if (!link)
+            continue;
+        const double length = text::toDouble(pipes->rowTokens(link->row)[3]).value_or(0.0);
+        CHECK(length > 0.0);
+        for (int p : {0, 7, 19})
+        {
+            const double drop = std::fabs(value(r, "node", "Head", link->from.c_str(), p) -
+                                          value(r, "node", "Head", link->to.c_str(), p));
+            CHECK_NEAR(value(r, "link", "Headloss", id, p), 1000.0 * drop / length, 0.01 + 0.01 * drop);
+        }
+    }
+    // A pump keeps its head gain (a negative loss).
+    CHECK_NEAR(value(r, "link", "Headloss", "PU1", 0),
+               value(r, "node", "Head", "R1", 0) - value(r, "node", "Head", "J1", 0), 0.01);
+}
+
+TEST_CASE("results: an EPANET binary output reads like the run")
+{
+    // A closed pipe: the file holds EPANET's status codes (2 for closed, 3
+    // for open), the run records 0 and 1.
+    const auto file = scratch("binary-status.inp");
+    {
+        std::ifstream in(example("epanet/mirab-demo.inp"), std::ios::binary);
+        std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        text.replace(text.find("[STATUS]"), 8, "[STATUS]\n P6 Closed");
+        std::ofstream(file, std::ios::binary) << text;
+    }
+    engine::EpanetLibrary lib;
+    std::string error;
+    CHECK(lib.load(*registry().locate(*registry().descriptor("epanet-2.3-owa")), &error));
+    const auto out = scratch("binary-status.out");
+    {
+        engine::EpanetSession s(lib.api());
+        s.open(file, scratch("binary-status.rpt"), out);
+        s.openH();
+        s.initH(engine::en::SAVE);
+        s.openQ();
+        s.initQ(engine::en::SAVE);
+        long tstep = 0;
+        do
+        {
+            s.runH();
+            s.runQ();
+            tstep = s.nextH();
+            s.nextQ();
+        } while (tstep > 0);
+        s.closeQ();
+        s.closeH();
+        s.close();
+    }
+    const auto fromFile = core::ResultSet::loadAny(out);
+    const auto r = run("epanet-2.3-owa", file);
+    CHECK_EQ(fromFile.periodCount(), r.periodCount());
+    const auto* t = fromFile.table("link");
+    CHECK_EQ(t->variables[static_cast<std::size_t>(t->variableIndex("Status"))].unit, std::string("0=closed 1=open"));
+    for (const char* id : {"P6", "P1", "PU1"})
+    {
+        for (int p : {0, 12})
+        {
+            CHECK_NEAR(value(fromFile, "link", "Status", id, p), value(r, "link", "Status", id, p), 1e-6);
+            CHECK_NEAR(value(fromFile, "link", "Flow", id, p), value(r, "link", "Flow", id, p), 1e-3);
+            CHECK_NEAR(value(fromFile, "link", "Headloss", id, p), value(r, "link", "Headloss", id, p), 1e-3);
+        }
+    }
+    CHECK_NEAR(value(fromFile, "link", "Status", "P6", 0), 0.0, 1e-9);
+    CHECK_NEAR(value(fromFile, "link", "Status", "P1", 0), 1.0, 1e-9);
+}
+
+TEST_CASE("resilience: service availability counts the consumer demand delivered, not emitter flow")
+{
+    const auto file = scratch("wsa-emitter.inp");
+    std::ofstream(file) << "[JUNCTIONS]\n J1 0 0\n J2 0 20\n\n[RESERVOIRS]\n R1 25\n\n[PIPES]\n"
+                           " P1 R1 J1 500 150 100 0 Open\n P2 J1 J2 500 100 100 0 Open\n\n[EMITTERS]\n J2 3\n\n"
+                           "[OPTIONS]\n Units LPS\n Headloss H-W\n Demand Model PDA\n Minimum Pressure 0\n"
+                           " Required Pressure 30\n Pressure Exponent 0.5\n\n[TIMES]\n Duration 0\n\n"
+                           "[COORDINATES]\n J1 0 0\n J2 100 0\n R1 -100 0\n";
+    const auto r = run("epanet-2.3-owa", file);
+    const auto s = resilience::waterServiceAvailability(r);
+    const double full = value(r, "node", "Full Demand", "J2", 0);
+    const double deficit = value(r, "node", "Demand Deficit", "J2", 0);
+    const double demand = value(r, "node", "Demand", "J2", 0);
+    CHECK(full > 19.9 && deficit > 1.0);
+    // "Demand" also holds the emitter flow; the availability does not.
+    CHECK(demand > full - deficit + 1.0);
+    CHECK_NEAR(s.overall, (full - deficit) / full, 1e-4);
+    CHECK(s.overall < 0.5);
+}
+
+TEST_CASE("resilience: fire flow at a time of day follows the start clock time and the pattern start")
+{
+    auto net = [&](const char* name, const char* times) {
+        const auto file = scratch(name);
+        std::ofstream(file) << "[JUNCTIONS]\n J1 0 10 PAT1\n J2 0 10 PAT1\n\n[RESERVOIRS]\n R1 40\n\n[PIPES]\n"
+                               " P1 R1 J1 500 150 100 0 Open\n P2 J1 J2 500 100 100 0 Open\n\n[PATTERNS]\n"
+                               " PAT1 0.5 1.0 1.5 2.0\n\n[TIMES]\n Duration 24:00\n Hydraulic Timestep 6:00\n"
+                               " Pattern Timestep 6:00\n Report Timestep 6:00\n"
+                            << times << "\n\n[OPTIONS]\n Units LPS\n Headloss H-W\n\n[COORDINATES]\n J1 0 0\n"
+                               " J2 100 0\n R1 -100 0\n";
+        return file;
+    };
+    engine::EpanetLibrary lib;
+    std::string error;
+    CHECK(lib.load(*registry().locate(*registry().descriptor("epanet-2.3-owa")), &error));
+    auto snapshot = [&](const fs::path& file, double hour) {
+        resilience::FireFlowOptions fo;
+        fo.fireFlow = 1e-4;
+        fo.residualPressure = 1.0;
+        fo.timeOfDay = hour * 3600.0;
+        fo.computeAvailableFlow = false;
+        fo.nodes = {"J2"};
+        const auto e = resilience::fireFlow(lib.api(), file, fo);
+        return e.size() == 1 && !e[0].failed ? e[0].residualPressure : -1e9;
+    };
+    // The clock starts at 6 am: period 0 of a run is 6 am, period 2 is 6 pm
+    // and period 3 midnight.
+    const auto clock6 = net("fire-clock.inp", " Start ClockTime 6 am");
+    const auto a = run("epanet-2.3-owa", clock6);
+    CHECK(std::fabs(value(a, "node", "Pressure", "J2", 0) - value(a, "node", "Pressure", "J2", 3)) > 1.0);
+    CHECK_NEAR(snapshot(clock6, 6.0), value(a, "node", "Pressure", "J2", 0), 1e-3);
+    CHECK_NEAR(snapshot(clock6, 18.0), value(a, "node", "Pressure", "J2", 2), 1e-3);
+    CHECK_NEAR(snapshot(clock6, 0.0), value(a, "node", "Pressure", "J2", 3), 1e-3);
+    // The pattern starts six hours in: at midnight the snapshot sees the
+    // second pattern step, as the run does at its start.
+    const auto pat6 = net("fire-pattern.inp", " Pattern Start 6:00");
+    const auto b = run("epanet-2.3-owa", pat6);
+    CHECK_NEAR(snapshot(pat6, 0.0), value(b, "node", "Pressure", "J2", 0), 1e-3);
+}
+
+TEST_CASE("interop: WNTR import keeps statuses, options and demands without a pattern")
+{
+    const auto file = scratch("wntr-statuses.inp");
+    std::ofstream(file) << "[TITLE]\nStatuses\n\n[JUNCTIONS]\n J1 100 3\n J2 100 8\n J3 95 5\n J4 90 2\n\n"
+                           "[RESERVOIRS]\n R1 150\n R2 120\n\n[PIPES]\n P1 R1 J1 1000 300 100 0 Open\n"
+                           " P2 J1 J2 1000 200 100 0 Open\n P3 J2 J3 1000 200 100 0 Closed\n"
+                           " P4 J1 J3 1200 150 100 0 Open\n\n[PUMPS]\n PU1 R2 J2 HEAD C1\n\n[VALVES]\n"
+                           " V1 J3 J4 150 TCV 0 0\n\n[DEMANDS]\n J1 3 PAT1 ;Domestic\n J1 1 ;Commercial\n\n"
+                           "[EMITTERS]\n J3 2\n\n[STATUS]\n PU1 Closed\n V1 Open\n\n[PATTERNS]\n PAT1 1.0 2.0\n\n"
+                           "[CURVES]\n C1 50 40\n\n[TIMES]\n Duration 1:00\n Hydraulic Timestep 1:00\n"
+                           " Pattern Timestep 1:00\n Pattern Start 1:00\n Report Timestep 1:00\n"
+                           " Start ClockTime 6 am\n\n[OPTIONS]\n Units LPS\n Headloss H-W\n Demand Multiplier 1.5\n"
+                           " Emitter Exponent 0.7\n\n[COORDINATES]\n J1 0 0\n J2 100 0\n J3 100 100\n J4 200 100\n"
+                           " R1 -100 0\n R2 100 -100\n";
+    const auto model = core::Model::fromFile(file);
+    auto json = interop::toWntrJson(model);
+    // WNTR itself writes the statuses as "Closed", "Open" and "Active".
+    json::Value& links = json["links"];
+    bool valveOpen = false;
+    for (std::size_t i = 0; i < links.size(); ++i)
+    {
+        const std::string st = links[i].get("initial_status").asString();
+        links[i].set("initial_status", st == "CLOSED" ? "Closed" : st == "OPEN" ? "Open" : "Active");
+        if (links[i].get("name").asString() == "V1")
+            valveOpen = st == "OPEN";
+    }
+    CHECK(valveOpen);
+
+    const auto back = interop::fromWntrJson(json);
+    const auto& doc = back.document();
+    auto option = [&](const char* section, const char* key) {
+        return doc.keyValue(section, key).value_or("<missing>");
+    };
+    CHECK_NEAR(text::toDouble(option("OPTIONS", "DEMAND MULTIPLIER")).value_or(0.0), 1.5, 1e-9);
+    CHECK_NEAR(text::toDouble(option("OPTIONS", "EMITTER EXPONENT")).value_or(0.0), 0.7, 1e-9);
+    CHECK_EQ(option("TIMES", "PATTERN START"), std::string("1:00"));
+    CHECK_EQ(option("TIMES", "START CLOCKTIME"), std::string("6:00"));
+    std::map<std::string, std::string> statuses;
+    if (const auto* status = doc.find("STATUS"))
+    {
+        for (int i = 0; i < status->rowCount(); ++i)
+        {
+            const auto t = status->rowTokens(i);
+            if (t.size() >= 2)
+                statuses[t[0]] = t[1];
+        }
+    }
+    CHECK_EQ(statuses["PU1"], std::string("Closed"));
+    CHECK_EQ(statuses["V1"], std::string("Open"));
+    bool pipeClosed = false;
+    for (int i = 0; i < doc.find("PIPES")->rowCount(); ++i)
+    {
+        const auto t = doc.find("PIPES")->rowTokens(i);
+        if (t.size() >= 8 && t[0] == "P3")
+            pipeClosed = t[7] == "Closed";
+    }
+    CHECK(pipeClosed);
+    const auto* demands = doc.find("DEMANDS");
+    CHECK(demands != nullptr && demands->rowCount() == 2);
+    for (int i = 0; demands && i < demands->rowCount(); ++i)
+    {
+        const auto t = demands->rowTokens(i);
+        CHECK(std::find(t.begin(), t.end(), "*") == t.end());
+    }
+
+    // Both files run alike: the closed pipe carries nothing, and the demand
+    // of J1 is (3 x 2.0 + 1) x 1.5 at the start (the pattern starts at its
+    // second step).
+    const auto imported = scratch("wntr-statuses-back.inp");
+    back.save(imported);
+    const auto a = run("epanet-2.3-owa", file);
+    const auto b = run("epanet-2.3-owa", imported);
+    CHECK_EQ(b.periodCount(), a.periodCount());
+    CHECK(value(a, "node", "Demand", "J1", 0) > 10.0);
+    for (int p = 0; p < a.periodCount(); ++p)
+    {
+        CHECK_NEAR(value(b, "node", "Demand", "J1", p), value(a, "node", "Demand", "J1", p), 1e-3);
+        CHECK_NEAR(value(b, "node", "Pressure", "J2", p), value(a, "node", "Pressure", "J2", p), 1e-3);
+        CHECK_NEAR(value(b, "link", "Flow", "P3", p), 0.0, 1e-6);
+    }
 }

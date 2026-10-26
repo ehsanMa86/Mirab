@@ -377,6 +377,7 @@ const char* swmmFlowUnits(int code)
 
 ResultSet ResultSet::readEpanetOutput(const std::filesystem::path& path)
 {
+    constexpr int kStatusColumn = 4; // flow, velocity, headloss, quality, status, ...
     BinaryReader in(path);
     if (in.size() < 15 * 4 + 28)
         throw std::runtime_error(path.u8string() + " is too small to be an EPANET output file");
@@ -444,7 +445,7 @@ ResultSet ResultSet::readEpanetOutput(const std::filesystem::path& path)
                    {"Velocity", units.label("velocity")},
                    {"Headloss", units.label("headloss")},
                    {"Quality", qualUnit},
-                   {"Status", ""},
+                   {"Status", "0=closed 1=open"},
                    {"Setting", ""},
                    {"Reaction Rate", ""},
                    {"Friction Factor", ""}});
@@ -468,7 +469,15 @@ ResultSet ResultSet::readEpanetOutput(const std::filesystem::path& path)
         {
             in.readFloats(buf, static_cast<std::size_t>(nLinks));
             for (int e = 0; e < nLinks; ++e)
-                links.set(period, v, e, buf[static_cast<std::size_t>(e)]);
+            {
+                float value = buf[static_cast<std::size_t>(e)];
+                // The file holds EPANET's status codes (0 XHEAD, 1 TEMPCLOSED,
+                // 2 CLOSED, then OPEN, ACTIVE and the others); engine runs record
+                // 0 for closed and 1 for open, as EN_STATUS does.
+                if (v == kStatusColumn)
+                    value = value <= 2.5f ? 0.0f : 1.0f;
+                links.set(period, v, e, value);
+            }
         }
     }
     if (warning)
@@ -525,7 +534,7 @@ SwmmVariables swmmVariables(const std::string& flowUnits,
     return v;
 }
 
-ResultSet ResultSet::readSwmmOutput(const std::filesystem::path& path)
+ResultSet ResultSet::readSwmmOutput(const std::filesystem::path& path, std::optional<double> reportStart)
 {
     BinaryReader in(path);
     if (in.size() < 7 * 4 + 6 * 4)
@@ -643,14 +652,28 @@ ResultSet ResultSet::readSwmmOutput(const std::filesystem::path& path)
     r.defineTable("link", linkIds, fit(linkVars, nLinkVars));
     r.defineTable("system", {"System"}, sysVars);
 
+    // When reporting starts later than the simulation, SWMM writes the date
+    // one report step before the first reported time in the header, not the
+    // simulation start, so the dates alone cannot place the periods on the
+    // simulation's time axis. With the model's report start, the first period
+    // lies at the first multiple of the report step at or after it (SWMM does
+    // not report the initial state).
+    const bool rebase = reportStart.has_value() && reportStep > 0;
+    const double firstSeconds =
+        rebase ? reportStep * std::max(1.0, std::ceil((*reportStart - 1e-3) / reportStep)) : 0.0;
+    double firstDate = 0.0;
+
     in.seek(outPos);
     std::vector<float> buf;
     bool firstPeriod = true;
     for (int p = 0; p < periods; ++p)
     {
         const double date = in.f64();
+        if (firstPeriod)
+            firstDate = date;
         // SWMM report times are whole seconds; remove floating-point noise.
-        const double seconds = std::round((date - startDate) * 86400.0);
+        const double seconds = rebase ? firstSeconds + std::round((date - firstDate) * 86400.0)
+                                      : std::round((date - startDate) * 86400.0);
         if (firstPeriod)
         {
             r.reportStart = seconds;
@@ -679,7 +702,7 @@ ResultSet ResultSet::readSwmmOutput(const std::filesystem::path& path)
     return r;
 }
 
-ResultSet ResultSet::loadAny(const std::filesystem::path& path)
+ResultSet ResultSet::loadAny(const std::filesystem::path& path, std::optional<double> swmmReportStart)
 {
     std::ifstream in(path, std::ios::binary);
     if (!in)
@@ -694,7 +717,7 @@ ResultSet ResultSet::loadAny(const std::filesystem::path& path)
     if (magic == kEpanetMagic)
         return readEpanetOutput(path);
     if (magic == kSwmmMagic)
-        return readSwmmOutput(path);
+        return readSwmmOutput(path, swmmReportStart);
     throw std::runtime_error(path.u8string() + " is not a recognized results file");
 }
 
