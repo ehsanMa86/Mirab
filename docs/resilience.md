@@ -47,7 +47,7 @@ By default the runs are pressure-driven so that isolating part of the network sh
 
 ## Fire-flow capacity
 
-For each hydrant node a constant fire demand is added and a single-period hydraulic snapshot is solved at the chosen time of day. The tool reports the pressure at the hydrant, the lowest junction pressure and where it occurs, whether every junction stays above the residual pressure, and the largest flow that keeps every junction above it (found by bisection).
+For each hydrant node a constant fire demand is added and a single-period hydraulic snapshot is solved at the chosen time of day (a clock time of the model, so its START CLOCKTIME and PATTERN START apply). The tool reports the pressure at the hydrant, the lowest junction pressure and where it occurs, whether every junction stays above the residual pressure, and the largest flow that keeps every junction above it (found by bisection).
 
 ## Command line examples
 

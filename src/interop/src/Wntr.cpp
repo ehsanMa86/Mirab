@@ -457,7 +457,9 @@ Value toWntrJson(const core::Model& model, std::vector<std::string>* notes)
             l.set("initial_setting", num(t[5]) * pf);
         if (type == "PCV")
             note("valve " + t[0] + " is a PCV (EPANET 2.3), which WNTR may not support");
-        l.set("initial_status", "ACTIVE");
+        // A valve is active unless [STATUS] opens or closes it (a setting there keeps it active).
+        const std::string vs = status.count(t[0]) ? status[t[0]] : std::string();
+        l.set("initial_status", vs == "CLOSED" ? "CLOSED" : vs == "OPEN" ? "OPEN" : "ACTIVE");
         l.set("vertices", vertices(t[0]));
         links.push(l);
     }
@@ -512,10 +514,26 @@ core::Model fromWntrJson(const Value& w, std::vector<std::string>* notes)
     }
     if (hyd.contains("pattern") && !hyd.get("pattern").isNull())
         doc.setKeyValue("OPTIONS", "PATTERN", hyd.get("pattern").asString());
+    auto hydOption = [&](const char* key, const char* json) {
+        if (hyd.contains(json) && !hyd.get(json).isNull())
+            doc.setKeyValue("OPTIONS", key, fmt(hyd.get(json).asNumber()));
+    };
+    hydOption("DEMAND MULTIPLIER", "demand_multiplier");
+    hydOption("EMITTER EXPONENT", "emitter_exponent");
+    hydOption("TRIALS", "trials");
+    hydOption("ACCURACY", "accuracy");
     doc.setKeyValue("TIMES", "DURATION", clock(time.get("duration").asNumber(0)));
     doc.setKeyValue("TIMES", "HYDRAULIC TIMESTEP", clock(time.get("hydraulic_timestep").asNumber(3600)));
     doc.setKeyValue("TIMES", "PATTERN TIMESTEP", clock(time.get("pattern_timestep").asNumber(3600)));
     doc.setKeyValue("TIMES", "REPORT TIMESTEP", clock(time.get("report_timestep").asNumber(3600)));
+    auto timeOptionIn = [&](const char* key, const char* json) {
+        if (time.contains(json) && !time.get(json).isNull())
+            doc.setKeyValue("TIMES", key, clock(time.get(json).asNumber()));
+    };
+    timeOptionIn("QUALITY TIMESTEP", "quality_timestep");
+    timeOptionIn("PATTERN START", "pattern_start");
+    timeOptionIn("REPORT START", "report_start");
+    timeOptionIn("START CLOCKTIME", "start_clocktime");
     if (!w.get("name").asString().empty())
     {
         auto& title = doc.ensure("TITLE");
@@ -582,10 +600,11 @@ core::Model fromWntrJson(const Value& w, std::vector<std::string>* notes)
             {
                 for (const auto& d : dl.items())
                 {
-                    std::vector<std::string> r = {name, fmt(d.get("base_val").asNumber() * q),
-                                                  patternOf(d.get("pattern_name"))};
-                    if (r.back().empty())
-                        r.back() = "*";
+                    // EPANET has no placeholder for a missing pattern: the row ends after the base demand.
+                    std::vector<std::string> r = {name, fmt(d.get("base_val").asNumber() * q)};
+                    const std::string pat = patternOf(d.get("pattern_name"));
+                    if (!pat.empty())
+                        r.push_back(pat);
                     if (!d.get("category").isNull())
                         r.push_back(";" + d.get("category").asString());
                     doc.ensure("DEMANDS").appendRow(r);
@@ -634,7 +653,9 @@ core::Model fromWntrJson(const Value& w, std::vector<std::string>* notes)
         if (type == "Pipe")
         {
             const double rough = l.get("roughness").asNumber(100) * (dw ? 1000.0 : 1.0);
-            std::string st = l.get("check_valve").asBool() ? "CV" : (l.get("initial_status").asString() == "CLOSED" ? "Closed" : "Open");
+            // WNTR writes the status as "Closed"/"Open"; any case is accepted.
+            const bool closed = text::iequals(l.get("initial_status").asString(), "CLOSED");
+            std::string st = l.get("check_valve").asBool() ? "CV" : (closed ? "Closed" : "Open");
             doc.ensure("PIPES").appendRow({name, a, b, fmt(l.get("length").asNumber()),
                                            fmt(l.get("diameter").asNumber() * 1000.0), fmt(rough),
                                            fmt(l.get("minor_loss").asNumber()), st});
@@ -664,6 +685,8 @@ core::Model fromWntrJson(const Value& w, std::vector<std::string>* notes)
                 row.push_back(pat);
             }
             doc.ensure("PUMPS").appendRow(row);
+            if (text::iequals(l.get("initial_status").asString(), "CLOSED"))
+                doc.ensure("STATUS").appendRow({name, "Closed"});
         }
         else if (type == "Valve")
         {
@@ -677,6 +700,10 @@ core::Model fromWntrJson(const Value& w, std::vector<std::string>* notes)
                 setting = fmt(l.get("initial_setting").asNumber());
             doc.ensure("VALVES").appendRow({name, a, b, fmt(l.get("diameter").asNumber() * 1000.0), vt, setting,
                                             fmt(l.get("minor_loss").asNumber())});
+            // Active is the default; an open or closed valve needs a [STATUS] row.
+            const std::string vs = text::toUpper(l.get("initial_status").asString());
+            if (vs == "CLOSED" || vs == "OPEN")
+                doc.ensure("STATUS").appendRow({name, vs == "CLOSED" ? "Closed" : "Open"});
         }
         else
         {

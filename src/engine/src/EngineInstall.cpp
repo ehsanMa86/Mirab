@@ -94,6 +94,12 @@ EngineManifest EngineManifest::parse(const std::string& textValue)
         throw std::runtime_error("unsupported engine manifest format \"" + v.get("format").asString() + "\"");
     EngineManifest m;
     m.engine = v.get("engine").asString();
+    // The id names the install record inside the engine folder, so it must be
+    // a plain name: letters, digits, ".", "_" and "-", and not "." or "..".
+    if (m.engine.empty() || m.engine == "." || m.engine == ".." ||
+        m.engine.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-") !=
+            std::string::npos)
+        throw std::runtime_error("the engine manifest has an invalid engine id \"" + m.engine + "\"");
     m.name = v.get("name").asString(m.engine);
     m.version = v.get("version").asString();
     m.packageVersion = v.get("packageVersion").asString();

@@ -1557,6 +1557,26 @@ int cmdResilience(const Args& a)
         const fs::path inp = pathArg(rest.positional.empty() ? std::string() : rest.positional[0]);
         const auto model = loadModel(rest);
         auto lib = loadEpanet(a, model, inp);
+        // The engine reads the file itself, so a scenario's model is written
+        // next to the project (file references relative to it keep working).
+        fs::path input = inp;
+        const std::string scenario = rest.opt("scenario");
+        struct Scratch
+        {
+            fs::path file;
+            ~Scratch()
+            {
+                std::error_code ec;
+                if (!file.empty())
+                    fs::remove(file, ec);
+            }
+        } scratch;
+        if (!scenario.empty() && !text::iequals(scenario, "base"))
+        {
+            scratch.file = inp.parent_path() / ("." + inp.stem().u8string() + ".mirab-" + what + ".inp");
+            model.save(scratch.file);
+            input = scratch.file;
+        }
         if (what == "criticality")
         {
             resilience::CriticalityOptions o;
@@ -1565,7 +1585,7 @@ int cmdResilience(const Args& a)
             o.minimumPressure = a.num("minimum-pressure", 0.0);
             o.requiredPressure = a.num("required-pressure", 0.0);
             o.links = splitList(a.opt("links"));
-            const auto entries = resilience::pipeCriticality(lib->api(), inp, o, progress);
+            const auto entries = resilience::pipeCriticality(lib->api(), input, o, progress);
             Value list = Value::array();
             for (const auto& e : entries)
             {
@@ -1603,7 +1623,7 @@ int cmdResilience(const Args& a)
             o.maximumFlow = a.num("max-flow", 0.0);
             o.computeAvailableFlow = !a.flag("no-available");
             o.nodes = splitList(a.opt("nodes"));
-            const auto entries = resilience::fireFlow(lib->api(), inp, o, progress);
+            const auto entries = resilience::fireFlow(lib->api(), input, o, progress);
             Value list = Value::array();
             for (const auto& e : entries)
             {
@@ -1672,7 +1692,14 @@ int cmdExport(const Args& a)
     {
         results = core::ResultSet::loadAny(pathArg(a.opt("results")));
         g.results = &results;
-        g.period = static_cast<int>(a.num("period", -1));
+        if (a.has("period"))
+        {
+            const int p = static_cast<int>(a.num("period", 0));
+            if (p < 0 || p >= results.periodCount())
+                throw std::runtime_error("--period must be between 0 and " +
+                                         std::to_string(results.periodCount() - 1));
+            g.period = p;
+        }
     }
     std::vector<std::string> notes;
     if (format == "geojson")

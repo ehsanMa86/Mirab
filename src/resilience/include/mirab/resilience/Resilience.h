@@ -129,7 +129,7 @@ struct FireFlowOptions
 {
     double fireFlow = 0.0;          ///< project flow units
     double residualPressure = 0.0;  ///< project pressure units
-    double timeOfDay = 0.0;         ///< seconds; the pattern time used for the snapshot
+    double timeOfDay = 0.0;         ///< clock time of the snapshot, seconds since midnight
     bool computeAvailableFlow = true;
     double maximumFlow = 0.0;       ///< upper bound of the search (0: 4 x fireFlow)
     std::vector<std::string> nodes; ///< empty: every junction

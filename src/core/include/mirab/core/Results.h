@@ -26,6 +26,7 @@
 
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -107,10 +108,17 @@ public:
 
     /// Reads a binary output file written by EPANET 2.x.
     static ResultSet readEpanetOutput(const std::filesystem::path& path);
-    /// Reads a binary output file written by SWMM 5.x.
-    static ResultSet readSwmmOutput(const std::filesystem::path& path);
-    /// Chooses the reader from the file's magic number.
-    static ResultSet loadAny(const std::filesystem::path& path);
+    /// Reads a binary output file written by SWMM 5.x. @p reportStart is the
+    /// model's report start in seconds from the simulation start (its
+    /// REPORT_START_DATE and REPORT_START_TIME). The file does not hold the
+    /// simulation start when reporting begins later, so without it the times
+    /// are measured from the date in the file's header.
+    static ResultSet readSwmmOutput(const std::filesystem::path& path,
+                                    std::optional<double> reportStart = std::nullopt);
+    /// Chooses the reader from the file's magic number. @p swmmReportStart is
+    /// passed to readSwmmOutput() for a SWMM binary output.
+    static ResultSet loadAny(const std::filesystem::path& path,
+                             std::optional<double> swmmReportStart = std::nullopt);
 };
 
 /// Variables of SWMM results, named as ResultSet::readSwmmOutput() names them.
