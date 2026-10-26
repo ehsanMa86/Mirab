@@ -12,7 +12,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "mirab"
-version = "0.2.5"
+version = "0.2.6"
 description = "Scripting for Mirab water distribution and stormwater models through mirab-cli"
 readme = "README.md"
 requires-python = ">=3.9"
