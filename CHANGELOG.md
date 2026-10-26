@@ -2,6 +2,8 @@
 
 ## 0.2.5 (2026-10-26)
 
+The fixes in this release come from a review of the engine integration by Robert Dickinson, who traced each one to the engine sources and reproduced it.
+
 - SWMM5+ engine (swmm5plus-capi 0.2.3, fetched by *Install SWMM5+*): the total inflow of a junction between two conduits and of an outfall no longer counts its inflow or runoff twice, so the system outflow agrees with the runoff; a missing input or settings file is reported instead of ending the solver.
 - Fix: SWMM results whose reporting starts after the simulation start (REPORT_START_DATE and REPORT_START_TIME later than START) were placed too early, by the report start less one report step. The live view, the exports and calibration now agree with SWMM's report.
 - Fix: `mirab-cli resilience criticality` and `fireflow` solved the base model when `--scenario` was given; they now solve the scenario's model.
