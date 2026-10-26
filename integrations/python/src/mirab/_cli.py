@@ -172,7 +172,7 @@ class Cli:
                            self.command(args)) from exc
 
     def version(self) -> str:
-        """Mirab version, e.g. ``"0.2.5"``."""
+        """Mirab version, e.g. ``"0.2.6"``."""
         return str(self.json(["version", "--json"])["version"])
 
 
