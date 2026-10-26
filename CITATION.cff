@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use Mirab in your work, please cite it as below."
+type: software
+title: "Mirab: water distribution and stormwater modeling with EPANET, SWMM and SWMM5+"
+authors:
+  - family-names: Madadi
+    given-names: Ehsan
+license: GPL-3.0-or-later
+repository-code: "https://github.com/ehsanMa86/Mirab"
+url: "https://ehsanma86.github.io/Mirab/"
+abstract: >-
+  Mirab is a free, cross-platform desktop application for modeling water
+  distribution and stormwater systems. It puts EPA EPANET 2.2, OWA EPANET 2.3,
+  EPANET-MSX 2.0, EPA SWMM 5.2 and the SWMM5+ finite-volume solver behind one
+  interface, with live results, calibration, scenarios, resilience metrics,
+  GIS exchange, a command-line interface and a Python package.
+keywords:
+  - EPANET
+  - SWMM
+  - SWMM5+
+  - water distribution
+  - stormwater
+  - urban drainage
+  - hydraulic modeling

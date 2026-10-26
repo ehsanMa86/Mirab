@@ -1,0 +1,38 @@
+{
+  "title": "Mirab: water distribution and stormwater modeling with EPANET, SWMM and SWMM5+",
+  "upload_type": "software",
+  "description": "<p>Mirab is a free, cross-platform desktop application for modeling water distribution and stormwater systems. It puts several established solvers behind one interface: EPA EPANET 2.2, OWA EPANET 2.3, EPANET-MSX 2.0, EPA SWMM 5.2 and, as an optional add-on, the SWMM5+ finite-volume dynamic-wave solver. The user picks the engine and keeps working in the same project, on the same map, with the same tools. Mirab checks each project against the chosen engine and reports what that engine ignores or cannot run.</p><p>Features include model building and editing for EPANET and SWMM, live results while a simulation runs, basemaps and GeoTIFF elevation models, network tracing and selection queries, calibration against observed data (NSE, KGE, PBIAS, RMSE, R²) with automated parameter search, scenarios with a comparison report and difference map, resilience metrics (Todini index, water service availability, pipe criticality, fire-flow capacity), GIS and WNTR data exchange, print layouts and report documents, a command-line interface with JSON output and a Python package. The input file remains the master copy: Mirab writes standard EPANET and SWMM files.</p><p>Mirab runs on Windows, macOS and Linux and needs no other software. The changes in each version are listed in the changelog: https://ehsanma86.github.io/Mirab/changelog/</p>",
+  "creators": [
+    {
+      "name": "Madadi, Ehsan"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Dickinson, Robert",
+      "type": "Other"
+    }
+  ],
+  "license": "gpl-3.0-or-later",
+  "keywords": [
+    "EPANET",
+    "SWMM",
+    "SWMM5+",
+    "water distribution",
+    "stormwater",
+    "urban drainage",
+    "hydraulic modeling",
+    "water quality",
+    "resilience",
+    "calibration",
+    "GIS",
+    "desktop application"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://ehsanma86.github.io/Mirab/",
+      "relation": "isDocumentedBy",
+      "resource_type": "publication-softwaredocumentation"
+    }
+  ]
+}
