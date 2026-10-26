@@ -7,6 +7,11 @@ authors:
     given-names: Ehsan
 license: GPL-3.0-or-later
 repository-code: "https://github.com/ehsanMa86/Mirab"
+doi: 10.5281/zenodo.23679047
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23679047
+    description: All versions (concept DOI); resolves to the latest version.
 url: "https://ehsanma86.github.io/Mirab/"
 abstract: >-
   Mirab is a free, cross-platform desktop application for modeling water
