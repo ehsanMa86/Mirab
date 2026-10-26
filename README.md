@@ -98,7 +98,7 @@ The documentation is also published as a website: <https://ehsanma86.github.io/M
 
 ## Feedback and contributing
 
-Report problems and suggest features in [Issues](https://github.com/ehsanMa86/Mirab/issues/new/choose). Code contributions are welcome as pull requests; [CONTRIBUTING.md](CONTRIBUTING.md) explains how to build, test and submit them. Report security problems privately as described in [SECURITY.md](SECURITY.md).
+Report problems and suggest features in [Issues](https://github.com/ehsanMa86/Mirab/issues/new/choose). Code contributions are welcome as pull requests; [CONTRIBUTING.md](CONTRIBUTING.md) explains how to build, test and submit them. Report security problems privately as described in [SECURITY.md](SECURITY.md). Thanks to Robert Dickinson for the review of the engine integration behind release 0.2.5; everyone who helped is named in [AUTHORS](AUTHORS).
 
 ## License
 
