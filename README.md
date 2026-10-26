@@ -4,6 +4,8 @@
 
 # Mirab
 
+[![CI](https://github.com/ehsanMa86/Mirab/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ehsanMa86/Mirab/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ehsanMa86/Mirab)](https://github.com/ehsanMa86/Mirab/releases/latest) [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23679047.svg)](https://doi.org/10.5281/zenodo.23679047)
+
 Mirab is a free, cross-platform desktop application for modeling water distribution and stormwater systems. It puts several established solvers behind one interface, so you pick the engine and keep working in the same project, on the same map, with the same tools.
 
 | Engine | Use it for | Provider |
@@ -99,6 +101,10 @@ The documentation is also published as a website: <https://ehsanma86.github.io/M
 ## Feedback and contributing
 
 Report problems and suggest features in [Issues](https://github.com/ehsanMa86/Mirab/issues/new/choose). Code contributions are welcome as pull requests; [CONTRIBUTING.md](CONTRIBUTING.md) explains how to build, test and submit them. Report security problems privately as described in [SECURITY.md](SECURITY.md). Thanks to Robert Dickinson for the review of the engine integration behind release 0.2.5; everyone who helped is named in [AUTHORS](AUTHORS).
+
+## Citing
+
+Each release from 0.2.6 on is archived on Zenodo. Cite the version you used, or all versions with [10.5281/zenodo.23679047](https://doi.org/10.5281/zenodo.23679047); GitHub's *Cite this repository* button gives the reference from [CITATION.cff](CITATION.cff). Please also cite the simulation engines your results come from.
 
 ## License
 
