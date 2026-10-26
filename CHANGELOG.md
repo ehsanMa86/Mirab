@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.6 (2026-10-26)
+
+- Mirab is archived on Zenodo with a DOI for each release from this one on, and GitHub offers *Cite this repository* (`CITATION.cff`).
+- `AUTHORS`, the README and the website name the people who have helped, starting with Robert Dickinson, whose review led to the fixes in 0.2.5.
+- No changes to the application since 0.2.5.
+
 ## 0.2.5 (2026-10-26)
 
 The fixes in this release come from a review of the engine integration by Robert Dickinson, who traced each one to the engine sources and reproduced it.
