@@ -569,7 +569,7 @@ The translations are maintained in `translations/` of the source tree; [translat
 
 | Option | Effect |
 |---|---|
-| `--language CODE` | Starts in a language: `en`, `fa`, `ar`, `es`, `zh_CN` or `system` (default: the language chosen in *Tools > Settings*). |
+| `--language CODE` | Starts in a language: `en`, `fa`, `ar`, `he`, `es`, `pt_BR`, `fr`, `it`, `de`, `zh_CN`, `zh_TW` or `system` (default: the language chosen in *Tools > Settings*). |
 | `--import FILE` | Opens the import dialog for a shapefile, DXF drawing or CSV table. |
 | `--show-data SECTION:ID` | Opens the editor of a pattern, curve, time series, named object, LID control, transect or unit hydrograph group, for example `PATTERNS:PAT1`, `POLLUTANTS:TSS` or `LID_CONTROLS:Cell1`; `CONTROLS:` or `RULES:` opens the control rules and `LID_USAGE:S1` the LID usage of subcatchment S1. |
 | `--options-dialog PAGE` | Opens the simulation options dialog at a page: `general`, `dates`, `steps`, `dynwave`, `files`, `report`, `evaporation`, `climate`, `adjustments` (SWMM) or `hydraulics`, `quality`, `times`, `energy`, `report` (EPANET). |
